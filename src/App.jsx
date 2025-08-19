@@ -24,7 +24,7 @@ export default function App() {
 
     // 커스텀 훅 사용
     const { audioStates, playAudio, clearNewsAudioCache, clearOldExpressionsAudioCache } = useAudio();
-    const { translateText, summarizeText, clearOldTranslations } = useTranslation();
+    const { translateText, summarizeText, generateExamples, clearOldTranslations } = useTranslation();
     const { loading, error, fetchExpressions, fetchNews, initializeData } = useDataFetching();
 
     const levels = useMemo(() => ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'], []);
@@ -143,6 +143,7 @@ export default function App() {
                 onClose={closeWordModal}
                 onPlayAudio={playAudio}
                 audioStates={audioStates}
+                onGenerateExamples={generateExamples}
             />
 
             {/* 플로팅 스크롤 버튼 */}

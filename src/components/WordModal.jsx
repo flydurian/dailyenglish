@@ -1,7 +1,31 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Volume2Icon, LoaderIcon, CloseIcon } from './Icons';
 
-const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPlayAudio, audioStates }) => {
+const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPlayAudio, audioStates, onGenerateExamples }) => {
+    const [examples, setExamples] = useState([]);
+    const [isGeneratingExamples, setIsGeneratingExamples] = useState(false);
+
+    // 모달이 열리고 단어가 변경될 때 예문 생성
+    useEffect(() => {
+        if (isOpen && word && meaning) {
+            const generateWordExamples = async () => {
+                setIsGeneratingExamples(true);
+                try {
+                    const generatedExamples = await onGenerateExamples(word, meaning);
+                    setExamples(generatedExamples);
+                } catch (error) {
+                    console.error('예문 생성 실패:', error);
+                    setExamples([]);
+                } finally {
+                    setIsGeneratingExamples(false);
+                }
+            };
+            generateWordExamples();
+        } else {
+            setExamples([]);
+        }
+    }, [isOpen, word, meaning, onGenerateExamples]);
+
     if (!isOpen) return null;
 
     return (
@@ -89,6 +113,48 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
                             </div>
                         </div>
                     )}
+                    
+                    {/* 동적 생성 예문 */}
+                    <div>
+                        <h5 className="font-semibold text-gray-600 mb-2 mobile-text">예문</h5>
+                        {isGeneratingExamples ? (
+                            <div className="flex items-center justify-center p-4">
+                                <LoaderIcon size="h-5 w-5" />
+                                <span className="ml-2 text-gray-500 mobile-text">예문 생성 중...</span>
+                            </div>
+                        ) : examples.length > 0 ? (
+                            <div className="space-y-2">
+                                {examples.map((example, index) => (
+                                    <div key={index} className="bg-gray-50 p-3 rounded-lg">
+                                        <p className="text-gray-700 italic mobile-text">"{example}"</p>
+                                        <button 
+                                            onClick={() => onPlayAudio(example)}
+                                            className={`mt-2 text-sm px-3 py-1 rounded transition-colors ${
+                                                audioStates[example] === 'loading' 
+                                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                                                    : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+                                            }`}
+                                            disabled={audioStates[example] === 'loading'}
+                                        >
+                                            {audioStates[example] === 'loading' ? (
+                                                <div className="flex items-center">
+                                                    <LoaderIcon size="h-3 w-3" />
+                                                    <span className="ml-1">생성 중...</span>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center">
+                                                    <Volume2Icon className="h-3 w-3" />
+                                                    <span className="ml-1">듣기</span>
+                                                </div>
+                                            )}
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-gray-500 italic mobile-text">예문을 생성할 수 없습니다.</p>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
