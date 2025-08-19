@@ -52,6 +52,18 @@ const NewsCard = ({ news, index, isActive, onToggle, audioStates, onPlayAudio, o
         setShowLearningMaterials(!showLearningMaterials);
     }, [showLearningMaterials]);
 
+    // news가 변경될 때 번역 상태 초기화
+    useEffect(() => {
+        setShowTitleTranslation(false);
+        setShowArticleTranslation(false);
+        setTitleTranslation('');
+        setArticleTranslation('');
+        setIsTranslatingTitle(false);
+        setIsTranslatingArticle(false);
+        setSummarizedText('');
+        setIsSummarizing(false);
+    }, [news.title, news.full_text]);
+
     // 컴포넌트 마운트 시 요약된 텍스트 가져오기
     useEffect(() => {
         const getSummarizedText = async () => {
@@ -216,8 +228,7 @@ const NewsCard = ({ news, index, isActive, onToggle, audioStates, onPlayAudio, o
                                                     onClick={(e) => handleWordClick(e, word.word, word.meaning, word.example, {
                                                         type: 'vocabulary',
                                                         context: '뉴스 기사에서 사용된 단어',
-                                                        frequency: 'high',
-                                                        collocations: ['뉴스에서 자주 사용되는 표현']
+                                                        frequency: 'high'
                                                     })}
                                                     className="text-left hover:bg-indigo-50 p-1.5 rounded transition-colors text-xs touch-optimized"
                                                 >

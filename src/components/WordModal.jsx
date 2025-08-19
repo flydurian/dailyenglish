@@ -79,16 +79,7 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
                                         <span className="ml-2 text-gray-800">{detailedInfo.frequency}</span>
                                     </div>
                                 )}
-                                                                        {detailedInfo.examples && (
-                                            <div>
-                                                <span className="font-medium text-gray-600">추가 예문:</span>
-                                                <ul className="mt-1 ml-4 text-gray-700">
-                                                    {detailedInfo.examples.map((example, i) => (
-                                                        <li key={i} className="mobile-text italic">• {example}</li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        )}
+                                        
                                 {detailedInfo.synonyms && (
                                     <div>
                                         <span className="font-medium text-gray-600">동의어:</span>
@@ -98,33 +89,6 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
                             </div>
                         </div>
                     )}
-                    
-                    <div>
-                        <h5 className="font-semibold text-gray-600 mb-2 mobile-text">예문</h5>
-                        <p className="text-gray-700 italic mobile-text">"{example}"</p>
-                    </div>
-                    
-                    <button 
-                        onClick={() => onPlayAudio(example)}
-                        className={`w-full p-3 rounded-lg transition-colors ${
-                            audioStates[example] === 'loading' 
-                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                                : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
-                        }`}
-                        disabled={audioStates[example] === 'loading'}
-                    >
-                        {audioStates[example] === 'loading' ? (
-                            <div className="flex items-center justify-center">
-                                <LoaderIcon size="h-5 w-5" />
-                                <span className="ml-2 mobile-text">음성 생성 중...</span>
-                            </div>
-                        ) : (
-                            <div className="flex items-center justify-center">
-                                <Volume2Icon />
-                                <span className="ml-2 mobile-text">예문 듣기</span>
-                            </div>
-                        )}
-                    </button>
                 </div>
             </div>
         </div>

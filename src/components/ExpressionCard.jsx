@@ -1,10 +1,17 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Volume2Icon, TranslateIcon, LoaderIcon } from './Icons';
 
 const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, onPlayAudio, onWordClick, onTranslate }) => {
     const [showTranslation, setShowTranslation] = useState(false);
     const [translation, setTranslation] = useState('');
     const [isTranslating, setIsTranslating] = useState(false);
+    
+    // expression이 변경될 때 번역 상태 초기화
+    useEffect(() => {
+        setShowTranslation(false);
+        setTranslation('');
+        setIsTranslating(false);
+    }, [expression.sentence]);
     
     const handleCardClick = useCallback(() => {
         onToggle(index);
@@ -94,11 +101,6 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
                             onClick={(e) => handleWordClick(e, expression.phrasal_verb, expression.meaning, expression.sentence, {
                                 type: 'phrasal_verb',
                                 usage: '일상 대화에서 자주 사용되는 구동사',
-                                examples: [
-                                    'I need to look up that word in the dictionary.',
-                                    'She always looks after her younger brother.',
-                                    'Let\'s look into this problem together.'
-                                ],
                                 synonyms: ['investigate', 'examine', 'research'],
                                 formality: 'informal to formal'
                             })}
@@ -121,10 +123,7 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
                                     key={i}
                                     onClick={(e) => handleWordClick(e, word.word, word.meaning, word.example || expression.sentence, {
                                         type: 'vocabulary',
-                                        part_of_speech: 'noun/verb/adjective',
-                                        frequency: 'high/medium/low',
-                                        collocations: ['common phrases with this word'],
-                                        etymology: 'word origin information'
+                                        frequency: 'high'
                                     })}
                                     className="text-left hover:bg-gray-50 p-1.5 rounded transition-colors text-xs touch-optimized"
                                 >
