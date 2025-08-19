@@ -1,0 +1,384 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* 모바일 터치 최적화 */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  overscroll-behavior: none;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* 커스텀 스크롤바 */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* 포커스 스타일 */
+button:focus,
+input:focus {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+/* 접근성 개선 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* 커스텀 애니메이션 */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.3s ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out;
+}
+
+/* 호버 효과 개선 */
+.hover-lift {
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* 로딩 스피너 개선 */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* 그라데이션 배경 */
+.gradient-bg {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* 텍스트 선택 개선 */
+::selection {
+  background-color: #6366f1;
+  color: white;
+}
+
+/* 다크 모드 지원 (향후 확장용) */
+@media (prefers-color-scheme: dark) {
+  /* 다크 모드 스타일은 향후 추가 */
+}
+
+/* 모바일 최적화 */
+@media (max-width: 640px) {
+  .mobile-optimized {
+    font-size: 14px;
+    line-height: 1.4;
+  }
+}
+
+/* 성능 최적화 */
+.will-change-transform {
+  will-change: transform;
+}
+
+.will-change-opacity {
+  will-change: opacity;
+}
+
+/* 모바일 터치 최적화 스타일 */
+.touch-optimized {
+  /* 터치 영역 최소 32px (더 효율적) */
+  min-height: 32px;
+  min-width: 32px;
+  /* 터치 피드백 */
+  -webkit-tap-highlight-color: rgba(99, 102, 241, 0.1);
+  /* 부드러운 터치 반응 */
+  transition: all 0.15s ease-out;
+  /* 터치 액션 최적화 */
+  touch-action: manipulation;
+  /* 사용자 선택 방지 */
+  user-select: none;
+}
+
+.touch-optimized:active {
+  transform: scale(0.95);
+  background-color: rgba(99, 102, 241, 0.05);
+}
+
+/* 아이콘 버튼 최적화 */
+.icon-button {
+  /* 아이콘 크기에 맞는 터치 영역 */
+  min-height: 40px;
+  min-width: 40px;
+  /* 터치 피드백 */
+  -webkit-tap-highlight-color: rgba(99, 102, 241, 0.1);
+  /* 부드러운 터치 반응 */
+  transition: all 0.15s ease-out;
+  /* 터치 액션 최적화 */
+  touch-action: manipulation;
+  /* 사용자 선택 방지 */
+  user-select: none;
+}
+
+.icon-button:active {
+  transform: scale(0.95);
+  background-color: rgba(99, 102, 241, 0.05);
+}
+
+/* 카드 확장 영역 터치 최적화 */
+.card-expanded {
+  overflow: hidden;
+  transition: max-height 0.5s ease-in-out, opacity 0.5s ease-in-out;
+}
+
+.card-expanded-content {
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+/* 모바일 버튼 스타일 */
+.mobile-button {
+  @apply touch-optimized;
+  @apply flex items-center justify-center;
+  @apply rounded-lg;
+  @apply font-medium;
+  @apply select-none;
+  /* 터치 시 시각적 피드백 */
+  @apply active:scale-95;
+  @apply active:bg-opacity-80;
+}
+
+/* 모바일 카드 스타일 */
+.mobile-card {
+  @apply touch-optimized;
+  @apply rounded-xl;
+  @apply shadow-md;
+  @apply transition-all;
+  @apply duration-200;
+  /* 터치 시 시각적 피드백 */
+  @apply active:scale-95;
+  @apply active:shadow-lg;
+}
+
+/* 모바일 스와이프 제스처 지원 */
+.swipeable {
+  touch-action: pan-y;
+  user-select: none;
+}
+
+/* 모바일 스크롤 최적화 */
+.mobile-scroll {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* 모바일 텍스트 크기 최적화 */
+.mobile-text {
+  font-size: clamp(14px, 4vw, 16px);
+  line-height: 1.5;
+}
+
+.mobile-text-large {
+  font-size: clamp(16px, 5vw, 20px);
+  line-height: 1.4;
+}
+
+/* 모바일 간격 최적화 */
+.mobile-spacing {
+  padding: clamp(12px, 3vw, 16px);
+  margin: clamp(8px, 2vw, 12px);
+}
+
+/* 모바일 그리드 최적화 */
+.mobile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: clamp(8px, 2vw, 12px);
+}
+
+/* 모바일 플로팅 버튼 */
+.mobile-floating {
+  position: fixed;
+  bottom: env(safe-area-inset-bottom, 20px);
+  right: env(safe-area-inset-right, 20px);
+  z-index: 50;
+  /* 터치 영역 확대 */
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  @apply touch-optimized;
+  @apply shadow-lg;
+  /* 그림자 효과 */
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  transition: all 0.2s ease-out;
+}
+
+.mobile-floating:active {
+  transform: scale(0.95);
+  background-color: rgba(99, 102, 241, 0.8);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+}
+
+.mobile-floating:hover {
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+}
+
+/* 모바일 모달 최적화 */
+.mobile-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  /* 안전 영역 고려 */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* 모바일 입력 필드 최적화 */
+.mobile-input {
+  @apply touch-optimized;
+  @apply rounded-lg;
+  @apply border;
+  @apply border-gray-300;
+  @apply px-4;
+  @apply py-3;
+  @apply text-base;
+  /* 모바일에서 자동 확대 방지 */
+  font-size: 16px;
+  /* 터치 시 포커스 */
+  @apply focus:border-indigo-500;
+  @apply focus:ring-2;
+  @apply focus:ring-indigo-200;
+}
+
+/* 모바일 탭 최적화 */
+.mobile-tabs {
+  @apply flex;
+  @apply rounded-lg;
+  @apply bg-gray-100;
+  @apply p-1;
+  @apply gap-1;
+}
+
+.mobile-tab {
+  @apply touch-optimized;
+  @apply flex-1;
+  @apply py-3;
+  @apply px-4;
+  @apply rounded-md;
+  @apply text-sm;
+  @apply font-semibold;
+  @apply transition-all;
+  @apply duration-200;
+  @apply text-center;
+}
+
+/* 모바일 리스트 최적화 */
+.mobile-list {
+  @apply space-y-2;
+}
+
+.mobile-list-item {
+  @apply touch-optimized;
+  @apply rounded-lg;
+  @apply p-4;
+  @apply bg-white;
+  @apply shadow-sm;
+  @apply transition-all;
+  @apply duration-200;
+}
+
+/* 모바일 헤더 최적화 */
+.mobile-header {
+  @apply sticky;
+  @apply top-0;
+  @apply z-40;
+  @apply bg-white;
+  @apply shadow-sm;
+  @apply px-4;
+  @apply py-3;
+  /* 안전 영역 고려 */
+  padding-top: max(12px, env(safe-area-inset-top));
+}
+
+/* 모바일 푸터 최적화 */
+.mobile-footer {
+  @apply px-4;
+  @apply py-6;
+  @apply text-center;
+  /* 안전 영역 고려 */
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+}

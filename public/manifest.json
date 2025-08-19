@@ -1,0 +1,16 @@
+{
+  "short_name": "영어 표현",
+  "name": "오늘의 영어 표현",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#6366f1",
+  "background_color": "#f9fafb",
+  "description": "매일 3개의 영어 구동사를 학습하는 앱"
+}
