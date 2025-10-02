@@ -1,14 +1,13 @@
 // API 호출 유틸리티 함수들
 export const callGeminiAPI = async (payload, model, maxRetries = 3) => {
-    const API_KEY = process.env.REACT_APP_GEMINI_API_KEY || "";
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`;
+    const apiUrl = '/api/gemini'; // 서버 사이드 엔드포인트 사용
     
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({ payload, model })
             });
             
             if (!response.ok) {
