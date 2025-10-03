@@ -394,7 +394,7 @@ export default function App() {
         clearOldAudioCache,
         clearAllAudioCache
     } = useAudio();
-    const { translateText, summarizeText, generateExamples, translations } = useTranslation();
+    const { translateText, summarizeText, generateExamples, translations, isLoading: isTranslating, error: translationError } = useTranslation();
     const { loading, error, fetchExpressions, fetchNews, initializeData } = useDataFetching();
 
     const levels = useMemo(() => ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'], []);

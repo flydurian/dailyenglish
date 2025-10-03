@@ -88,21 +88,22 @@ const ExampleContent = styled.div`
 
 const ExampleText = styled.p`
   color: #ffffff;
-  font-size: clamp(18px, 4vw, 24px);
-  font-weight: 500;
-  line-height: 1.6;
+  font-size: clamp(20px, 4.5vw, 28px);
+  font-weight: 700;
+  line-height: 1.4;
   margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
   
   @media (max-width: 768px) {
-    font-size: clamp(16px, 3.5vw, 22px);
+    font-size: clamp(18px, 4vw, 24px);
   }
   
   @media (max-width: 640px) {
-    font-size: clamp(14px, 3vw, 20px);
+    font-size: clamp(16px, 3.5vw, 22px);
   }
   
   @media (max-width: 480px) {
-    font-size: clamp(12px, 2.5vw, 18px);
+    font-size: clamp(14px, 3vw, 20px);
   }
 `;
 
@@ -129,12 +130,12 @@ const ActionButton = styled.button`
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px;
+  padding: 3px;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 2px 8px rgba(0, 212, 255, 0.3);
   touch-action: manipulation;
-  min-width: 40px;
-  min-height: 40px;
+  min-width: 24px;
+  min-height: 24px;
   
   &:hover {
     transform: scale(1.1);
@@ -152,15 +153,15 @@ const ActionButton = styled.button`
   }
   
   @media (max-width: 768px) {
-    padding: 6px;
-    min-width: 36px;
-    min-height: 36px;
+    padding: 2px;
+    min-width: 20px;
+    min-height: 20px;
   }
   
   @media (max-width: 480px) {
-    padding: 4px;
-    min-width: 32px;
-    min-height: 32px;
+    padding: 1px;
+    min-width: 18px;
+    min-height: 18px;
   }
 `;
 
@@ -250,20 +251,21 @@ const KeyWordsTitle = styled.h3`
 
 const KeyWordsGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   
   @media (max-width: 768px) {
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
     gap: 10px;
   }
   
   @media (max-width: 640px) {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
     gap: 8px;
   }
   
   @media (max-width: 480px) {
+    grid-template-columns: 1fr;
     gap: 6px;
   }
 `;
@@ -274,14 +276,14 @@ const KeyWordCard = styled.button`
   border-radius: 16px;
   color: #ffffff;
   cursor: pointer;
-  padding: 16px;
-  text-align: left;
+  padding: 12px;
+  text-align: center;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 
     0 8px 24px rgba(0, 0, 0, 0.3),
     0 0 0 1px rgba(0, 212, 255, 0.05);
   touch-action: manipulation;
-  min-height: 70px;
+  min-height: 60px;
   
   &:hover {
     transform: translateY(-2px) scale(1.02);
@@ -418,16 +420,16 @@ const DetailTitle = styled.h3`
 
 const DetailContent = styled.div`
   color: #ffffff;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.6;
   margin-bottom: 16px;
   
   @media (max-width: 768px) {
-    font-size: 13px;
+    font-size: 14px;
   }
   
   @media (max-width: 480px) {
-    font-size: 12px;
+    font-size: 13px;
   }
 `;
 
@@ -461,17 +463,17 @@ const UsageExample = styled.div`
 
 const DetailExampleText = styled.p`
   color: #ffffff;
-  font-weight: 500;
+  font-weight: 700;
   margin: 0;
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: clamp(18px, 4vw, 24px);
+  line-height: 1.4;
   
   @media (max-width: 768px) {
-    font-size: 13px;
+    font-size: clamp(16px, 3.5vw, 20px);
   }
   
   @media (max-width: 480px) {
-    font-size: 12px;
+    font-size: clamp(14px, 3vw, 18px);
   }
 `;
 
@@ -495,8 +497,8 @@ const SmallActionButton = styled.button`
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 2px 8px rgba(0, 212, 255, 0.3);
   touch-action: manipulation;
-  min-width: 14px;
-  min-height: 14px;
+  min-width: 12px;
+  min-height: 12px;
   
   &:hover {
     transform: scale(1.1);
@@ -512,9 +514,15 @@ const SmallActionButton = styled.button`
     cursor: not-allowed;
   }
   
+  @media (max-width: 768px) {
+    min-width: 10px;
+    min-height: 10px;
+    padding: 2px;
+  }
+  
   @media (max-width: 480px) {
-    min-width: 12px;
-    min-height: 12px;
+    min-width: 8px;
+    min-height: 8px;
     padding: 1px;
   }
 `;
@@ -533,6 +541,7 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
     const [showTranslation, setShowTranslation] = useState(false);
     const [translation, setTranslation] = useState('');
     const [isTranslating, setIsTranslating] = useState(false);
+    const [exampleTranslations, setExampleTranslations] = useState({});
     const [showPhrasalVerbDetail, setShowPhrasalVerbDetail] = useState(false);
     
     // expression이 변경될 때 번역 상태 초기화
@@ -554,7 +563,15 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
 
     const handleTranslateClick = useCallback(async (e) => {
         e.stopPropagation();
-        if (!showTranslation && !translation) {
+        
+        // 이미 번역이 표시 중이면 토글로 숨기기
+        if (showTranslation) {
+            setShowTranslation(false);
+            return;
+        }
+        
+        // 번역이 없으면 번역 요청
+        if (!translation) {
             setIsTranslating(true);
             // 문장에서 마크다운 형식 제거 후 번역
             const cleanSentence = expression.sentence.replace(/\*\*(.*?)\*\*/g, '$1');
@@ -562,7 +579,9 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
             setTranslation(result);
             setIsTranslating(false);
         }
-        setShowTranslation(!showTranslation);
+        
+        // 번역 표시
+        setShowTranslation(true);
     }, [showTranslation, translation, onTranslate, expression.sentence]);
 
     const handleWordClick = useCallback((e, word, meaning, example, detailedInfo) => {
@@ -604,51 +623,51 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
         
         const details = {
             'figure out': {
-                nuance: '생각과 분석을 통해 결론에 도달하는 과정을 강조하는 뉘앙스. 단순히 아는 것이 아니라 "파악하고 이해하는" 능동적인 과정을 나타냅니다.',
-                usage: '어려운 문제를 해결하거나, 복잡한 상황을 이해하려고 할 때 사용합니다. 수학 문제, 사람의 의도, 비용 계산 등 "알아내야 하는" 상황에서 자주 쓰입니다.',
+                nuance: '생각과 분석을 통해 결론에 도달하는 과정을 강조하는 뉘앙스입니다. 단순히 "알다"가 아니라 "파악하고 이해하는" 능동적이고 체계적인 사고 과정을 나타냅니다. 이 구동사는 문제 해결의 과정에서 논리적 추론과 분석을 거쳐 답을 찾아내는 뇌의 활동을 강조합니다. 특히 복잡하거나 어려운 문제를 해결할 때 사용되며, 단순한 암기나 기억이 아닌 능동적인 사고 과정을 의미합니다.',
+                usage: '어려운 문제를 해결하거나, 복잡한 상황을 이해하려고 할 때 사용합니다. 수학 문제, 사람의 의도 파악, 비용 계산, 기술적 문제 해결 등 "알아내야 하는" 상황에서 자주 쓰입니다. 또한 추상적인 개념을 이해하거나, 복잡한 시스템의 작동 원리를 파악할 때도 사용됩니다. 이 구동사는 문제 해결 과정에서의 인지적 노력과 사고 과정을 강조하므로, 단순한 정보 전달보다는 깊이 있는 이해가 필요한 상황에서 사용됩니다.',
                 situations: [
-                    '"I can\'t figure out this math problem."',
-                    '"Can you figure out what he means?"'
+                    'I can\'t figure out this math problem.',
+                    'Can you figure out what he means?'
                 ]
             },
             'look into': {
-                nuance: '신중하고 체계적인 조사를 의미하는 뉘앙스. 단순히 "보다"가 아니라 "깊이 살펴보고 조사하는" 전문적이고 신중한 태도를 나타냅니다.',
-                usage: '문제나 사건을 조사하거나, 불만사항을 검토할 때 사용합니다. 경찰이 사건을 조사하거나, 회사에서 고객 불만을 처리할 때 자주 쓰입니다.',
+                nuance: '신중하고 체계적인 조사를 의미하는 뉘앙스입니다. 단순히 "보다"가 아니라 "깊이 살펴보고 조사하는" 전문적이고 신중한 태도를 나타냅니다. 이 구동사는 표면적인 관찰을 넘어서 내부적인 원인과 배경을 파악하려는 의도를 담고 있습니다. 특히 문제나 사건의 근본 원인을 찾기 위한 체계적인 접근 방식을 의미하며, 단순한 확인이 아닌 철저한 검토와 분석을 포함합니다.',
+                usage: '문제나 사건을 조사하거나, 불만사항을 검토할 때 사용합니다. 경찰이 사건을 조사하거나, 회사에서 고객 불만을 처리할 때, 연구자가 특정 현상을 분석할 때 자주 쓰입니다. 또한 개인적인 문제나 상황에 대해 더 깊이 알아보고 싶을 때도 사용됩니다. 이 구동사는 조사의 목적과 의도를 명확히 하며, 단순한 확인이 아닌 체계적인 검토 과정을 강조합니다.',
                 situations: [
-                    '"The police will look into the matter."',
-                    '"I\'ll look into your complaint."'
+                    'The police will look into the matter.',
+                    'I\'ll look into your complaint.'
                 ]
             },
             'come up with': {
-                nuance: '창의적이고 즉흥적인 아이디어 생성의 뉘앙스. "나타나다, 생겨나다"는 의미에서 "새로운 것을 만들어내는" 창조적 과정을 강조합니다.',
-                usage: '회의에서 새로운 아이디어를 제안하거나, 문제 해결책을 찾을 때 사용합니다. 브레인스토밍이나 창의적 사고가 필요한 상황에서 자주 쓰입니다.',
+                nuance: '창의적이고 즉흥적인 아이디어 생성의 뉘앙스입니다. "나타나다, 생겨나다"는 의미에서 "새로운 것을 만들어내는" 창조적 과정을 강조합니다. 이 구동사는 기존에 없던 새로운 것을 만들어내는 능동적이고 창의적인 사고 과정을 나타냅니다. 특히 문제 해결을 위한 새로운 접근법이나 혁신적인 아이디어를 제시할 때 사용되며, 단순한 모방이나 복사가 아닌 독창적인 창조 과정을 의미합니다.',
+                usage: '회의에서 새로운 아이디어를 제안하거나, 문제 해결책을 찾을 때 사용합니다. 브레인스토밍이나 창의적 사고가 필요한 상황에서 자주 쓰입니다. 또한 예술 작품을 만들거나, 새로운 비즈니스 모델을 개발할 때도 사용됩니다. 이 구동사는 창의성과 혁신을 강조하므로, 기존의 방법으로는 해결할 수 없는 문제에 대한 새로운 접근법을 제시할 때 사용됩니다.',
                 situations: [
-                    '"Can you come up with a better plan?"',
-                    '"We need to come up with a solution."'
+                    'Can you come up with a better plan?',
+                    'We need to come up with a solution.'
                 ]
             },
             'put up with': {
-                nuance: '불만스럽지만 어쩔 수 없이 참고 견디는 뉘앙스. "올려놓고 견디다"는 의미에서 "불쾌한 것을 감내하는" 부정적이지만 인내심 있는 태도를 나타냅니다.',
-                usage: '시끄러운 소음, 어려운 사람, 불편한 상황을 참고 견딜 때 사용합니다. 불만이 있지만 어쩔 수 없이 받아들여야 하는 상황에서 자주 쓰입니다.',
+                nuance: '불만스럽지만 어쩔 수 없이 참고 견디는 뉘앙스입니다. "올려놓고 견디다"는 의미에서 "불쾌한 것을 감내하는" 부정적이지만 인내심 있는 태도를 나타냅니다. 이 구동사는 개인의 의지와는 상관없이 주어진 상황을 받아들이고 견뎌내는 과정을 강조합니다. 특히 선택의 여지가 없거나 피할 수 없는 상황에서의 인내와 관용을 의미하며, 단순한 참는 것이 아닌 적극적인 수용과 적응의 과정을 포함합니다.',
+                usage: '시끄러운 소음, 어려운 사람, 불편한 상황을 참고 견딜 때 사용합니다. 불만이 있지만 어쩔 수 없이 받아들여야 하는 상황에서 자주 쓰입니다. 또한 가족이나 동료와의 갈등 상황에서, 또는 사회적 제약이나 규칙을 받아들일 때도 사용됩니다. 이 구동사는 개인의 감정과 의지보다는 현실적인 필요나 상황에 따른 선택을 강조하므로, 이상적이지 않지만 현실적으로 받아들여야 하는 상황에서 사용됩니다.',
                 situations: [
-                    '"I can\'t put up with this noise anymore."',
-                    '"How do you put up with him?"'
+                    'I can\'t put up with this noise anymore.',
+                    'How do you put up with him?'
                 ]
             },
             'get over': {
-                nuance: '시간이 지나면서 자연스럽게 극복되는 과정의 뉘앙스. "넘어서다"라는 의미에서 "어려움을 뒤로 하고 앞으로 나아가는" 회복과 성장의 과정을 나타냅니다.',
-                usage: '이별, 질병, 실망 같은 어려운 상황에서 회복할 때 사용합니다. 시간이 지나면서 자연스럽게 극복되는 과정을 나타냅니다.',
+                nuance: '시간이 지나면서 자연스럽게 극복되는 과정의 뉘앙스입니다. "넘어서다"라는 의미에서 "어려움을 뒤로 하고 앞으로 나아가는" 회복과 성장의 과정을 나타냅니다. 이 구동사는 개인의 내적 성장과 회복력을 강조하며, 단순한 시간의 경과가 아닌 적극적인 극복과 성장의 과정을 의미합니다. 특히 감정적 상처나 어려운 경험을 통해 더 강해지고 성숙해지는 과정을 나타냅니다.',
+                usage: '이별, 질병, 실망 같은 어려운 상황에서 회복할 때 사용합니다. 시간이 지나면서 자연스럽게 극복되는 과정을 나타내며, 개인의 내적 성장과 회복력을 강조합니다. 또한 과거의 트라우마나 상처를 극복하고 새로운 시작을 할 때도 사용됩니다. 이 구동사는 단순한 시간의 경과가 아닌 적극적인 극복과 성장의 과정을 강조하므로, 개인의 의지와 노력이 필요한 상황에서 사용됩니다.',
                 situations: [
-                    '"It took time to get over the breakup."',
-                    '"I finally got over the flu."'
+                    'It took time to get over the breakup.',
+                    'I finally got over the flu.'
                 ]
             },
             'run out of': {
-                nuance: '갑작스럽고 예상치 못한 부족함의 뉘앙스. "달려나가서 떠나다"는 의미에서 "갑자기 없어져버리는" 놀라움과 당황스러움을 동시에 나타냅니다.',
-                usage: '우유, 시간, 빵 같은 것들이 갑자기 떨어졌을 때 사용합니다. 예상치 못하게 부족해진 상황에서 자주 쓰입니다.',
+                nuance: '갑작스럽고 예상치 못한 부족함의 뉘앙스입니다. "달려나가서 떠나다"는 의미에서 "갑자기 없어져버리는" 놀라움과 당황스러움을 동시에 나타냅니다. 이 구동사는 예상치 못한 상황의 급작스러운 변화를 강조하며, 단순한 부족함이 아닌 갑작스러운 결핍 상태를 의미합니다. 특히 일상적인 흐름이 갑자기 중단되는 상황에서의 당황과 긴급함을 나타냅니다.',
+                usage: '우유, 시간, 빵 같은 것들이 갑자기 떨어졌을 때 사용합니다. 예상치 못하게 부족해진 상황에서 자주 쓰이며, 특히 일상적인 흐름이 갑자기 중단되는 상황에서 사용됩니다. 또한 에너지, 인내심, 아이디어 등 추상적인 것들이 갑자기 부족해질 때도 사용됩니다. 이 구동사는 갑작스러운 변화와 긴급함을 강조하므로, 예상치 못한 상황에서의 당황과 대응의 필요성을 나타낼 때 사용됩니다.',
                 situations: [
-                    '"We\'ve run out of milk."',
-                    '"I\'m running out of time."'
+                    'We\'ve run out of milk.',
+                    'I\'m running out of time.'
                 ]
             }
         };
@@ -657,8 +676,8 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
             nuance: `이 구동사는 "${expression.meaning}"라는 의미를 가지며, 특별한 뉘앙스와 사용 맥락이 있습니다. 문맥에 따라 의미가 달라질 수 있으니 주의 깊게 학습하세요.`,
             usage: '이 구동사는 다양한 상황에서 사용될 수 있습니다. 문맥에 따라 의미가 달라질 수 있으니 주의 깊게 학습하세요.',
             situations: [
-                `"${expression.sentence.replace(/\*\*(.*?)\*\*/g, '$1')}"`,
-                `"Can you ${phrasalVerb} the answer?"`
+                `${expression.sentence.replace(/\*\*(.*?)\*\*/g, '$1')}`,
+                `Can you ${phrasalVerb} the answer?`
             ]
         };
     }, [expression.phrasal_verb, expression.meaning, expression.sentence]);
@@ -670,7 +689,7 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
                 <ExampleCard onClick={handleCardClick}>
                     <ExampleContent>
                         <ExampleText>
-                            "{expression.sentence.replace(/\*\*(.*?)\*\*/g, '$1')}"
+                            {expression.sentence.replace(/\*\*(.*?)\*\*/g, '$1')}
                         </ExampleText>
                         <ActionButtons>
                             <ActionButton 

@@ -84,17 +84,17 @@ const NewsTitle = styled.h3`
 const TitleActionButtons = styled.div`
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-left: 12px;
+  gap: 6px;
+  margin-left: 8px;
   
   @media (max-width: 768px) {
-    gap: 6px;
-    margin-left: 10px;
+    gap: 4px;
+    margin-left: 6px;
   }
   
   @media (max-width: 480px) {
-    gap: 4px;
-    margin-left: 8px;
+    gap: 3px;
+    margin-left: 4px;
   }
 `;
 
@@ -125,16 +125,16 @@ const ActionButton = styled.button`
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 12px;
+  padding: 6px;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(0, 212, 255, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 212, 255, 0.3);
   touch-action: manipulation;
-  min-width: 48px;
-  min-height: 48px;
+  min-width: 32px;
+  min-height: 32px;
   
   &:hover {
     transform: scale(1.1);
-    box-shadow: 0 6px 16px rgba(0, 212, 255, 0.4);
+    box-shadow: 0 4px 12px rgba(0, 212, 255, 0.4);
   }
   
   &:active {
@@ -142,20 +142,21 @@ const ActionButton = styled.button`
   }
   
   &:disabled {
-    opacity: 0.5;
+    opacity: 0.6;
     cursor: not-allowed;
+    transform: none;
   }
   
   @media (max-width: 768px) {
-    padding: 10px;
-    min-width: 44px;
-    min-height: 44px;
+    padding: 4px;
+    min-width: 28px;
+    min-height: 28px;
   }
   
   @media (max-width: 480px) {
-    padding: 8px;
-    min-width: 40px;
-    min-height: 40px;
+    padding: 3px;
+    min-width: 24px;
+    min-height: 24px;
   }
 `;
 
@@ -302,19 +303,19 @@ const SmallActionButton = styled.button`
 
 const TranslationText = styled.div`
     color: #00d4ff;
-    font-size: clamp(11px, 2.5vw, 13px);
+    font-size: clamp(14px, 3vw, 18px);
     line-height: 1.4;
     margin-top: 8px;
     padding-left: 8px;
     border-left: 2px solid #00d4ff;
     
     @media (max-width: 768px) {
-        font-size: clamp(10px, 2.5vw, 12px);
+        font-size: clamp(13px, 2.8vw, 16px);
         margin-top: 6px;
     }
     
     @media (max-width: 480px) {
-        font-size: clamp(9px, 2.5vw, 11px);
+        font-size: clamp(12px, 2.5vw, 14px);
         margin-top: 4px;
     }
 `;
@@ -346,24 +347,44 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
 
     const handleTitleTranslateClick = useCallback(async (e) => {
         e.stopPropagation();
-        if (!showTitleTranslation && !titleTranslation) {
+        
+        // 이미 번역이 표시 중이면 토글로 숨기기
+        if (showTitleTranslation) {
+            setShowTitleTranslation(false);
+            return;
+        }
+        
+        // 번역이 없으면 번역 요청
+        if (!titleTranslation) {
             setIsTranslatingTitle(true);
             const result = await onTranslate(cleanTitle);
             setTitleTranslation(result);
             setIsTranslatingTitle(false);
         }
-        setShowTitleTranslation(!showTitleTranslation);
+        
+        // 번역 표시
+        setShowTitleTranslation(true);
     }, [showTitleTranslation, titleTranslation, onTranslate, cleanTitle]);
 
     const handleArticleTranslateClick = useCallback(async (e) => {
         e.stopPropagation();
-        if (!showArticleTranslation && !articleTranslation) {
+        
+        // 이미 번역이 표시 중이면 토글로 숨기기
+        if (showArticleTranslation) {
+            setShowArticleTranslation(false);
+            return;
+        }
+        
+        // 번역이 없으면 번역 요청
+        if (!articleTranslation) {
             setIsTranslatingArticle(true);
             const result = await onTranslate(textToRead);
             setArticleTranslation(result);
             setIsTranslatingArticle(false);
         }
-        setShowArticleTranslation(!showArticleTranslation);
+        
+        // 번역 표시
+        setShowArticleTranslation(true);
     }, [showArticleTranslation, articleTranslation, onTranslate, textToRead]);
 
 
@@ -564,7 +585,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                             {newsItem?.category === 'korean' ? '한국 뉴스 요약' : '세계 뉴스 요약'}
                         </SectionTitle>
                         
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'absolute', right: '0' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', position: 'absolute', right: '0' }}>
                             <ActionButton 
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -572,12 +593,12 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                                 }}
                                     disabled={audioStates[textToRead] === 'loading'}
                                     aria-label="기사 음성 재생"
-                                style={{ minWidth: '24px', minHeight: '24px', padding: '6px' }}
+                                style={{ minWidth: '20px', minHeight: '20px', padding: '3px' }}
                                 >
                                     {audioStates[textToRead] === 'loading' ? (
-                                    <LoaderIcon size="h-3 w-3" />
+                                    <LoaderIcon size="h-2 w-2" />
                                 ) : (
-                                    <Volume2Icon className="h-3 w-3" />
+                                    <Volume2Icon className="h-2 w-2" />
                                 )}
                             </ActionButton>
                             <ActionButton 
@@ -587,12 +608,12 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                                 }}
                                 disabled={isTranslatingArticle}
                                 aria-label="기사 번역 보기"
-                                style={{ minWidth: '24px', minHeight: '24px', padding: '6px' }}
+                                style={{ minWidth: '20px', minHeight: '20px', padding: '3px' }}
                             >
                                 {isTranslatingArticle ? (
-                                    <LoaderIcon size="h-3 w-3" />
+                                    <LoaderIcon size="h-2 w-2" />
                                 ) : (
-                                    <TranslateIcon className="h-3 w-3" />
+                                    <TranslateIcon className="h-2 w-2" />
                                 )}
                             </ActionButton>
                         </div>
