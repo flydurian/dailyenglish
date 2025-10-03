@@ -134,12 +134,12 @@ const ActionButton = styled.button`
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 3px;
+  padding: 4px;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 2px 8px rgba(0, 212, 255, 0.3);
   touch-action: manipulation;
-  min-width: 24px;
-  min-height: 24px;
+  min-width: 32px;
+  min-height: 32px;
   
   &:hover {
     transform: scale(1.1);
@@ -157,15 +157,15 @@ const ActionButton = styled.button`
   }
   
   @media (max-width: 768px) {
-    padding: 2px;
-    min-width: 20px;
-    min-height: 20px;
+    padding: 3px;
+    min-width: 28px;
+    min-height: 28px;
   }
   
   @media (max-width: 480px) {
-    padding: 1px;
-    min-width: 18px;
-    min-height: 18px;
+    padding: 2px;
+    min-width: 24px;
+    min-height: 24px;
   }
 `;
 
@@ -538,12 +538,12 @@ const SmallActionButton = styled.button`
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
+  padding: 6px;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 2px 8px rgba(0, 212, 255, 0.3);
   touch-action: manipulation;
-  min-width: 12px;
-  min-height: 12px;
+  min-width: 20px;
+  min-height: 20px;
   
   &:hover {
     transform: scale(1.1);
@@ -560,15 +560,15 @@ const SmallActionButton = styled.button`
   }
   
   @media (max-width: 768px) {
-    min-width: 10px;
-    min-height: 10px;
-    padding: 2px;
+    min-width: 18px;
+    min-height: 18px;
+    padding: 4px;
   }
   
   @media (max-width: 480px) {
-    min-width: 8px;
-    min-height: 8px;
-    padding: 1px;
+    min-width: 16px;
+    min-height: 16px;
+    padding: 3px;
   }
 `;
 

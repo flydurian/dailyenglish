@@ -107,12 +107,12 @@ const ActionButton = styled.button`
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 6px;
+  padding: 8px;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 2px 8px rgba(0, 212, 255, 0.3);
   touch-action: manipulation;
-  min-width: 32px;
-  min-height: 32px;
+  min-width: 36px;
+  min-height: 36px;
   
   &:hover {
     transform: scale(1.1);
@@ -130,15 +130,15 @@ const ActionButton = styled.button`
   }
   
   @media (max-width: 768px) {
-    padding: 4px;
-    min-width: 28px;
-    min-height: 28px;
+    padding: 6px;
+    min-width: 32px;
+    min-height: 32px;
   }
   
   @media (max-width: 480px) {
-    padding: 3px;
-    min-width: 24px;
-    min-height: 24px;
+    padding: 4px;
+    min-width: 28px;
+    min-height: 28px;
   }
 `;
 
