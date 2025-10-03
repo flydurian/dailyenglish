@@ -38,6 +38,91 @@ export const useTranslation = () => {
         }
     }, [translations]);
 
+    // 긴 텍스트를 청크로 나누어 번역하는 함수
+    const translateLongText = useCallback(async (text) => {
+        try {
+            // 텍스트를 문장 단위로 나누기
+            const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+            const chunks = [];
+            let currentChunk = '';
+            
+            // 청크 생성 (각 청크는 최대 1000자)
+            for (const sentence of sentences) {
+                if ((currentChunk + sentence).length > 1000 && currentChunk.length > 0) {
+                    chunks.push(currentChunk.trim());
+                    currentChunk = sentence;
+                } else {
+                    currentChunk += (currentChunk ? '. ' : '') + sentence;
+                }
+            }
+            if (currentChunk.trim()) {
+                chunks.push(currentChunk.trim());
+            }
+            
+            console.log(`긴 텍스트를 ${chunks.length}개 청크로 나누어 번역`);
+            
+            // 각 청크를 순차적으로 번역
+            const translatedChunks = [];
+            for (let i = 0; i < chunks.length; i++) {
+                const chunk = chunks[i];
+                const chunkKey = `chunk_${i}_${chunk.substring(0, 50)}`;
+                
+                // 청크별 캐시 확인
+                if (translations[chunkKey] && translations[chunkKey].translation) {
+                    translatedChunks.push(translations[chunkKey].translation);
+                    continue;
+                }
+                
+                const prompt = `Translate this English text to Korean. Return only the Korean translation, nothing else: "${chunk}"`;
+                
+                const payload = {
+                    contents: [{ role: "user", parts: [{ text: prompt }] }],
+                    generationConfig: {
+                        responseMimeType: "text/plain",
+                        maxOutputTokens: 2000, // 청크 번역을 위한 토큰 제한
+                        temperature: 0.1
+                    }
+                };
+                
+                const result = await callGeminiAPI(payload, 'gemini-2.5-flash-preview-05-20');
+                
+                if (result?.candidates?.[0]?.content?.parts?.[0]?.text) {
+                    const translation = result.candidates[0].content.parts[0].text.trim();
+                    translatedChunks.push(translation);
+                    
+                    // 청크별 캐시 저장
+                    const cacheData = {
+                        translation: translation,
+                        timestamp: Date.now()
+                    };
+                    saveToCache(chunkKey, cacheData);
+                } else {
+                    translatedChunks.push(chunk); // 번역 실패 시 원문 사용
+                }
+                
+                // API 호출 간격 조절
+                if (i < chunks.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            }
+            
+            const finalTranslation = translatedChunks.join(' ');
+            
+            // 전체 번역 결과 캐시 저장
+            const cacheData = {
+                translation: finalTranslation,
+                timestamp: Date.now()
+            };
+            saveToCache(text, cacheData);
+            
+            return finalTranslation;
+            
+        } catch (error) {
+            console.error('청크 번역 실패:', error);
+            return text; // 실패 시 원문 반환
+        }
+    }, [translations, saveToCache]);
+
     const translateText = useCallback(async (text) => {
         if (!text || text.trim().length === 0) {
             return '';
@@ -127,92 +212,8 @@ export const useTranslation = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [translations, saveToCache]);
+    }, [translations, saveToCache, translateLongText]);
 
-    // 긴 텍스트를 청크로 나누어 번역하는 함수
-    const translateLongText = useCallback(async (text) => {
-        try {
-            // 텍스트를 문장 단위로 나누기
-            const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
-            const chunks = [];
-            let currentChunk = '';
-            
-            // 청크 생성 (각 청크는 최대 1000자)
-            for (const sentence of sentences) {
-                if ((currentChunk + sentence).length > 1000 && currentChunk.length > 0) {
-                    chunks.push(currentChunk.trim());
-                    currentChunk = sentence;
-                } else {
-                    currentChunk += (currentChunk ? '. ' : '') + sentence;
-                }
-            }
-            if (currentChunk.trim()) {
-                chunks.push(currentChunk.trim());
-            }
-            
-            console.log(`긴 텍스트를 ${chunks.length}개 청크로 나누어 번역`);
-            
-            // 각 청크를 순차적으로 번역
-            const translatedChunks = [];
-            for (let i = 0; i < chunks.length; i++) {
-                const chunk = chunks[i];
-                const chunkKey = `chunk_${i}_${chunk.substring(0, 50)}`;
-                
-                // 청크별 캐시 확인
-                if (translations[chunkKey] && translations[chunkKey].translation) {
-                    translatedChunks.push(translations[chunkKey].translation);
-                    continue;
-                }
-                
-                const prompt = `Translate this English text to Korean. Return only the Korean translation, nothing else: "${chunk}"`;
-                
-                const payload = {
-                    contents: [{ role: "user", parts: [{ text: prompt }] }],
-                    generationConfig: {
-                        responseMimeType: "text/plain",
-                        maxOutputTokens: 2000,
-                        temperature: 0.1
-                    }
-                };
-                
-                const result = await callGeminiAPI(payload, 'gemini-2.5-flash-preview-05-20');
-                
-                if (result?.candidates?.[0]?.content?.parts?.[0]?.text) {
-                    const translation = result.candidates[0].content.parts[0].text.trim();
-                    translatedChunks.push(translation);
-                    
-                    // 청크별 캐시 저장
-                    const cacheData = {
-                        translation: translation,
-                        timestamp: Date.now()
-                    };
-                    saveToCache(chunkKey, cacheData);
-                } else {
-                    translatedChunks.push(chunk); // 번역 실패 시 원문 사용
-                }
-                
-                // API 호출 간격 조절
-                if (i < chunks.length - 1) {
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                }
-            }
-            
-            const finalTranslation = translatedChunks.join(' ');
-            
-            // 전체 번역 결과 캐시 저장
-            const cacheData = {
-                translation: finalTranslation,
-                timestamp: Date.now()
-            };
-            saveToCache(text, cacheData);
-            
-            return finalTranslation;
-            
-        } catch (error) {
-            console.error('청크 번역 실패:', error);
-            return text; // 실패 시 원문 반환
-        }
-    }, [translations, saveToCache]);
 
     const summarizeText = useCallback(async (text) => {
         if (!text || text.trim().length === 0) {

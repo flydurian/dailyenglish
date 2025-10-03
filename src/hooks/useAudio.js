@@ -43,12 +43,10 @@ const saveAudioCache = (cache) => {
 export const useAudio = () => {
     const [audioStates, setAudioStates] = useState({});
     const [audioCache, setAudioCache] = useState({});
-    const [persistentCache, setPersistentCache] = useState({});
 
     // 컴포넌트 마운트 시 영구 캐시 로드
     useEffect(() => {
         const loadedCache = loadAudioCache();
-        setPersistentCache(loadedCache);
         
         // 메모리 캐시에 영구 캐시 데이터 로드
         const memoryCache = {};
@@ -129,22 +127,22 @@ export const useAudio = () => {
                     mimeType: 'audio/wav'
                 };
                 
-                setPersistentCache(prev => {
-                    const newCache = { ...prev, [sentence]: cacheEntry };
-                    
-                    // 캐시 크기 제한
-                    const keys = Object.keys(newCache);
-                    if (keys.length > MAX_CACHE_SIZE) {
-                        // 가장 오래된 항목 제거
-                        const sortedKeys = keys.sort((a, b) => 
-                            newCache[a].timestamp - newCache[b].timestamp
-                        );
-                        delete newCache[sortedKeys[0]];
-                    }
-                    
-                    saveAudioCache(newCache);
-                    return newCache;
-                });
+                // 영구 캐시에 직접 저장
+                const currentCache = loadAudioCache();
+                const newCache = { ...currentCache, [sentence]: cacheEntry };
+                
+                // 캐시 크기 제한
+                const keys = Object.keys(newCache);
+                if (keys.length > MAX_CACHE_SIZE) {
+                    // 가장 오래된 항목 제거
+                    const sortedKeys = keys.sort((a, b) => 
+                        newCache[a].timestamp - newCache[b].timestamp
+                    );
+                    delete newCache[sortedKeys[0]];
+                }
+                
+                // 영구 캐시에 저장
+                saveAudioCache(newCache);
                 
                 audio.onplay = () => setAudioStates(prev => ({ ...prev, [sentence]: 'playing' }));
                 audio.onended = () => {
@@ -194,16 +192,14 @@ export const useAudio = () => {
         });
         
         // 영구 캐시에서도 제거
-        setPersistentCache(prev => {
-            const newCache = { ...prev };
-            Object.keys(newCache).forEach(key => {
-                if (key.length > 50 || key.includes('news') || key.includes('article')) {
-                    delete newCache[key];
-                }
-            });
-            saveAudioCache(newCache);
-            return newCache;
+        const currentCache = loadAudioCache();
+        const newCache = { ...currentCache };
+        Object.keys(newCache).forEach(key => {
+            if (key.length > 50 || key.includes('news') || key.includes('article')) {
+                delete newCache[key];
+            }
         });
+        saveAudioCache(newCache);
     }, []);
 
     // 오래된 음성 캐시 정리
@@ -222,23 +218,20 @@ export const useAudio = () => {
             return newCache;
         });
         
-        setPersistentCache(prev => {
-            const newCache = {};
-            Object.keys(prev).forEach(key => {
-                if (prev[key].timestamp && (now - prev[key].timestamp) <= expiryTime) {
-                    newCache[key] = prev[key];
-                }
-            });
-            saveAudioCache(newCache);
-            return newCache;
+        const currentCache = loadAudioCache();
+        const newCache = {};
+        Object.keys(currentCache).forEach(key => {
+            if (currentCache[key].timestamp && (now - currentCache[key].timestamp) <= expiryTime) {
+                newCache[key] = currentCache[key];
+            }
         });
+        saveAudioCache(newCache);
     }, []);
 
     // 모든 캐시 삭제
     const clearAllAudioCache = useCallback(() => {
         setAudioCache({});
         setAudioStates({});
-        setPersistentCache({});
         localStorage.removeItem(TTS_CACHE_KEY);
     }, []);
 

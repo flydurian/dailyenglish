@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import styled from '@emotion/styled';
-import { css } from '@emotion/react';
 import { Volume2Icon, TranslateIcon, LoaderIcon } from './Icons';
 
 // 최신 CSS Grid와 Flexbox를 활용한 스타일드 컴포넌트들
@@ -98,23 +97,6 @@ const TitleActionButtons = styled.div`
   }
 `;
 
-const ActionButtons = styled.div`
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
-  
-  @media (max-width: 768px) {
-    gap: 10px;
-    margin-bottom: 16px;
-  }
-  
-  @media (max-width: 480px) {
-    gap: 8px;
-    margin-bottom: 12px;
-  }
-`;
 
 const ActionButton = styled.button`
   background: linear-gradient(135deg, #00d4ff 0%, rgba(0, 212, 255, 0.8) 100%);
@@ -264,42 +246,6 @@ const KeyPointText = styled.span`
   }
 `;
 
-const SmallActionButton = styled.button`
-  background: linear-gradient(135deg, #00d4ff 0%, rgba(0, 212, 255, 0.8) 100%);
-  border: 1px solid #00d4ff;
-  border-radius: 50%;
-  color: #000;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 8px rgba(0, 212, 255, 0.3);
-  touch-action: manipulation;
-  min-width: 14px;
-  min-height: 14px;
-  
-  &:hover {
-    transform: scale(1.1);
-    box-shadow: 0 4px 12px rgba(0, 212, 255, 0.4);
-  }
-  
-  &:active {
-    transform: scale(0.95);
-  }
-  
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-  
-  @media (max-width: 480px) {
-    min-width: 12px;
-    min-height: 12px;
-    padding: 1px;
-  }
-`;
 
 const TranslationText = styled.div`
     color: #00d4ff;
@@ -399,10 +345,6 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
     }, [newsItem?.title, newsItem?.full_text]);
 
 
-    const handleWordClick = useCallback((e, word, meaning, example, detailedInfo) => {
-        e.stopPropagation();
-        onWordClick(word, meaning, example, detailedInfo);
-    }, [onWordClick]);
 
     // 구동사 클릭 핸들러
     const handlePhrasalVerbClick = useCallback((phrasalVerb) => {

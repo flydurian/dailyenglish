@@ -1,7 +1,7 @@
 // 구동사 사용 여부 추적 시스템
 
 const USAGE_STORAGE_KEY = 'phrasal_verb_usage';
-const MAX_STORAGE_DAYS = 30; // 30일간 사용 기록 보관
+ // 30일간 사용 기록 보관
 
 // 사용된 구동사 기록 저장
 export const markPhrasalVerbAsUsed = (phrasalVerb, date = new Date()) => {

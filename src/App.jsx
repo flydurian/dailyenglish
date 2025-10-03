@@ -391,10 +391,9 @@ export default function App() {
         audioStates, 
         playAudio, 
         clearNewsAudioCache, 
-        clearOldAudioCache,
-        clearAllAudioCache
+        clearOldAudioCache
     } = useAudio();
-    const { translateText, summarizeText, generateExamples, translations, isLoading: isTranslating, error: translationError } = useTranslation();
+    const { translateText, summarizeText, generateExamples, translations } = useTranslation();
     const { loading, error, fetchExpressions, fetchNews, initializeData } = useDataFetching();
 
     const levels = useMemo(() => ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'], []);
@@ -421,7 +420,7 @@ export default function App() {
         } catch (err) {
             console.error('데이터 로딩 실패:', err);
         }
-    }, [activeTab, currentDate, level, fetchExpressions, fetchNews, clearNewsAudioCache]);
+    }, [activeTab, currentDate, level, fetchExpressions, fetchNews, clearNewsAudioCache, clearOldAudioCache]);
 
     // 스크롤 이벤트 처리
     useEffect(() => {

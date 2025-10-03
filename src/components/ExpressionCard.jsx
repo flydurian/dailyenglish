@@ -541,7 +541,6 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
     const [showTranslation, setShowTranslation] = useState(false);
     const [translation, setTranslation] = useState('');
     const [isTranslating, setIsTranslating] = useState(false);
-    const [exampleTranslations, setExampleTranslations] = useState({});
     const [showPhrasalVerbDetail, setShowPhrasalVerbDetail] = useState(false);
     
     // expression이 변경될 때 번역 상태 초기화
