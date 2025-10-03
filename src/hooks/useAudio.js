@@ -71,20 +71,30 @@ export const useAudio = () => {
             try {
                 // blob URL이 유효한지 확인하고 재생
                 if (cachedAudio.src && cachedAudio.src.startsWith('blob:')) {
+                    // 오디오 상태 이벤트 리스너 설정
+                    cachedAudio.onplay = () => setAudioStates(prev => ({ ...prev, [sentence]: 'playing' }));
+                    cachedAudio.onended = () => {
+                        setAudioStates(prev => ({ ...prev, [sentence]: 'idle' }));
+                    };
+                    cachedAudio.onerror = (error) => {
+                        console.error('캐시된 오디오 재생 에러:', error);
+                        setAudioStates(prev => ({ ...prev, [sentence]: 'idle' }));
+                        // 에러 발생 시 캐시에서 제거
+                        setAudioCache(prev => {
+                            const newCache = { ...prev };
+                            delete newCache[sentence];
+                            return newCache;
+                        });
+                    };
+                    
                     await cachedAudio.play();
                 } else {
                     throw new Error('Invalid audio source');
                 }
-                
-                cachedAudio.onended = () => {
-                    setAudioStates(prev => ({ ...prev, [sentence]: 'idle' }));
-                };
-                cachedAudio.onerror = () => {
-                    setAudioStates(prev => ({ ...prev, [sentence]: 'idle' }));
-                };
                 return;
             } catch (e) {
                 console.error("캐시된 음성 재생 실패:", e);
+                setAudioStates(prev => ({ ...prev, [sentence]: 'idle' }));
                 // 캐시된 음성 재생에 실패하면 새로 불러오기
                 setAudioCache(prev => {
                     const newCache = { ...prev };
@@ -109,12 +119,34 @@ export const useAudio = () => {
             const mimeType = part?.inlineData?.mimeType;
             
             if (audioData && mimeType?.startsWith("audio/")) {
-                const sampleRate = parseInt(mimeType.match(/rate=(\d+)/)?.[1] || "24000", 10);
-                const pcmData = base64ToArrayBuffer(audioData);
-                const pcm16 = new Int16Array(pcmData);
-                const wavBlob = pcmToWav(pcm16, sampleRate);
-                const audioUrl = URL.createObjectURL(wavBlob);
-                const audio = new Audio(audioUrl);
+                try {
+                    const sampleRate = parseInt(mimeType.match(/rate=(\d+)/)?.[1] || "24000", 10);
+                    const pcmData = base64ToArrayBuffer(audioData);
+                    
+                    // 오디오 데이터 유효성 검사
+                    if (!pcmData || pcmData.byteLength === 0) {
+                        throw new Error('빈 오디오 데이터');
+                    }
+                    
+                    const pcm16 = new Int16Array(pcmData);
+                    if (pcm16.length === 0) {
+                        throw new Error('유효하지 않은 PCM 데이터');
+                    }
+                    
+                    const wavBlob = pcmToWav(pcm16, sampleRate);
+                    
+                    // WAV 블롭 유효성 검사
+                    if (!wavBlob || wavBlob.size === 0) {
+                        throw new Error('유효하지 않은 WAV 데이터');
+                    }
+                    
+                    const audioUrl = URL.createObjectURL(wavBlob);
+                    const audio = new Audio(audioUrl);
+                    
+                    // 오디오 객체 유효성 검사
+                    if (!audio) {
+                        throw new Error('오디오 객체 생성 실패');
+                    }
                 
                 // 오디오를 메모리 캐시에 저장
                 setAudioCache(prev => ({ ...prev, [sentence]: audio }));
@@ -148,7 +180,8 @@ export const useAudio = () => {
                 audio.onended = () => {
                     setAudioStates(prev => ({ ...prev, [sentence]: 'idle' }));
                 };
-                audio.onerror = () => {
+                audio.onerror = (error) => {
+                    console.error('새 오디오 재생 에러:', error);
                     setAudioStates(prev => ({ ...prev, [sentence]: 'idle' }));
                     // 에러 발생 시 캐시에서 제거
                     setAudioCache(prev => {
@@ -158,7 +191,18 @@ export const useAudio = () => {
                     });
                 };
                 
-                await audio.play();
+                    try {
+                        await audio.play();
+                    } catch (playError) {
+                        console.error('오디오 재생 실패:', playError);
+                        setAudioStates(prev => ({ ...prev, [sentence]: 'idle' }));
+                        throw new Error(`오디오 재생 실패: ${playError.message}`);
+                    }
+                } catch (audioError) {
+                    console.error('오디오 생성 실패:', audioError);
+                    setAudioStates(prev => ({ ...prev, [sentence]: 'idle' }));
+                    throw new Error(`오디오 생성 실패: ${audioError.message}`);
+                }
             } else {
                 throw new Error("유효한 오디오 데이터를 받지 못했습니다.");
             }
