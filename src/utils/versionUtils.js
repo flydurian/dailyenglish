@@ -2,21 +2,12 @@
 
 const CACHE_KEY = 'app_hash';
 
-// 해시 체크 함수
+// 해시 체크 함수 (새로고침 시에만 실행)
 export const checkForUpdates = async () => {
     try {
         const currentHash = localStorage.getItem(CACHE_KEY);
-        const lastCheckTime = localStorage.getItem('last_update_check');
-        const now = Date.now();
         
-        // 5분 이내에 체크했다면 다시 체크하지 않음
-        if (lastCheckTime && (now - parseInt(lastCheckTime)) < 5 * 60 * 1000) {
-            console.log('최근에 업데이트를 체크했으므로 건너뜁니다.');
-            return false;
-        }
-        
-        // 마지막 체크 시간 업데이트
-        localStorage.setItem('last_update_check', now.toString());
+        console.log('업데이트 체크 중...');
         
         const response = await fetch(`/hash.json?t=${Date.now()}`, {
             cache: 'no-cache',
@@ -31,7 +22,7 @@ export const checkForUpdates = async () => {
             
             if (currentHash !== latestHash) {
                 console.log(`새 빌드 발견: ${currentHash?.substring(0, 8) || '없음'} → ${latestHash.substring(0, 8)}`);
-                console.log('자동으로 최신 버전을 가져옵니다...');
+                console.log('새로운 버전이 있습니다. 업데이트를 적용합니다...');
                 
                 localStorage.setItem(CACHE_KEY, latestHash);
                 
@@ -41,8 +32,10 @@ export const checkForUpdates = async () => {
                 
                 return true;
             } else {
-                console.log('최신 버전입니다.');
+                console.log('이미 최신 버전입니다.');
             }
+        } else {
+            console.log('업데이트 정보를 가져올 수 없습니다.');
         }
         
         return false;
@@ -70,19 +63,18 @@ export const forceRefresh = () => {
     window.location.reload(true);
 };
 
-// 앱 시작 시 해시 체크 (한 번만 실행)
-let hasCheckedForUpdates = false;
-
+// 사용자 새로고침 시에만 업데이트 체크
 export const detectHotReload = () => {
     if (process.env.NODE_ENV === 'development') {
         return;
     }
     
-    // 이미 체크했다면 다시 체크하지 않음
-    if (hasCheckedForUpdates) {
-        return;
-    }
+    // 페이지 로드 시에만 업데이트 체크 (새로고침 감지)
+    const isPageRefresh = performance.navigation.type === 1 || 
+                         performance.getEntriesByType('navigation')[0]?.type === 'reload';
     
-    hasCheckedForUpdates = true;
-    checkForUpdates();
+    if (isPageRefresh) {
+        console.log('사용자 새로고침 감지 - 업데이트 체크 시작');
+        checkForUpdates();
+    }
 };
