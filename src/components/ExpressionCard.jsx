@@ -95,15 +95,19 @@ const ExampleText = styled.p`
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
   
   @media (max-width: 768px) {
-    font-size: clamp(18px, 4vw, 24px);
+    font-size: clamp(20px, 4.5vw, 26px);
   }
   
   @media (max-width: 640px) {
-    font-size: clamp(16px, 3.5vw, 22px);
+    font-size: clamp(18px, 4vw, 24px);
   }
   
   @media (max-width: 480px) {
-    font-size: clamp(14px, 3vw, 20px);
+    font-size: clamp(16px, 3.5vw, 22px);
+  }
+  
+  @media (max-width: 360px) {
+    font-size: clamp(15px, 3.2vw, 20px);
   }
 `;
 
@@ -256,17 +260,22 @@ const KeyWordsGrid = styled.div`
   
   @media (max-width: 768px) {
     grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
+    gap: 8px;
   }
   
   @media (max-width: 640px) {
     grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
+    gap: 6px;
   }
   
   @media (max-width: 480px) {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px;
+  }
+  
+  @media (max-width: 360px) {
     grid-template-columns: 1fr;
-    gap: 6px;
+    gap: 4px;
   }
 `;
 
@@ -304,44 +313,80 @@ const KeyWordCard = styled.button`
   }
   
   @media (max-width: 768px) {
-    padding: 14px;
-    min-height: 66px;
-    border-radius: 14px;
+    padding: 10px;
+    min-height: 55px;
+    border-radius: 12px;
+  }
+  
+  @media (max-width: 640px) {
+    padding: 8px;
+    min-height: 50px;
+    border-radius: 10px;
   }
   
   @media (max-width: 480px) {
-    padding: 12px;
-    min-height: 62px;
-    border-radius: 12px;
+    padding: 6px;
+    min-height: 45px;
+    border-radius: 8px;
+  }
+  
+  @media (max-width: 360px) {
+    padding: 8px;
+    min-height: 50px;
+    border-radius: 10px;
   }
 `;
 
 const KeyWordTitle = styled.div`
   color: #00d4ff;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
   margin-bottom: 4px;
   
   @media (max-width: 768px) {
+    font-size: 14px;
+    margin-bottom: 3px;
+  }
+  
+  @media (max-width: 640px) {
     font-size: 13px;
+    margin-bottom: 2px;
   }
   
   @media (max-width: 480px) {
     font-size: 12px;
+    margin-bottom: 2px;
+  }
+  
+  @media (max-width: 360px) {
+    font-size: 13px;
+    margin-bottom: 3px;
   }
 `;
 
 const KeyWordMeaning = styled.div`
   color: #cccccc;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.4;
   
   @media (max-width: 768px) {
+    font-size: 12px;
+    line-height: 1.3;
+  }
+  
+  @media (max-width: 640px) {
     font-size: 11px;
+    line-height: 1.2;
   }
   
   @media (max-width: 480px) {
     font-size: 10px;
+    line-height: 1.2;
+  }
+  
+  @media (max-width: 360px) {
+    font-size: 11px;
+    line-height: 1.3;
   }
 `;
 
@@ -465,15 +510,15 @@ const DetailExampleText = styled.p`
   color: #ffffff;
   font-weight: 700;
   margin: 0;
-  font-size: clamp(18px, 4vw, 24px);
+  font-size: clamp(16px, 3.5vw, 22px);
   line-height: 1.4;
   
   @media (max-width: 768px) {
-    font-size: clamp(16px, 3.5vw, 20px);
+    font-size: clamp(14px, 3vw, 18px);
   }
   
   @media (max-width: 480px) {
-    font-size: clamp(14px, 3vw, 18px);
+    font-size: clamp(12px, 2.5vw, 16px);
   }
 `;
 
