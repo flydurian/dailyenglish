@@ -1,47 +1,411 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, LoaderIcon, ArrowUpIcon } from './components/Icons';
-import Calendar from './components/Calendar';
+import styled from '@emotion/styled';
+import { ArrowUpIcon } from './components/Icons';
 import WordModal from './components/WordModal';
 import ExpressionCard from './components/ExpressionCard';
 import NewsCard from './components/NewsCard';
 import { useAudio } from './hooks/useAudio';
 import { useTranslation } from './hooks/useTranslation';
 import { useDataFetching } from './hooks/useDataFetching';
-import { getAvailableDates, isCacheValid, getCacheKey } from './utils/cacheUtils';
 import { levelDescriptions } from './utils/apiUtils';
+import { detectHotReload } from './utils/versionUtils';
+
+// 최신 CSS Grid와 Flexbox를 활용한 스타일드 컴포넌트들
+const AppContainer = styled.div`
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0f0f0f 100%);
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+`;
+
+const MainContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  text-align: center;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 16px;
+  
+  @media (max-width: 768px) {
+    padding: 0 12px;
+  }
+  
+  @media (max-width: 480px) {
+    padding: 0 8px;
+  }
+`;
+
+const Header = styled.header`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  padding: 32px 0;
+  
+  @media (max-width: 768px) {
+    padding: 20px 0;
+  }
+  
+  @media (max-width: 480px) {
+    padding: 16px 0;
+  }
+`;
+
+const Title = styled.h1`
+  background: linear-gradient(135deg, #00d4ff 0%, #ffffff 50%, #00d4ff 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-size: clamp(2rem, 6vw, 3.5rem);
+  font-weight: 800;
+  margin: 0 0 20px 0;
+  text-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
+  letter-spacing: -0.02em;
+  
+  @media (max-width: 768px) {
+    margin-bottom: 16px;
+    font-size: clamp(1.8rem, 5vw, 2.5rem);
+  }
+  
+  @media (max-width: 480px) {
+    margin-bottom: 12px;
+    font-size: clamp(1.5rem, 4vw, 2rem);
+  }
+`;
+
+const TabNavigation = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 8px;
+  
+  @media (max-width: 768px) {
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  
+  @media (max-width: 640px) {
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  
+  @media (max-width: 480px) {
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+`;
+
+const TabButton = styled.button`
+  background: ${props => props.isActive 
+    ? 'linear-gradient(135deg, #00d4ff 0%, rgba(0, 212, 255, 0.8) 100%)'
+    : 'linear-gradient(135deg, #2a2a2a 0%, rgba(0, 212, 255, 0.05) 100%)'
+  };
+  border: 2px solid ${props => props.isActive ? '#00d4ff' : '#444'};
+  border-radius: 16px;
+  color: ${props => props.isActive ? '#000000' : '#ffffff'};
+  cursor: pointer;
+  font-size: clamp(14px, 3vw, 16px);
+  font-weight: 700;
+  min-height: 44px;
+  padding: 8px 20px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: ${props => props.isActive 
+    ? '0 8px 32px rgba(0, 212, 255, 0.3)'
+    : '0 4px 16px rgba(0, 0, 0, 0.1)'
+  };
+  touch-action: manipulation;
+  
+  &:hover {
+    transform: scale(1.02);
+    box-shadow: ${props => props.isActive 
+      ? '0 12px 40px rgba(0, 212, 255, 0.4)'
+      : '0 6px 20px rgba(0, 0, 0, 0.2)'
+    };
+  }
+  
+  &:active {
+    transform: scale(0.98);
+  }
+  
+  @media (max-width: 768px) {
+    padding: 8px 16px;
+    min-height: 40px;
+    font-size: 15px;
+  }
+  
+  @media (max-width: 640px) {
+    padding: 6px 12px;
+    min-height: 36px;
+    font-size: 14px;
+  }
+  
+  @media (max-width: 480px) {
+    padding: 6px 10px;
+    min-height: 32px;
+    font-size: 13px;
+  }
+`;
+
+
+const LevelSelection = styled.div`
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+  border: 2px solid #333;
+  border-radius: 20px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  margin: 0 auto 8px;
+  padding: 20px;
+  width: 100%;
+  max-width: 600px;
+  
+  @media (max-width: 768px) {
+    padding: 16px;
+    margin: 0 auto 6px;
+    border-radius: 16px;
+  }
+  
+  @media (max-width: 480px) {
+    padding: 12px;
+    margin: 0 auto 4px;
+    border-radius: 12px;
+  }
+`;
+
+const LevelGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  
+  @media (max-width: 768px) {
+    gap: 10px;
+  }
+  
+  @media (max-width: 640px) {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  
+  @media (max-width: 480px) {
+    gap: 6px;
+  }
+`;
+
+const LevelButton = styled.button`
+  background: ${props => props.isActive 
+    ? 'linear-gradient(135deg, #00d4ff 0%, rgba(0, 212, 255, 0.8) 100%)'
+    : 'linear-gradient(135deg, #2a2a2a 0%, #3a3a3a 100%)'
+  };
+  border: 2px solid ${props => props.isActive ? '#00d4ff' : '#444'};
+  border-radius: 12px;
+  color: ${props => props.isActive ? '#000000' : '#ffffff'};
+  cursor: pointer;
+  font-size: clamp(14px, 2.5vw, 16px);
+  font-weight: 700;
+  min-height: 36px;
+  padding: 8px 8px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: ${props => props.isActive 
+    ? '0 4px 16px rgba(0, 212, 255, 0.3)'
+    : '0 2px 8px rgba(0, 0, 0, 0.2)'
+  };
+  touch-action: manipulation;
+  
+  &:hover {
+    transform: scale(1.05);
+    box-shadow: ${props => props.isActive 
+      ? '0 6px 20px rgba(0, 212, 255, 0.4)'
+      : '0 4px 12px rgba(0, 0, 0, 0.3)'
+    };
+  }
+  
+  @media (max-width: 768px) {
+    min-height: 32px;
+    padding: 6px 6px;
+    font-size: 14px;
+  }
+  
+  @media (max-width: 640px) {
+    min-height: 28px;
+    padding: 4px 4px;
+    font-size: 13px;
+  }
+  
+  @media (max-width: 480px) {
+    min-height: 24px;
+    padding: 2px 2px;
+    font-size: 12px;
+  }
+`;
+
+const MainContent = styled.main`
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+`;
+
+const ContentList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+`;
+
+const LoadingContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  text-align: center;
+`;
+
+const Spinner = styled.div`
+  width: 40px;
+  height: 40px;
+  border: 3px solid #333;
+  border-top: 3px solid #00d4ff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+
+const LoadingText = styled.div`
+  margin-top: 16px;
+  
+  h3 {
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+  }
+  
+  p {
+    color: #cccccc;
+    font-size: 14px;
+    margin: 0;
+  }
+`;
+
+const ErrorContainer = styled.div`
+  background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%);
+  border: 2px solid #ff6666;
+  border-radius: 16px;
+  color: #ffffff;
+  padding: 20px;
+  text-align: center;
+  
+  h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+  }
+  
+  p {
+    font-size: 14px;
+    margin: 0;
+    opacity: 0.9;
+  }
+`;
+
+const ScrollToTopButton = styled.button`
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: linear-gradient(135deg, #00d4ff 0%, rgba(0, 212, 255, 0.8) 100%);
+  border: 2px solid #00d4ff;
+  border-radius: 50%;
+  color: #000000;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 8px 24px rgba(0, 212, 255, 0.3);
+  z-index: 1000;
+  touch-action: manipulation;
+  
+  &:hover {
+    transform: translateY(-2px) scale(1.1);
+    box-shadow: 0 12px 32px rgba(0, 212, 255, 0.4);
+  }
+  
+  &:active {
+    transform: scale(0.95);
+  }
+  
+  @media (max-width: 768px) {
+    width: 52px;
+    height: 52px;
+    bottom: 20px;
+    right: 20px;
+  }
+  
+  @media (max-width: 640px) {
+    width: 48px;
+    height: 48px;
+    bottom: 16px;
+    right: 16px;
+  }
+  
+  @media (max-width: 480px) {
+    width: 44px;
+    height: 44px;
+    bottom: 12px;
+    right: 12px;
+  }
+`;
+
+const Footer = styled.footer`
+  text-align: center;
+  margin-top: 48px;
+  padding: 24px 0;
+  
+  p {
+    color: #888888;
+    font-size: 12px;
+    margin: 0;
+  }
+`;
 
 export default function App() {
-    const [currentDate, setCurrentDate] = useState(new Date());
-    const [level, setLevel] = useState('B2');
+    const [currentDate] = useState(new Date());
+    const [level, setLevel] = useState('B1');
     const [activeTab, setActiveTab] = useState('expressions');
     const [expressions, setExpressions] = useState([]);
     const [news, setNews] = useState([]);
     const [activeCardIndex, setActiveCardIndex] = useState(null);
     const [activeNewsIndex, setActiveNewsIndex] = useState(null);
-    const [isCalendarOpen, setCalendarOpen] = useState(false);
     const [wordModal, setWordModal] = useState({ isOpen: false, word: '', meaning: '', example: '', detailedInfo: null });
     const [showScrollToTop, setShowScrollToTop] = useState(false);
 
     // 커스텀 훅 사용
-    const { audioStates, playAudio, clearNewsAudioCache, clearOldExpressionsAudioCache } = useAudio();
-    const { translateText, summarizeText, generateExamples, clearOldTranslations } = useTranslation();
+    const { 
+        audioStates, 
+        playAudio, 
+        clearNewsAudioCache, 
+        clearOldAudioCache,
+        clearAllAudioCache
+    } = useAudio();
+    const { translateText, summarizeText, generateExamples, translations } = useTranslation();
     const { loading, error, fetchExpressions, fetchNews, initializeData } = useDataFetching();
 
     const levels = useMemo(() => ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'], []);
 
-    // 캐시 관련 헬퍼 함수들
-    const getExpressionsCacheKey = useCallback((date) => getCacheKey('expressions', date), []);
-    const getNewsCacheKey = useCallback((date) => getCacheKey('news', date), []);
-    const isExpressionsCacheValid = useCallback((date) => isCacheValid('expressions', date), []);
-    const isNewsCacheValid = useCallback((date) => isCacheValid('news', date), []);
 
     // 데이터 가져오기
     const loadData = useCallback(async () => {
         try {
             if (activeTab === 'expressions') {
-                // 표현 데이터를 새로 불러올 때 1주일 전 데이터 삭제
-                clearOldExpressionsAudioCache();
-                clearOldTranslations();
+                // 표현 데이터를 새로 불러올 때 오래된 캐시 정리
+                clearOldAudioCache();
                 const data = await fetchExpressions(currentDate, level);
                 setExpressions(data);
                 setActiveCardIndex(null);
@@ -54,417 +418,197 @@ export default function App() {
                 setNews(data);
                 setActiveNewsIndex(null);
             }
-        } catch (e) {
-            console.error('데이터 로드 실패:', e);
+        } catch (err) {
+            console.error('데이터 로딩 실패:', err);
         }
-    }, [currentDate, level, activeTab, fetchExpressions, fetchNews, clearNewsAudioCache, clearOldExpressionsAudioCache, clearOldTranslations]);
+    }, [activeTab, currentDate, level, fetchExpressions, fetchNews, clearNewsAudioCache]);
 
-    // 초기화 및 데이터 로드
+    // 스크롤 이벤트 처리
     useEffect(() => {
-        initializeData();
-        loadData();
-    }, [initializeData, loadData]);
-
-    // 스크롤 이벤트 핸들러
-    useEffect(() => {
+        let scrollTimeout;
+        
         const handleScroll = () => {
-            setShowScrollToTop(window.scrollY > 100);
+            setShowScrollToTop(window.scrollY > 300);
+            
+            // 스크롤 중일 때 클래스 추가
+            document.body.classList.add('scrolling');
+            document.documentElement.classList.add('scrolling');
+            
+            // 스크롤이 멈춘 후 클래스 제거
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+                document.body.classList.remove('scrolling');
+                document.documentElement.classList.remove('scrolling');
+            }, 150);
         };
-
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
-
-    // 이벤트 핸들러들
-    const changeDate = useCallback((days) => {
-        // 뉴스학습 탭에서는 날짜 변경 불가
-        if (activeTab === 'news') {
-            return;
-        }
         
-        setCurrentDate(prev => {
-            const d = new Date(prev);
-            d.setDate(d.getDate() + days);
-            return d;
-        });
-    }, [activeTab]);
-
-    const goToToday = useCallback(() => {
-        // 뉴스학습 탭에서는 오늘로 돌아가기 불가
-        if (activeTab === 'news') {
-            return;
-        }
-        
-        setCurrentDate(new Date());
-    }, [activeTab]);
-
-    const formatDate = useCallback((date) => {
-        return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일 (${['일', '월', '화', '수', '목', '금', '토'][date.getDay()]})`;
-    }, []);
-    
-    const isToday = useMemo(() => {
-        return currentDate.toDateString() === new Date().toDateString();
-    }, [currentDate]);
-
-    const toggleCard = useCallback((index) => {
-        setActiveCardIndex(prev => prev === index ? null : index);
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+            clearTimeout(scrollTimeout);
+        };
     }, []);
 
-    const handleWordClick = useCallback((word, meaning, example, detailedInfo) => {
-        setWordModal({ isOpen: true, word, meaning, example, detailedInfo });
-    }, []);
-
-    const closeWordModal = useCallback(() => {
-        setWordModal({ isOpen: false, word: '', meaning: '', example: '', detailedInfo: null });
-    }, []);
-
+    // 스크롤 to top
     const scrollToTop = useCallback(() => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }, []);
 
+    // 초기 데이터 로딩
+    useEffect(() => {
+        initializeData();
+    }, [initializeData]);
+
+    // 버전 체크 및 핫 리로드 감지
+    useEffect(() => {
+        detectHotReload();
+    }, []);
+
+    // 탭이나 레벨 변경 시 데이터 로딩
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
+
+
     return (
-        <div className="bg-gray-50 font-sans min-h-screen flex flex-col items-center mobile-spacing mobile-scroll">
-            {isCalendarOpen && activeTab === 'expressions' && (
-                <Calendar 
-                    selectedDate={currentDate} 
-                    onDateSelect={setCurrentDate} 
-                    closeCalendar={() => setCalendarOpen(false)} 
-                    goToToday={goToToday}
-                    availableDates={getAvailableDates()}
-                />
-            )}
-            
+        <AppContainer>
             <WordModal
                 isOpen={wordModal.isOpen}
                 word={wordModal.word}
                 meaning={wordModal.meaning}
                 example={wordModal.example}
                 detailedInfo={wordModal.detailedInfo}
-                onClose={closeWordModal}
-                onPlayAudio={playAudio}
-                audioStates={audioStates}
-                onGenerateExamples={generateExamples}
+                onClose={() => setWordModal({ ...wordModal, isOpen: false })}
             />
-
-            {/* 플로팅 스크롤 버튼 */}
+            
             {showScrollToTop && (
-                <button
+                <ScrollToTopButton 
                     onClick={scrollToTop}
-                    className="mobile-floating bg-indigo-600 text-white p-3 rounded-full hover:bg-indigo-700 transition-all duration-200 transform hover:scale-110"
-                    aria-label="맨 위로 이동"
+                    aria-label="맨 위로 스크롤"
                 >
-                    <ArrowUpIcon className="h-5 w-5" />
-                </button>
+                    <ArrowUpIcon className="h-6 w-6" />
+                </ScrollToTopButton>
             )}
             
-            <div className="w-full max-w-2xl mx-auto pt-0">
-                {/* 고정 헤더 */}
-                <div className={`fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm shadow-sm border-b border-gray-100 transition-transform duration-300 ${
-                    showScrollToTop ? 'translate-y-0' : '-translate-y-full'
-                }`}>
-                    <div className="max-w-2xl mx-auto mobile-spacing">
-                        <div className="flex items-center justify-between py-2">
-                            <button 
-                                onClick={() => changeDate(-1)} 
-                                className={`mobile-button p-2 rounded-full transition-colors ${
-                                    activeTab === 'news' ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-100 text-gray-600'
-                                }`}
-                                disabled={activeTab === 'news'}
-                                aria-label="이전 날"
-                            >
-                                <ChevronLeftIcon />
-                            </button>
-                            
-                            <div className="flex flex-col items-center">
-                                {activeTab === 'expressions' ? (
-                                    <button 
-                                        onClick={() => setCalendarOpen(true)} 
-                                        className="mobile-button flex items-center text-sm font-semibold text-indigo-600 tabular-nums p-2 rounded-lg hover:bg-indigo-50 transition-colors"
-                                    >
-                                        <CalendarIcon className="h-4 w-4 mr-1" /> 
-                                        {formatDate(currentDate)}
-                                    </button>
-                                ) : (
-                                    <div className="text-sm font-semibold text-indigo-600 tabular-nums p-2">
-                                        {formatDate(currentDate)}
-                                    </div>
-                                )}
-                            </div>
-                            
-                            <button 
-                                onClick={() => changeDate(1)} 
-                                className={`mobile-button p-2 rounded-full transition-colors ${
-                                    activeTab === 'news' ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-100 text-gray-600'
-                                }`}
-                                disabled={activeTab === 'news'}
-                                aria-label="다음 날"
-                            >
-                                <ChevronRightIcon />
-                            </button>
-                        </div>
-                        
-                        {/* 탭 표시 (선택 불가) */}
-                        <div className="flex gap-1 mb-2">
-                            <div className={`flex-1 py-1 px-2 text-xs font-medium rounded relative ${
-                                activeTab === 'expressions'
-                                    ? 'bg-indigo-100 text-indigo-700'
-                                    : 'text-gray-500'
-                            }`}>
-                                오늘의 표현
-                                {activeTab === 'expressions' && isExpressionsCacheValid(currentDate) && (
-                                    <span className="absolute -top-0.5 -right-0.5 bg-green-500 text-white text-xs rounded-full w-2 h-2 flex items-center justify-center">
-                                        ✓
-                                    </span>
-                                )}
-                            </div>
-                            <div className={`flex-1 py-1 px-2 text-xs font-medium rounded relative ${
-                                activeTab === 'news'
-                                    ? 'bg-indigo-100 text-indigo-700'
-                                    : 'text-gray-500'
-                            }`}>
-                                뉴스 학습
-                                {activeTab === 'news' && isNewsCacheValid(new Date()) && (
-                                    <span className="absolute -top-0.5 -right-0.5 bg-green-500 text-white text-xs rounded-full w-2 h-2 flex items-center justify-center">
-                                        ✓
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* 메인 헤더 */}
-                <header className="text-center mb-2 mobile-header">
-                    <h1 className="mobile-text-large font-bold text-gray-800">
+            <MainContainer>
+                <Header>
+                    <Title>
                         Daily English
-                    </h1>
-                </header>
-
-                <div className="bg-white mobile-spacing rounded-xl shadow-sm mb-2 mobile-card">
-                    {/* 날짜 선택 및 탭 버튼 */}
-                    <div className="flex items-center justify-between mb-4">
-                        <button 
-                            onClick={() => changeDate(-1)} 
-                            className={`mobile-button p-3 rounded-full transition-colors ${
-                                activeTab === 'news' ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-100 text-gray-600'
-                            }`}
-                            disabled={activeTab === 'news'}
-                            aria-label="이전 날"
-                        >
-                            <ChevronLeftIcon />
-                        </button>
-                        
-                        <div className="flex flex-col items-center">
-                            {activeTab === 'expressions' ? (
-                                <>
-                                    <button 
-                                        onClick={() => setCalendarOpen(true)} 
-                                        className="mobile-button flex items-center mobile-text-large font-semibold text-indigo-600 tabular-nums p-3 rounded-lg hover:bg-indigo-50 transition-colors"
-                                    >
-                                        <CalendarIcon /> {formatDate(currentDate)}
-                                    </button>
-                                    {!isToday && (
-                                        <button 
-                                            onClick={goToToday} 
-                                            className="mobile-button mt-2 mobile-text bg-indigo-100 text-indigo-700 font-semibold px-4 py-2 rounded-full hover:bg-indigo-200 transition-colors"
-                                        >
-                                            오늘로 돌아가기
-                                        </button>
-                                    )}
-                                </>
-                            ) : (
-                                <div className="mobile-text-large font-semibold text-indigo-600 tabular-nums p-3">
-                                    {formatDate(currentDate)}
-                                </div>
-                            )}
-                        </div>
-                        
-                        <button 
-                            onClick={() => changeDate(1)} 
-                            className={`mobile-button p-3 rounded-full transition-colors ${
-                                activeTab === 'news' ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-100 text-gray-600'
-                            }`}
-                            disabled={activeTab === 'news'}
-                            aria-label="다음 날"
-                        >
-                            <ChevronRightIcon />
-                        </button>
-                    </div>
+                    </Title>
                     
-                    {/* 탭 버튼 */}
-                    <div className="flex gap-2 mb-4 p-1 bg-gray-50 rounded-lg">
-                        <button 
+                    <TabNavigation>
+                        <TabButton 
+                            isActive={activeTab === 'expressions'}
                             onClick={() => setActiveTab('expressions')}
-                            className={`flex-1 py-3 px-4 text-sm font-medium rounded-lg transition-all duration-200 relative cursor-pointer ${
-                                activeTab === 'expressions'
-                                    ? 'bg-white text-indigo-700 shadow-sm transform scale-105'
-                                    : 'text-gray-600 hover:text-gray-800 hover:bg-white/50'
-                            }`}
                         >
                             오늘의 표현
-                            {activeTab === 'expressions' && isExpressionsCacheValid(currentDate) && (
-                                <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                                    ✓
-                                </span>
-                            )}
-                        </button>
-                        <button 
+                        </TabButton>
+                        <TabButton 
+                            isActive={activeTab === 'news'}
                             onClick={() => setActiveTab('news')}
-                            className={`flex-1 py-3 px-4 text-sm font-medium rounded-lg transition-all duration-200 relative cursor-pointer ${
-                                activeTab === 'news'
-                                    ? 'bg-white text-indigo-700 shadow-sm transform scale-105'
-                                    : 'text-gray-600 hover:text-gray-800 hover:bg-white/50'
-                            }`}
                         >
                             뉴스 학습
-                            {activeTab === 'news' && isNewsCacheValid(new Date()) && (
-                                <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                                    ✓
-                                </span>
-                            )}
-                        </button>
-                    </div>
+                        </TabButton>
+                    </TabNavigation>
+                </Header>
+
                     
-                    {/* 캐시 상태 표시 - 모바일에서는 숨김 */}
-                    <div className="hidden sm:block">
-                        {activeTab === 'news' && (
-                            <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center">
-                                        <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
-                                        <span className="text-sm text-blue-700">
-                                            {isNewsCacheValid(new Date()) 
-                                                ? '오늘의 뉴스가 캐시되어 있습니다. 레벨을 변경하면 같은 기사를 해당 레벨에 맞게 재구성합니다.'
-                                                : '새로운 뉴스를 가져오는 중입니다. 하루에 한 번만 업데이트되며, 이전 데이터는 자동으로 삭제됩니다.'
-                                            }
-                                        </span>
-                                    </div>
-                                    {isNewsCacheValid(new Date()) && (
-                                        <button 
-                                            onClick={() => {
-                                                const cacheKey = getNewsCacheKey(new Date());
-                                                localStorage.removeItem(cacheKey);
-                                                window.location.reload();
-                                            }}
-                                            className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 transition-colors"
-                                        >
-                                            캐시 새로고침
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                        
-                        {activeTab === 'expressions' && (
-                            <div className="mb-4 p-3 bg-green-50 rounded-lg border border-green-200">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center">
-                                        <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                                        <span className="text-sm text-green-700">
-                                            {isExpressionsCacheValid(currentDate) 
-                                                ? '오늘의 표현이 캐시되어 있습니다. 레벨을 변경하면 같은 표현을 해당 레벨에 맞게 재구성합니다.'
-                                                : '새로운 표현을 가져오는 중입니다. 하루에 한 번만 업데이트되며, 일주일 이전 데이터는 자동으로 삭제됩니다.'
-                                            }
-                                        </span>
-                                    </div>
-                                    {isExpressionsCacheValid(currentDate) && (
-                                        <button 
-                                            onClick={() => {
-                                                const cacheKey = getExpressionsCacheKey(currentDate);
-                                                localStorage.removeItem(cacheKey);
-                                                window.location.reload();
-                                            }}
-                                            className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 transition-colors"
-                                        >
-                                            캐시 새로고침
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                    
-                    <div className="grid grid-cols-3 gap-2">
+                {/* 레벨 선택 */}
+                <LevelSelection>
+                    <LevelGrid>
                         {levels.map(l => (
-                            <button 
+                            <LevelButton 
                                 key={l} 
+                                isActive={level === l}
                                 onClick={() => setLevel(l)} 
-                                className={`py-2 px-3 text-sm font-semibold rounded-lg transition-all duration-200 ${
-                                    level === l 
-                                        ? 'bg-indigo-600 text-white shadow-md' 
-                                        : 'bg-gray-100 text-gray-700 hover:bg-indigo-100'
-                                }`}
                             >
                                 {l}
-                            </button>
+                            </LevelButton>
                         ))}
-                    </div>
-                </div>
+                    </LevelGrid>
+                </LevelSelection>
 
-                <main className="mobile-list mt-6">
+                {/* 메인 컨텐츠 */}
+                <MainContent>
                     {loading ? (
-                        <div className="flex justify-center items-center h-64">
-                            <div className="text-center">
-                                <LoaderIcon size="h-10 w-10" />
-                                <p className="mt-4 text-gray-600">
-                                    {activeTab === 'expressions' 
-                                        ? `${levelDescriptions[level]} 레벨 표현을 만들고 있어요...`
-                                        : `${levelDescriptions[level]} 레벨 뉴스를 만들고 있어요...`
-                                    }
-                                </p>
+                        <LoadingContainer>
+                            <div>
+                                <Spinner />
+                                <LoadingText>
+                                    <h3>
+                                        {activeTab === 'expressions' 
+                                            ? `${levelDescriptions[level]} 레벨 표현을 만들고 있어요...`
+                                            : `${levelDescriptions[level]} 레벨 뉴스를 만들고 있어요...`
+                                        }
+                                    </h3>
+                                    <p>AI가 최적화된 학습 콘텐츠를 생성하고 있습니다</p>
+                                </LoadingText>
                             </div>
-                        </div>
+                        </LoadingContainer>
                     ) : error ? (
-                        <div className="bg-red-100 text-red-700 p-4 rounded-lg text-center">
-                            {error}
-                        </div>
-                    ) : activeTab === 'expressions' ? (
-                        expressions.map((expr, index) => (
-                            <ExpressionCard
-                                key={index}
-                                expression={expr}
-                                index={index}
-                                isActive={activeCardIndex === index}
-                                onToggle={toggleCard}
-                                audioStates={audioStates}
-                                onPlayAudio={playAudio}
-                                onWordClick={handleWordClick}
-                                onTranslate={translateText}
-                            />
-                        ))
+                        <ErrorContainer>
+                            <h3>데이터를 불러오는 데 실패했습니다.</h3>
+                            <p>잠시 후 다시 시도해주세요. 문제가 지속되면 관리자에게 문의하세요.</p>
+                        </ErrorContainer>
                     ) : (
-                        news.map((newsItem, index) => (
-                            <NewsCard
-                                key={index}
-                                news={newsItem}
-                                index={index}
-                                isActive={activeNewsIndex === index}
-                                onToggle={setActiveNewsIndex}
-                                audioStates={audioStates}
-                                onPlayAudio={playAudio}
-                                onWordClick={handleWordClick}
-                                onTranslate={translateText}
-                                onSummarize={summarizeText}
-                            />
-                        ))
+                        <ContentList>
+                            {activeTab === 'expressions' && (
+                                expressions.map((expression, index) => (
+                                    <ExpressionCard
+                                        key={index}
+                                        expression={expression}
+                                        index={index}
+                                        isActive={activeCardIndex === index}
+                                        onToggle={(index) => {
+                                            setActiveCardIndex(activeCardIndex === index ? null : index);
+                                        }}
+                                        audioStates={audioStates}
+                                        onPlayAudio={playAudio}
+                                        onWordClick={setWordModal}
+                                        onTranslate={translateText}
+                                        level={level}
+                                        translations={translations}
+                                        handleTranslationClick={translateText}
+                                    />
+                                ))
+                            )}
+                            {activeTab === 'news' && (
+                                news.length > 0 ? news.map((newsItem, index) => (
+                                    <NewsCard
+                                        key={index}
+                                        newsItem={newsItem}
+                                        index={index}
+                                        isActive={activeNewsIndex === index}
+                                        onToggle={(index) => {
+                                            setActiveNewsIndex(activeNewsIndex === index ? null : index);
+                                        }}
+                                        audioStates={audioStates}
+                                        onPlayAudio={playAudio}
+                                        onWordClick={setWordModal}
+                                        onTranslate={translateText}
+                                        onSummarize={summarizeText}
+                                        onGenerateExamples={generateExamples}
+                                        translations={translations}
+                                        handleTranslationClick={translateText}
+                                    />
+                                )) : (
+                                    <div className="text-center py-8">
+                                        <div className="text-gray-500 mb-4">
+                                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                                            <p className="text-lg font-medium">뉴스를 불러오는 중...</p>
+                                            <p className="text-sm">AI가 최신 뉴스를 분석하고 있습니다</p>
+                                        </div>
+                                    </div>
+                                )
+                            )}
+                        </ContentList>
                     )}
-                </main>
+                </MainContent>
 
-                <footer className="mobile-footer text-center mt-8 text-gray-400 mobile-text">
-                    <p>Powered by Gemini API</p>
-                </footer>
-            </div>
-
-            {/* 최상단으로 올라가는 플로팅 버튼 */}
-            {showScrollToTop && (
-                <button
-                    onClick={scrollToTop}
-                    className="mobile-floating bg-indigo-600 text-white hover:bg-indigo-700 transition-all duration-300 flex items-center justify-center hover:scale-110"
-                    aria-label="최상단으로 이동"
-                >
-                    <ArrowUpIcon />
-                </button>
-            )}
-        </div>
+                <Footer>
+                    <p>Powered by Gemini AI</p>
+                </Footer>
+            </MainContainer>
+        </AppContainer>
     );
 }

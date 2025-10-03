@@ -4,6 +4,8 @@
   "description": "매일 3개의 영어 구동사를 학습하는 React 앱",
   "private": true,
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
     "@testing-library/jest-dom": "^5.16.4",
     "@testing-library/react": "^13.3.0",
     "@testing-library/user-event": "^13.5.0",
@@ -14,7 +16,8 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "node scripts/updateVersion.js && react-scripts build",
+    "build:hash": "node scripts/updateVersion.js",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -37,8 +40,8 @@
     ]
   },
   "devDependencies": {
-    "tailwindcss": "^3.3.0",
     "autoprefixer": "^10.4.14",
-    "postcss": "^8.4.24"
+    "postcss": "^8.4.24",
+    "tailwindcss": "^3.3.0"
   }
 }

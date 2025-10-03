@@ -103,3 +103,4 @@ tailwind.config.js
 
 # OneDrive specific
 .onedriveignore
+.env*.local

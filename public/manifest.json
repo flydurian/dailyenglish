@@ -10,7 +10,12 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#6366f1",
-  "background_color": "#f9fafb",
-  "description": "매일 3개의 영어 구동사를 학습하는 앱"
+  "orientation": "portrait",
+  "theme_color": "#00d4ff",
+  "background_color": "#0a0a0a",
+  "description": "매일 3개의 영어 구동사를 학습하는 앱",
+  "categories": ["education", "productivity"],
+  "lang": "ko",
+  "scope": "/",
+  "prefer_related_applications": false
 }

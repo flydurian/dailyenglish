@@ -11,99 +11,126 @@ export const useDataFetching = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    // 원본 뉴스 데이터 가져오기 (하루에 한 번만)
-    const fetchOriginalNews = useCallback(async (date) => {
-        const seed = `${date.toISOString().split('T')[0]}-original-news`;
-        const prompt = `You are an expert news analyst. Create 2 current news articles about recent events. These should be real, current news stories that are actually happening in the world right now. Return the response as a valid JSON array with the following structure for each news article:
-[
-  {
-    "title": "current news title",
-    "full_text": "complete news article with current events",
-    "original_complexity": "C1" // 원본 기사의 복잡도 레벨
-  }
-]
-Choose real, current news topics that are actually happening. Use seed for consistency: ${seed}.`;
-        
-        const payload = {
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig: {
-                responseMimeType: "application/json"
-            }
+    // 한국 뉴스 가져오기
+    const fetchKoreanNews = useCallback(async (date) => {
+        // 간단한 한국 뉴스 데이터 생성 (API 호출 없이)
+        const koreanNews = {
+            title: "South Korea's Economic Growth and Technological Innovation",
+            full_text: "South Korea has been showing remarkable achievements in economic growth and technological innovation recently. Particularly notable developments in semiconductor, automotive, and IT sectors have been prominent. This growth is enhancing South Korea's global competitiveness and establishing the foundation for sustainable future development.",
+            category: "korean",
+            original_complexity: "B2"
         };
-
-        try {
-            const result = await callGeminiAPI(payload, 'gemini-2.5-flash-preview-05-20');
-            const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-            
-            if (text) {
-                return JSON.parse(text);
-            } else {
-                throw new Error("API 응답에서 콘텐츠를 찾을 수 없습니다.");
-            }
-        } catch (e) {
-            console.error("원본 뉴스를 가져오는 데 실패했습니다:", e);
-            throw e;
-        }
+        
+        return koreanNews;
     }, []);
 
-    // 레벨에 맞게 뉴스 재구성
-    const adaptNewsForLevel = useCallback(async (originalNews, targetLevel) => {
-        const prompt = `You are an expert English teacher and news analyst. Take the following news articles and adapt them for CEFR ${targetLevel} (${levelDescriptions[targetLevel]}) level English learners. Keep the same news content but adjust the language complexity, vocabulary, and grammar structures to be appropriate for ${targetLevel} level learners.
-
-Original news articles:
-${JSON.stringify(originalNews, null, 2)}
-
-Return the response as a valid JSON array with the following structure for each adapted news article:
-[
-  {
-    "title": "news title adapted for ${targetLevel} level",
-    "full_text": "complete news article adapted for ${targetLevel} level with appropriate vocabulary and sentence structure",
-    "key_words": [
-      {
-        "word": "important word from the article that is appropriate for ${targetLevel} level",
-        "meaning": "Korean meaning",
-        "example": "simple example sentence suitable for ${targetLevel} level"
-      }
-    ],
-    "key_expressions": [
-      {
-        "expression": "useful expression from the article that is appropriate for ${targetLevel} level",
-        "meaning": "Korean meaning",
-        "example": "simple example sentence suitable for ${targetLevel} level"
-      }
-    ],
-    "phrasal_verbs": [
-      {
-        "phrasal_verb": "phrasal verb from the article that is appropriate for ${targetLevel} level",
-        "meaning": "Korean meaning",
-        "example": "simple example sentence suitable for ${targetLevel} level"
-      }
-    ]
-  }
-]
-
-For key_words, select only the most important words that are appropriate for ${targetLevel} level (maximum 10 words, ordered by importance). For key_expressions and phrasal_verbs, select only those that are appropriate for ${targetLevel} level learners.`;
-        
-        const payload = {
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig: {
-                responseMimeType: "application/json"
-            }
+    // 세계 뉴스 가져오기
+    const fetchWorldNews = useCallback(async (date) => {
+        // 간단한 세계 뉴스 데이터 생성 (API 호출 없이)
+        const worldNews = {
+            title: "Global Climate Change and Renewable Energy Initiatives",
+            full_text: "Countries around the world are taking significant steps to address climate change through renewable energy initiatives. Solar and wind power installations have reached record levels, while electric vehicle adoption continues to grow. International cooperation on environmental policies is strengthening, with new agreements on carbon reduction targets being established.",
+            category: "world",
+            original_complexity: "B2"
         };
+        
+        return worldNews;
+    }, []);
 
-        try {
-            const result = await callGeminiAPI(payload, 'gemini-2.5-flash-preview-05-20');
-            const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-            
-            if (text) {
-                return JSON.parse(text);
-            } else {
-                throw new Error("API 응답에서 콘텐츠를 찾을 수 없습니다.");
-            }
-        } catch (e) {
-            console.error("뉴스를 레벨에 맞게 재구성하는 데 실패했습니다:", e);
-            throw e;
+    // 레벨별 뉴스 요약 생성
+    const summarizeNewsForLevel = useCallback(async (newsItem, targetLevel) => {
+        // 뉴스 데이터 유효성 검사
+        if (!newsItem || !newsItem.title) {
+            console.error('뉴스 데이터가 유효하지 않습니다:', newsItem);
+            return {
+                title: "뉴스 제목을 불러올 수 없습니다",
+                summary: "뉴스 요약을 생성할 수 없습니다.",
+                key_points: [],
+                vocabulary_notes: []
+            };
         }
+        
+        // 뉴스별 맞춤 요약 생성
+        let summary, keyPoints, vocabularyNotes;
+        
+        if (newsItem.category === 'korean') {
+            summary = `South Korea continues to demonstrate remarkable achievements in technological innovation and economic development. The nation has established itself as a global leader in semiconductor manufacturing, with companies like Samsung and SK Hynix leading the world in memory chip production. The automotive industry has also seen significant growth, with Hyundai and Kia expanding their electric vehicle offerings and autonomous driving technologies. Additionally, South Korea's IT sector has been thriving, particularly in areas such as artificial intelligence, 5G networks, and digital transformation initiatives. These technological advancements have not only strengthened the country's domestic economy but have also enhanced its global competitiveness, positioning South Korea as a key player in the international technology market. The government has been actively supporting these industries through various policies and investments, fostering an environment conducive to innovation and growth.`;
+            keyPoints = [
+                "come up with: 생각해내다, 제안하다",
+                "look into: 조사하다, 살펴보다",
+                "put up with: 참다, 견디다",
+                "set up: 설립하다, 설치하다",
+                "take over: 인수하다, 이어받다",
+                "break through: 돌파하다, 성과를 내다"
+            ];
+            // 레벨별 주요 단어 필터링
+            if (targetLevel === 'A1' || targetLevel === 'A2') {
+                vocabularyNotes = [
+                    "company: 회사",
+                    "technology: 기술",
+                    "growth: 성장"
+                ];
+            } else if (targetLevel === 'B1' || targetLevel === 'B2') {
+                vocabularyNotes = [
+                    "semiconductor: 반도체",
+                    "automotive: 자동차 관련",
+                    "competitiveness: 경쟁력",
+                    "innovation: 혁신"
+                ];
+            } else {
+                vocabularyNotes = [
+                    "semiconductor: 반도체",
+                    "automotive: 자동차 관련",
+                    "competitiveness: 경쟁력",
+                    "innovation: 혁신",
+                    "manufacturing: 제조업",
+                    "infrastructure: 인프라"
+                ];
+            }
+        } else {
+            summary = `The global community is intensifying its efforts to address climate change through comprehensive renewable energy initiatives and international cooperation. Countries around the world are significantly increasing their investments in solar and wind power infrastructure, with many nations setting ambitious targets to achieve carbon neutrality within the next few decades. The adoption of electric vehicles is accelerating rapidly, supported by government incentives and improved battery technology. International organizations and governments are forming new partnerships and agreements to reduce greenhouse gas emissions and protect the environment. These collaborative efforts include sharing technological innovations, establishing carbon trading systems, and implementing stricter environmental regulations. The transition to renewable energy sources is not only helping to combat climate change but is also creating new economic opportunities and jobs in the green energy sector.`;
+            keyPoints = [
+                "work together: 함께 일하다, 협력하다",
+                "fight against: ~에 맞서 싸우다",
+                "come up with: 생각해내다, 제안하다",
+                "cut down: 줄이다, 감소시키다",
+                "phase out: 단계적으로 폐지하다",
+                "step up: 강화하다, 증대시키다"
+            ];
+            // 레벨별 주요 단어 필터링
+            if (targetLevel === 'A1' || targetLevel === 'A2') {
+                vocabularyNotes = [
+                    "energy: 에너지",
+                    "environment: 환경",
+                    "change: 변화"
+                ];
+            } else if (targetLevel === 'B1' || targetLevel === 'B2') {
+                vocabularyNotes = [
+                    "renewable: 재생 가능한",
+                    "cooperation: 협력",
+                    "pollution: 오염",
+                    "emissions: 배출량"
+                ];
+            } else {
+                vocabularyNotes = [
+                    "renewable: 재생 가능한",
+                    "cooperation: 협력",
+                    "pollution: 오염",
+                    "emissions: 배출량",
+                    "sustainability: 지속가능성",
+                    "carbon neutrality: 탄소 중립"
+                ];
+            }
+        }
+        
+        const result = {
+            title: newsItem.title,
+            summary: summary,
+            key_points: keyPoints,
+            vocabulary_notes: vocabularyNotes
+        };
+        
+        return result;
     }, []);
 
     const fetchExpressions = useCallback(async (date, selectedLevel) => {
@@ -244,36 +271,37 @@ CRITICAL: Generate completely NEW and DIFFERENT phrasal verbs every single day f
         setError(null);
         
         try {
-            // 캐시된 뉴스가 있는지 확인
-            if (isCacheValid('news', date)) {
-                const cached = getCachedData('news', date);
-                if (cached && cached.data[selectedLevel]) {
-                    setLoading(false);
-                    return cached.data[selectedLevel];
-                }
+            // 항상 새로운 뉴스 데이터 생성 (캐시 무시)
+            const [koreanNews, worldNews] = await Promise.all([
+                fetchKoreanNews(date),
+                fetchWorldNews(date)
+            ]);
+            
+            // 뉴스 데이터 유효성 검사
+            if (!koreanNews || !worldNews) {
+                console.error('뉴스 데이터가 없습니다:', { koreanNews, worldNews });
+                throw new Error('뉴스 데이터를 가져올 수 없습니다.');
             }
             
-            // 원본 뉴스 가져오기 (하루에 한 번만)
-            let originalNews;
-            if (isCacheValid('news', date)) {
-                const cached = getCachedData('news', date);
-                originalNews = cached.data.original;
-            } else {
-                originalNews = await fetchOriginalNews(date);
-                // 원본 뉴스를 캐시에 저장
-                setCachedData('news', date, { original: originalNews });
-            }
+            // 각 뉴스를 레벨에 맞게 요약
+            const [koreanSummary, worldSummary] = await Promise.all([
+                summarizeNewsForLevel(koreanNews, selectedLevel),
+                summarizeNewsForLevel(worldNews, selectedLevel)
+            ]);
             
-            // 레벨에 맞게 뉴스 재구성
-            const adaptedNews = await adaptNewsForLevel(originalNews, selectedLevel);
+            // 요약된 뉴스 배열 생성
+            const summarizedNews = [
+                { ...koreanSummary, category: 'korean', original: koreanNews },
+                { ...worldSummary, category: 'world', original: worldNews }
+            ];
             
             // 캐시 업데이트
             const cached = getCachedData('news', date) || { data: {} };
-            cached.data[selectedLevel] = adaptedNews;
+            cached.data[selectedLevel] = summarizedNews;
             setCachedData('news', date, cached.data);
             
             setLoading(false);
-            return adaptedNews;
+            return summarizedNews;
             
         } catch (e) {
             console.error("뉴스를 가져오는 데 실패했습니다:", e);
@@ -281,7 +309,7 @@ CRITICAL: Generate completely NEW and DIFFERENT phrasal verbs every single day f
             setLoading(false);
             throw e;
         }
-    }, [fetchOriginalNews, adaptNewsForLevel]);
+    }, [fetchKoreanNews, fetchWorldNews, summarizeNewsForLevel]);
 
     // 초기화 시 월별 데이터 정리
     const initializeData = useCallback(() => {

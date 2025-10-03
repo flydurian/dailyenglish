@@ -1,0 +1,14 @@
+{
+  "phrasalVerbs": [
+    {"id": 1, "verb": "look up", "meaning": "찾아보다, 조회하다", "frequency": 100},
+    {"id": 2, "verb": "find out", "meaning": "알아내다, 발견하다", "frequency": 99},
+    {"id": 3, "verb": "come up", "meaning": "나타나다, 제기되다", "frequency": 98},
+    {"id": 4, "verb": "go on", "meaning": "계속하다, 일어나다", "frequency": 97},
+    {"id": 5, "verb": "turn on", "meaning": "켜다, 작동시키다", "frequency": 96},
+    {"id": 6, "verb": "turn off", "meaning": "끄다, 중단하다", "frequency": 95},
+    {"id": 7, "verb": "put on", "meaning": "입다, 착용하다", "frequency": 94},
+    {"id": 8, "verb": "take off", "meaning": "벗다, 이륙하다", "frequency": 93},
+    {"id": 9, "verb": "get up", "meaning": "일어나다, 기상하다", "frequency": 92},
+    {"id": 10, "verb": "sit down", "meaning": "앉다", "frequency": 91}
+  ]
+}
