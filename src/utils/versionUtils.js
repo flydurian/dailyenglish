@@ -20,13 +20,13 @@ export const checkForUpdates = async () => {
             
             if (currentHash !== latestHash) {
                 console.log(`새 빌드 발견: ${currentHash?.substring(0, 8) || '없음'} → ${latestHash.substring(0, 8)}`);
+                console.log('자동으로 최신 버전을 가져옵니다...');
                 
                 localStorage.setItem(CACHE_KEY, latestHash);
                 
-                if (window.confirm('새로운 업데이트가 있습니다. 지금 새로고침하시겠습니까?')) {
-                    clearAllCaches();
-                    window.location.reload(true);
-                }
+                // 자동으로 캐시를 지우고 새로고침
+                clearAllCaches();
+                window.location.reload(true);
                 
                 return true;
             }
