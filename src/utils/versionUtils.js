@@ -6,6 +6,17 @@ const CACHE_KEY = 'app_hash';
 export const checkForUpdates = async () => {
     try {
         const currentHash = localStorage.getItem(CACHE_KEY);
+        const lastCheckTime = localStorage.getItem('last_update_check');
+        const now = Date.now();
+        
+        // 5분 이내에 체크했다면 다시 체크하지 않음
+        if (lastCheckTime && (now - parseInt(lastCheckTime)) < 5 * 60 * 1000) {
+            console.log('최근에 업데이트를 체크했으므로 건너뜁니다.');
+            return false;
+        }
+        
+        // 마지막 체크 시간 업데이트
+        localStorage.setItem('last_update_check', now.toString());
         
         const response = await fetch(`/hash.json?t=${Date.now()}`, {
             cache: 'no-cache',
@@ -29,6 +40,8 @@ export const checkForUpdates = async () => {
                 window.location.reload(true);
                 
                 return true;
+            } else {
+                console.log('최신 버전입니다.');
             }
         }
         
@@ -57,11 +70,19 @@ export const forceRefresh = () => {
     window.location.reload(true);
 };
 
-// 앱 시작 시 해시 체크
+// 앱 시작 시 해시 체크 (한 번만 실행)
+let hasCheckedForUpdates = false;
+
 export const detectHotReload = () => {
     if (process.env.NODE_ENV === 'development') {
         return;
     }
     
+    // 이미 체크했다면 다시 체크하지 않음
+    if (hasCheckedForUpdates) {
+        return;
+    }
+    
+    hasCheckedForUpdates = true;
     checkForUpdates();
 };
