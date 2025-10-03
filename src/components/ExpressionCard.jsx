@@ -830,7 +830,11 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
                                                         disabled={translations[situation]?.loading}
                                                         aria-label="번역"
                                                     >
-                                                        <TranslateIcon className="h-1.5 w-1.5" />
+                                                        {translations[situation]?.loading ? (
+                                                            <LoaderIcon size="h-1.5 w-1.5" />
+                                                        ) : (
+                                                            <TranslateIcon className="h-1.5 w-1.5" />
+                                                        )}
                                                     </SmallActionButton>
                                                 </UsageExampleActions>
                                             </div>

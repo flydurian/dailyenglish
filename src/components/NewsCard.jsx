@@ -356,6 +356,12 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
             return; // 이미 번역된 경우
         }
 
+        // 로딩 상태 설정
+        setExampleTranslations(prev => ({
+            ...prev,
+            [exampleText]: { loading: true }
+        }));
+
         try {
             const translation = await handleTranslationClick(exampleText);
             if (translation) {
@@ -366,6 +372,12 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
             }
         } catch (error) {
             console.error('예시 번역 실패:', error);
+            // 에러 발생 시 로딩 상태 제거
+            setExampleTranslations(prev => {
+                const newState = { ...prev };
+                delete newState[exampleText];
+                return newState;
+            });
         }
     }, [exampleTranslations, handleTranslationClick]);
 
@@ -782,11 +794,15 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                                                             e.stopPropagation();
                                                             handleExampleTranslation(situation);
                                                         }}>
-                                                            <TranslateIcon className="h-3 w-3" style={{ color: '#000' }} />
+                                                            {exampleTranslations[situation]?.loading ? (
+                                                                <LoaderIcon size="h-3 w-3" />
+                                                            ) : (
+                                                                <TranslateIcon className="h-3 w-3" style={{ color: '#000' }} />
+                                                            )}
                                                         </button>
                                                     </div>
                                                 </div>
-                                                {exampleTranslations[situation] && (
+                                                {exampleTranslations[situation] && !exampleTranslations[situation]?.loading && (
                                                     <div style={{
                                                         paddingTop: '8px',
                                                         borderTop: '1px solid #555',
