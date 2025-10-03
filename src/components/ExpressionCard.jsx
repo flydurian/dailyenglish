@@ -607,48 +607,48 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
                 nuance: '생각과 분석을 통해 결론에 도달하는 과정을 강조하는 뉘앙스. 단순히 아는 것이 아니라 "파악하고 이해하는" 능동적인 과정을 나타냅니다.',
                 usage: '어려운 문제를 해결하거나, 복잡한 상황을 이해하려고 할 때 사용합니다. 수학 문제, 사람의 의도, 비용 계산 등 "알아내야 하는" 상황에서 자주 쓰입니다.',
                 situations: [
-                    '문제 해결: "I can\'t figure out this math problem."',
-                    '이해하기: "Can you figure out what he means?"'
+                    '"I can\'t figure out this math problem."',
+                    '"Can you figure out what he means?"'
                 ]
             },
             'look into': {
                 nuance: '신중하고 체계적인 조사를 의미하는 뉘앙스. 단순히 "보다"가 아니라 "깊이 살펴보고 조사하는" 전문적이고 신중한 태도를 나타냅니다.',
                 usage: '문제나 사건을 조사하거나, 불만사항을 검토할 때 사용합니다. 경찰이 사건을 조사하거나, 회사에서 고객 불만을 처리할 때 자주 쓰입니다.',
                 situations: [
-                    '사건 조사: "The police will look into the matter."',
-                    '문제 검토: "I\'ll look into your complaint."'
+                    '"The police will look into the matter."',
+                    '"I\'ll look into your complaint."'
                 ]
             },
             'come up with': {
                 nuance: '창의적이고 즉흥적인 아이디어 생성의 뉘앙스. "나타나다, 생겨나다"는 의미에서 "새로운 것을 만들어내는" 창조적 과정을 강조합니다.',
                 usage: '회의에서 새로운 아이디어를 제안하거나, 문제 해결책을 찾을 때 사용합니다. 브레인스토밍이나 창의적 사고가 필요한 상황에서 자주 쓰입니다.',
                 situations: [
-                    '아이디어 제안: "Can you come up with a better plan?"',
-                    '해결책 찾기: "We need to come up with a solution."'
+                    '"Can you come up with a better plan?"',
+                    '"We need to come up with a solution."'
                 ]
             },
             'put up with': {
                 nuance: '불만스럽지만 어쩔 수 없이 참고 견디는 뉘앙스. "올려놓고 견디다"는 의미에서 "불쾌한 것을 감내하는" 부정적이지만 인내심 있는 태도를 나타냅니다.',
                 usage: '시끄러운 소음, 어려운 사람, 불편한 상황을 참고 견딜 때 사용합니다. 불만이 있지만 어쩔 수 없이 받아들여야 하는 상황에서 자주 쓰입니다.',
                 situations: [
-                    '불쾌한 상황: "I can\'t put up with this noise anymore."',
-                    '어려운 사람: "How do you put up with him?"'
+                    '"I can\'t put up with this noise anymore."',
+                    '"How do you put up with him?"'
                 ]
             },
             'get over': {
                 nuance: '시간이 지나면서 자연스럽게 극복되는 과정의 뉘앙스. "넘어서다"라는 의미에서 "어려움을 뒤로 하고 앞으로 나아가는" 회복과 성장의 과정을 나타냅니다.',
                 usage: '이별, 질병, 실망 같은 어려운 상황에서 회복할 때 사용합니다. 시간이 지나면서 자연스럽게 극복되는 과정을 나타냅니다.',
                 situations: [
-                    '감정 회복: "It took time to get over the breakup."',
-                    '질병 회복: "I finally got over the flu."'
+                    '"It took time to get over the breakup."',
+                    '"I finally got over the flu."'
                 ]
             },
             'run out of': {
                 nuance: '갑작스럽고 예상치 못한 부족함의 뉘앙스. "달려나가서 떠나다"는 의미에서 "갑자기 없어져버리는" 놀라움과 당황스러움을 동시에 나타냅니다.',
                 usage: '우유, 시간, 빵 같은 것들이 갑자기 떨어졌을 때 사용합니다. 예상치 못하게 부족해진 상황에서 자주 쓰입니다.',
                 situations: [
-                    '물건 부족: "We\'ve run out of milk."',
-                    '시간 부족: "I\'m running out of time."'
+                    '"We\'ve run out of milk."',
+                    '"I\'m running out of time."'
                 ]
             }
         };
@@ -657,8 +657,8 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
             nuance: `이 구동사는 "${expression.meaning}"라는 의미를 가지며, 특별한 뉘앙스와 사용 맥락이 있습니다. 문맥에 따라 의미가 달라질 수 있으니 주의 깊게 학습하세요.`,
             usage: '이 구동사는 다양한 상황에서 사용될 수 있습니다. 문맥에 따라 의미가 달라질 수 있으니 주의 깊게 학습하세요.',
             situations: [
-                `예문: "${expression.sentence.replace(/\*\*(.*?)\*\*/g, '$1')}"`,
-                `예문: "Can you ${phrasalVerb} the answer?"`
+                `"${expression.sentence.replace(/\*\*(.*?)\*\*/g, '$1')}"`,
+                `"Can you ${phrasalVerb} the answer?"`
             ]
         };
     }, [expression.phrasal_verb, expression.meaning, expression.sentence]);
