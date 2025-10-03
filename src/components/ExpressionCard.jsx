@@ -601,12 +601,23 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
     }, [onToggle, index]);
 
     const handleAudioClick = useCallback((e) => {
-        e.stopPropagation();
+        if (e && e.stopPropagation) {
+            e.stopPropagation();
+        }
         onPlayAudio(expression.sentence);
     }, [onPlayAudio, expression.sentence]);
 
+    const handleExampleAudioClick = useCallback((e, text) => {
+        if (e && e.stopPropagation) {
+            e.stopPropagation();
+        }
+        onPlayAudio(text);
+    }, [onPlayAudio]);
+
     const handleTranslateClick = useCallback(async (e) => {
-        e.stopPropagation();
+        if (e && e.stopPropagation) {
+            e.stopPropagation();
+        }
         
         // 이미 번역이 표시 중이면 토글로 숨기기
         if (showTranslation) {
@@ -810,8 +821,7 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
                                                 <UsageExampleActions style={{ marginTop: 0, marginLeft: '12px' }}>
                                                     <SmallActionButton 
                                                         onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleAudioClick(situation);
+                                                            handleExampleAudioClick(e, situation);
                                                         }}
                                                         disabled={audioStates[situation] === 'loading'}
                                                         aria-label="음성 재생"
