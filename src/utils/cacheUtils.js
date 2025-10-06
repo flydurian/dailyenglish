@@ -1,6 +1,12 @@
 // 캐시 관리 유틸리티 함수들
 export const getCacheKey = (type, date) => {
-    return `${type}_${date.toISOString().split('T')[0]}`;
+    // Date 객체 유효성 검사
+    const dateObj = date instanceof Date ? date : new Date(date);
+    if (isNaN(dateObj.getTime())) {
+        console.error('Invalid date provided to getCacheKey:', date);
+        return `${type}_${new Date().toISOString().split('T')[0]}`;
+    }
+    return `${type}_${dateObj.toISOString().split('T')[0]}`;
 };
 
 export const getCachedData = (type, date) => {
@@ -19,10 +25,16 @@ export const getCachedData = (type, date) => {
 
 export const setCachedData = (type, date, data) => {
     const cacheKey = getCacheKey(type, date);
+    // Date 객체 유효성 검사
+    const dateObj = date instanceof Date ? date : new Date(date);
+    if (isNaN(dateObj.getTime())) {
+        console.error('Invalid date provided to setCachedData:', date);
+        return;
+    }
     localStorage.setItem(cacheKey, JSON.stringify({
         data: data,
         timestamp: Date.now(),
-        date: date.toISOString().split('T')[0]
+        date: dateObj.toISOString().split('T')[0]
     }));
 };
 
@@ -30,7 +42,14 @@ export const isCacheValid = (type, date) => {
     const cached = getCachedData(type, date);
     if (!cached) return false;
     
-    const requestedDate = date.toISOString().split('T')[0];
+    // Date 객체 유효성 검사
+    const dateObj = date instanceof Date ? date : new Date(date);
+    if (isNaN(dateObj.getTime())) {
+        console.error('Invalid date provided to isCacheValid:', date);
+        return false;
+    }
+    
+    const requestedDate = dateObj.toISOString().split('T')[0];
     const cacheDate = cached.date;
     
     if (type === 'news') {

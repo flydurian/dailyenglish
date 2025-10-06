@@ -3,8 +3,8 @@ import styled from '@emotion/styled';
 import { css } from '@emotion/react';
 import { Volume2Icon, TranslateIcon, LoaderIcon } from './Icons';
 import { markPhrasalVerbUsage } from '../data/phrasalVerbsData';
+import { useFontSize } from '../contexts/FontSizeContext';
 
-// 최신 CSS Grid와 Flexbox를 활용한 스타일드 컴포넌트들
 const CardContainer = styled.div`
   background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
   border: 2px solid #333;
@@ -88,22 +88,22 @@ const ExampleContent = styled.div`
 
 const ExampleText = styled.p`
   color: #ffffff;
-  font-size: clamp(20px, 4.5vw, 28px);
+  font-size: clamp(28px, 6.5vw, 38px);
   font-weight: 700;
   line-height: 1.4;
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
   
   @media (max-width: 768px) {
-    font-size: clamp(20px, 4.5vw, 26px);
+    font-size: clamp(26px, 6vw, 36px);
   }
   
   @media (max-width: 640px) {
-    font-size: clamp(18px, 4vw, 24px);
+    font-size: clamp(24px, 5.5vw, 34px);
   }
   
   @media (max-width: 480px) {
-    font-size: clamp(16px, 3.5vw, 22px);
+    font-size: clamp(22px, 5vw, 32px);
   }
   
   @media (max-width: 360px) {
@@ -583,6 +583,7 @@ const ExampleTranslation = styled.p`
 `;
 
 const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, onPlayAudio, onWordClick, onTranslate, level, translations, handleTranslationClick }) => {
+    const { fontSize } = useFontSize();
     const [showTranslation, setShowTranslation] = useState(false);
     const [translation, setTranslation] = useState('');
     const [isTranslating, setIsTranslating] = useState(false);
@@ -675,65 +676,99 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
     // 구동사 상세 정보 생성 함수
     const getPhrasalVerbDetails = useCallback(() => {
         const phrasalVerb = expression.phrasal_verb;
+        const currentSentence = expression.sentence.replace(/\*\*(.*?)\*\*/g, '$1');
         
         const details = {
             'figure out': {
                 nuance: '생각과 분석을 통해 결론에 도달하는 과정을 강조하는 뉘앙스입니다. 단순히 "알다"가 아니라 "파악하고 이해하는" 능동적이고 체계적인 사고 과정을 나타냅니다. 이 구동사는 문제 해결의 과정에서 논리적 추론과 분석을 거쳐 답을 찾아내는 뇌의 활동을 강조합니다. 특히 복잡하거나 어려운 문제를 해결할 때 사용되며, 단순한 암기나 기억이 아닌 능동적인 사고 과정을 의미합니다.',
                 usage: '어려운 문제를 해결하거나, 복잡한 상황을 이해하려고 할 때 사용합니다. 수학 문제, 사람의 의도 파악, 비용 계산, 기술적 문제 해결 등 "알아내야 하는" 상황에서 자주 쓰입니다. 또한 추상적인 개념을 이해하거나, 복잡한 시스템의 작동 원리를 파악할 때도 사용됩니다. 이 구동사는 문제 해결 과정에서의 인지적 노력과 사고 과정을 강조하므로, 단순한 정보 전달보다는 깊이 있는 이해가 필요한 상황에서 사용됩니다.',
                 situations: [
-                    'I can\'t figure out this math problem.',
-                    'Can you figure out what he means?'
+                    'The detective couldn\'t figure out who stole the painting.',
+                    'Scientists are trying to figure out why the experiment failed.',
+                    'I need to figure out how to use this new software.',
+                    'The teacher helped me figure out the chemistry formula.'
                 ]
             },
             'look into': {
                 nuance: '신중하고 체계적인 조사를 의미하는 뉘앙스입니다. 단순히 "보다"가 아니라 "깊이 살펴보고 조사하는" 전문적이고 신중한 태도를 나타냅니다. 이 구동사는 표면적인 관찰을 넘어서 내부적인 원인과 배경을 파악하려는 의도를 담고 있습니다. 특히 문제나 사건의 근본 원인을 찾기 위한 체계적인 접근 방식을 의미하며, 단순한 확인이 아닌 철저한 검토와 분석을 포함합니다.',
                 usage: '문제나 사건을 조사하거나, 불만사항을 검토할 때 사용합니다. 경찰이 사건을 조사하거나, 회사에서 고객 불만을 처리할 때, 연구자가 특정 현상을 분석할 때 자주 쓰입니다. 또한 개인적인 문제나 상황에 대해 더 깊이 알아보고 싶을 때도 사용됩니다. 이 구동사는 조사의 목적과 의도를 명확히 하며, 단순한 확인이 아닌 체계적인 검토 과정을 강조합니다.',
                 situations: [
-                    'The police will look into the matter.',
-                    'I\'ll look into your complaint.'
+                    'The manager promised to look into the employee\'s concerns.',
+                    'The doctor will look into your symptoms more carefully.',
+                    'The government is looking into the environmental impact.',
+                    'I\'ll look into the best restaurants in the area.'
                 ]
             },
             'come up with': {
                 nuance: '창의적이고 즉흥적인 아이디어 생성의 뉘앙스입니다. "나타나다, 생겨나다"는 의미에서 "새로운 것을 만들어내는" 창조적 과정을 강조합니다. 이 구동사는 기존에 없던 새로운 것을 만들어내는 능동적이고 창의적인 사고 과정을 나타냅니다. 특히 문제 해결을 위한 새로운 접근법이나 혁신적인 아이디어를 제시할 때 사용되며, 단순한 모방이나 복사가 아닌 독창적인 창조 과정을 의미합니다.',
                 usage: '회의에서 새로운 아이디어를 제안하거나, 문제 해결책을 찾을 때 사용합니다. 브레인스토밍이나 창의적 사고가 필요한 상황에서 자주 쓰입니다. 또한 예술 작품을 만들거나, 새로운 비즈니스 모델을 개발할 때도 사용됩니다. 이 구동사는 창의성과 혁신을 강조하므로, 기존의 방법으로는 해결할 수 없는 문제에 대한 새로운 접근법을 제시할 때 사용됩니다.',
                 situations: [
-                    'Can you come up with a better plan?',
-                    'We need to come up with a solution.'
+                    'The artist came up with a unique painting style.',
+                    'The chef came up with a new recipe for the menu.',
+                    'The team came up with an innovative marketing strategy.',
+                    'She came up with a creative way to organize the event.'
                 ]
             },
             'put up with': {
                 nuance: '불만스럽지만 어쩔 수 없이 참고 견디는 뉘앙스입니다. "올려놓고 견디다"는 의미에서 "불쾌한 것을 감내하는" 부정적이지만 인내심 있는 태도를 나타냅니다. 이 구동사는 개인의 의지와는 상관없이 주어진 상황을 받아들이고 견뎌내는 과정을 강조합니다. 특히 선택의 여지가 없거나 피할 수 없는 상황에서의 인내와 관용을 의미하며, 단순한 참는 것이 아닌 적극적인 수용과 적응의 과정을 포함합니다.',
                 usage: '시끄러운 소음, 어려운 사람, 불편한 상황을 참고 견딜 때 사용합니다. 불만이 있지만 어쩔 수 없이 받아들여야 하는 상황에서 자주 쓰입니다. 또한 가족이나 동료와의 갈등 상황에서, 또는 사회적 제약이나 규칙을 받아들일 때도 사용됩니다. 이 구동사는 개인의 감정과 의지보다는 현실적인 필요나 상황에 따른 선택을 강조하므로, 이상적이지 않지만 현실적으로 받아들여야 하는 상황에서 사용됩니다.',
                 situations: [
-                    'I can\'t put up with this noise anymore.',
-                    'How do you put up with him?'
+                    'The neighbors have to put up with construction noise.',
+                    'Students must put up with strict school rules.',
+                    'The patient had to put up with a long waiting time.',
+                    'Parents often put up with their children\'s messy rooms.'
                 ]
             },
             'get over': {
                 nuance: '시간이 지나면서 자연스럽게 극복되는 과정의 뉘앙스입니다. "넘어서다"라는 의미에서 "어려움을 뒤로 하고 앞으로 나아가는" 회복과 성장의 과정을 나타냅니다. 이 구동사는 개인의 내적 성장과 회복력을 강조하며, 단순한 시간의 경과가 아닌 적극적인 극복과 성장의 과정을 의미합니다. 특히 감정적 상처나 어려운 경험을 통해 더 강해지고 성숙해지는 과정을 나타냅니다.',
                 usage: '이별, 질병, 실망 같은 어려운 상황에서 회복할 때 사용합니다. 시간이 지나면서 자연스럽게 극복되는 과정을 나타내며, 개인의 내적 성장과 회복력을 강조합니다. 또한 과거의 트라우마나 상처를 극복하고 새로운 시작을 할 때도 사용됩니다. 이 구동사는 단순한 시간의 경과가 아닌 적극적인 극복과 성장의 과정을 강조하므로, 개인의 의지와 노력이 필요한 상황에서 사용됩니다.',
                 situations: [
-                    'It took time to get over the breakup.',
-                    'I finally got over the flu.'
+                    'It took months to get over the loss of her pet.',
+                    'The athlete got over his injury and returned to training.',
+                    'She finally got over her fear of public speaking.',
+                    'The company got over the financial crisis successfully.'
                 ]
             },
             'run out of': {
                 nuance: '갑작스럽고 예상치 못한 부족함의 뉘앙스입니다. "달려나가서 떠나다"는 의미에서 "갑자기 없어져버리는" 놀라움과 당황스러움을 동시에 나타냅니다. 이 구동사는 예상치 못한 상황의 급작스러운 변화를 강조하며, 단순한 부족함이 아닌 갑작스러운 결핍 상태를 의미합니다. 특히 일상적인 흐름이 갑자기 중단되는 상황에서의 당황과 긴급함을 나타냅니다.',
                 usage: '우유, 시간, 빵 같은 것들이 갑자기 떨어졌을 때 사용합니다. 예상치 못하게 부족해진 상황에서 자주 쓰이며, 특히 일상적인 흐름이 갑자기 중단되는 상황에서 사용됩니다. 또한 에너지, 인내심, 아이디어 등 추상적인 것들이 갑자기 부족해질 때도 사용됩니다. 이 구동사는 갑작스러운 변화와 긴급함을 강조하므로, 예상치 못한 상황에서의 당황과 대응의 필요성을 나타낼 때 사용됩니다.',
                 situations: [
-                    'We\'ve run out of milk.',
-                    'I\'m running out of time.'
+                    'The restaurant ran out of ingredients for the special dish.',
+                    'The library ran out of copies of the popular book.',
+                    'The team ran out of energy in the final minutes.',
+                    'The store ran out of the limited edition product.'
                 ]
             }
         };
 
-        return details[phrasalVerb] || {
+        // 기본 예시와 중복되지 않는 예시들을 선택하는 함수
+        const getUniqueExamples = (examples) => {
+            return examples.filter(example => 
+                example.toLowerCase() !== currentSentence.toLowerCase()
+            ).slice(0, 2); // 최대 2개의 고유한 예시만 반환
+        };
+
+        const defaultDetails = details[phrasalVerb];
+        
+        if (defaultDetails) {
+            return {
+                ...defaultDetails,
+                situations: getUniqueExamples(defaultDetails.situations)
+            };
+        }
+
+        // 기본 구동사 정보가 없는 경우
+        const fallbackExamples = [
+            `Can you ${phrasalVerb} the answer?`,
+            `I need to ${phrasalVerb} this problem.`,
+            `Let's ${phrasalVerb} together.`,
+            `She will ${phrasalVerb} tomorrow.`
+        ];
+
+        return {
             nuance: `이 구동사는 "${expression.meaning}"라는 의미를 가지며, 특별한 뉘앙스와 사용 맥락이 있습니다. 문맥에 따라 의미가 달라질 수 있으니 주의 깊게 학습하세요.`,
             usage: '이 구동사는 다양한 상황에서 사용될 수 있습니다. 문맥에 따라 의미가 달라질 수 있으니 주의 깊게 학습하세요.',
-            situations: [
-                `${expression.sentence.replace(/\*\*(.*?)\*\*/g, '$1')}`,
-                `Can you ${phrasalVerb} the answer?`
-            ]
+            situations: getUniqueExamples(fallbackExamples)
         };
     }, [expression.phrasal_verb, expression.meaning, expression.sentence]);
 
@@ -743,7 +778,7 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
             <ExampleSection>
                 <ExampleCard onClick={handleCardClick}>
                     <ExampleContent>
-                        <ExampleText>
+                        <ExampleText style={{ fontSize: `${fontSize}em` }}>
                             {expression.sentence.replace(/\*\*(.*?)\*\*/g, '$1')}
                         </ExampleText>
                         <ActionButtons>
@@ -773,7 +808,7 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
                     </ExampleContent>
                     {showTranslation && (
                         <TranslationSection>
-                            <TranslationText>
+                            <TranslationText style={{ fontSize: `${fontSize}em` }}>
                                 {translation || '번역을 불러오는 중...'}
                             </TranslationText>
                         </TranslationSection>
@@ -787,7 +822,7 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
                     <PhrasalVerbTitle onClick={handlePhrasalVerbClick}>
                         {expression.phrasal_verb}
                     </PhrasalVerbTitle>
-                    <PhrasalVerbMeaning>
+                    <PhrasalVerbMeaning style={{ fontSize: `${fontSize}em` }}>
                         {expression.meaning}
                     </PhrasalVerbMeaning>
                 </PhrasalVerbHeader>
@@ -811,7 +846,7 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
                                         <UsageExample key={idx}>
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                                                 <div style={{ flex: 1 }}>
-                                                    <DetailExampleText>{situation}</DetailExampleText>
+                                                    <DetailExampleText style={{ fontSize: `${fontSize}em` }}>{situation}</DetailExampleText>
                                                     {translations[situation]?.translation && (
                                                         <ExampleTranslation>
                                                             {translations[situation].translation}
@@ -874,7 +909,7 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
                                     <KeyWordTitle>
                                         {word.word}
                                     </KeyWordTitle>
-                                    <KeyWordMeaning>
+                                    <KeyWordMeaning style={{ fontSize: `${fontSize}em` }}>
                                         {word.meaning}
                                     </KeyWordMeaning>
                                 </KeyWordCard>

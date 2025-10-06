@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import styled from '@emotion/styled';
 import { Volume2Icon, TranslateIcon, LoaderIcon } from './Icons';
+import { useFontSize } from '../contexts/FontSizeContext';
 
 // 최신 CSS Grid와 Flexbox를 활용한 스타일드 컴포넌트들
 const CardContainer = styled.div`
@@ -77,6 +78,62 @@ const NewsTitle = styled.h3`
   
   @media (max-width: 480px) {
     font-size: clamp(14px, 4vw, 18px);
+  }
+`;
+
+const NewsSource = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #2a2a2a 0%, #3a3a3a 100%);
+  border-radius: 12px;
+  border: 1px solid #444;
+  
+  @media (max-width: 768px) {
+    margin-bottom: 10px;
+    padding: 6px 10px;
+  }
+  
+  @media (max-width: 480px) {
+    margin-bottom: 8px;
+    padding: 4px 8px;
+  }
+`;
+
+const SourceBadge = styled.span`
+  background: linear-gradient(135deg, #00d4ff 0%, rgba(0, 212, 255, 0.8) 100%);
+  color: #000;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  
+  @media (max-width: 768px) {
+    font-size: 11px;
+    padding: 3px 6px;
+  }
+  
+  @media (max-width: 480px) {
+    font-size: 10px;
+    padding: 2px 5px;
+  }
+`;
+
+const NewsDate = styled.span`
+  color: #cccccc;
+  font-size: 12px;
+  font-weight: 500;
+  
+  @media (max-width: 768px) {
+    font-size: 11px;
+  }
+  
+  @media (max-width: 480px) {
+    font-size: 10px;
   }
 `;
 
@@ -269,6 +326,7 @@ const TranslationText = styled.div`
 
 
 const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudio, onWordClick, onTranslate, onSummarize, translations, handleTranslationClick }) => {
+    const { fontSize } = useFontSize();
     const [showTitleTranslation, setShowTitleTranslation] = useState(false);
     const [showArticleTranslation, setShowArticleTranslation] = useState(false);
     const [titleTranslation, setTitleTranslation] = useState('');
@@ -490,6 +548,22 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
 
     return (
         <CardContainer onClick={handleCardClick}>
+            <NewsSource>
+                <SourceBadge>
+                    {newsItem?.source || 'News Source'}
+                </SourceBadge>
+                <NewsDate>
+                    {newsItem?.date ? new Date(newsItem.date).toLocaleDateString('ko-KR', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    }) : new Date().toLocaleDateString('ko-KR', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    })}
+                </NewsDate>
+            </NewsSource>
             <TitleContainer>
                 <NewsTitle onClick={handleCardClick}>
                     {newsItem?.title?.replace(/\*\*(.*?)\*\*/g, '$1') || ''}
@@ -573,7 +647,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                         </div>
                     </div>
                     
-                    <SummaryText style={{ fontSize: '16px', lineHeight: '1.6', marginBottom: '16px' }}>
+                    <SummaryText style={{ fontSize: `${fontSize}em`, lineHeight: '1.6', marginBottom: '16px' }}>
                         {newsItem?.summary || (
                             <span style={{ color: '#888', fontStyle: 'italic' }}>
                                 {newsItem?.category === 'korean' ? '한국 뉴스 요약을 생성하고 있습니다...' : '세계 뉴스 요약을 생성하고 있습니다...'}

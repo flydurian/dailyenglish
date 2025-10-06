@@ -4,9 +4,11 @@ import { ArrowUpIcon } from './components/Icons';
 import WordModal from './components/WordModal';
 import ExpressionCard from './components/ExpressionCard';
 import NewsCard from './components/NewsCard';
+import FontSizeControl from './components/FontSizeControl';
 import { useAudio } from './hooks/useAudio';
 import { useTranslation } from './hooks/useTranslation';
 import { useDataFetching } from './hooks/useDataFetching';
+import { FontSizeProvider } from './contexts/FontSizeContext';
 import { levelDescriptions } from './utils/apiUtils';
 import { detectHotReload } from './utils/versionUtils';
 
@@ -44,6 +46,7 @@ const Header = styled.header`
   align-items: center;
   width: 100%;
   padding: 32px 0;
+  position: relative;
   
   @media (max-width: 768px) {
     padding: 20px 0;
@@ -54,6 +57,58 @@ const Header = styled.header`
   }
 `;
 
+const HeaderTop = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 1200px;
+  padding: 0 20px;
+  margin-bottom: 20px;
+  
+  @media (max-width: 768px) {
+    padding: 0 16px;
+    margin-bottom: 16px;
+  }
+  
+  @media (max-width: 480px) {
+    padding: 0 12px;
+    margin-bottom: 12px;
+  }
+`;
+
+const HeaderContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+`;
+
+const TitleRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 600px;
+  margin-bottom: 20px;
+  position: relative;
+  
+  @media (max-width: 768px) {
+    margin-bottom: 16px;
+  }
+  
+  @media (max-width: 480px) {
+    margin-bottom: 12px;
+  }
+`;
+
+const FontControlWrapper = styled.div`
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+`;
+
 const Title = styled.h1`
   background: linear-gradient(135deg, #00d4ff 0%, #ffffff 50%, #00d4ff 100%);
   background-clip: text;
@@ -61,17 +116,15 @@ const Title = styled.h1`
   -webkit-text-fill-color: transparent;
   font-size: clamp(2rem, 6vw, 3.5rem);
   font-weight: 800;
-  margin: 0 0 20px 0;
+  margin: 0;
   text-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
   letter-spacing: -0.02em;
   
   @media (max-width: 768px) {
-    margin-bottom: 16px;
     font-size: clamp(1.8rem, 5vw, 2.5rem);
   }
   
   @media (max-width: 480px) {
-    margin-bottom: 12px;
     font-size: clamp(1.5rem, 4vw, 2rem);
   }
 `;
@@ -245,7 +298,9 @@ const MainContent = styled.main`
   width: 100%;
   max-width: 800px;
   margin: 0 auto;
+  position: relative;
 `;
+
 
 const ContentList = styled.div`
   display: flex;
@@ -470,7 +525,8 @@ export default function App() {
 
 
     return (
-        <AppContainer>
+        <FontSizeProvider>
+            <AppContainer>
             <WordModal
                 isOpen={wordModal.isOpen}
                 word={wordModal.word}
@@ -491,24 +547,31 @@ export default function App() {
             
             <MainContainer>
                 <Header>
-                    <Title>
-                        Daily English
-                    </Title>
-                    
-                    <TabNavigation>
-                        <TabButton 
-                            isActive={activeTab === 'expressions'}
-                            onClick={() => setActiveTab('expressions')}
-                        >
-                            오늘의 표현
-                        </TabButton>
-                        <TabButton 
-                            isActive={activeTab === 'news'}
-                            onClick={() => setActiveTab('news')}
-                        >
-                            뉴스 학습
-                        </TabButton>
-                    </TabNavigation>
+                    <HeaderContent>
+                        <TitleRow>
+                            <Title>
+                                Daily English
+                            </Title>
+                            <FontControlWrapper>
+                                <FontSizeControl />
+                            </FontControlWrapper>
+                        </TitleRow>
+                        
+                        <TabNavigation>
+                            <TabButton 
+                                isActive={activeTab === 'expressions'}
+                                onClick={() => setActiveTab('expressions')}
+                            >
+                                오늘의 표현
+                            </TabButton>
+                            <TabButton 
+                                isActive={activeTab === 'news'}
+                                onClick={() => setActiveTab('news')}
+                            >
+                                뉴스 학습
+                            </TabButton>
+                        </TabNavigation>
+                    </HeaderContent>
                 </Header>
 
                     
@@ -609,5 +672,6 @@ export default function App() {
                 </Footer>
             </MainContainer>
         </AppContainer>
+        </FontSizeProvider>
     );
 }
