@@ -19,7 +19,7 @@ export default async function handler(req, res) {
 
         // gemini-flash-latest가 2.5로 연결되어 429 에러 빈발, 1.5로 고정
         if (model === 'gemini-flash-latest' || model === 'gemini-1.5-flash' || model === 'gemini-1.5-flash-002') {
-            model = 'gemini-pro';
+            model = 'gemini-1.5-flash';
         }
 
         if (!payload || !model) {
@@ -42,6 +42,22 @@ export default async function handler(req, res) {
         if (!response.ok) {
             const errorText = await response.text();
             console.error('Gemini API Error Detail:', errorText);
+
+            if (response.status === 404) {
+                // 404일 경우 사용 가능한 모델 리스트 확인 및 로그 출력
+                try {
+                    const modelsUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`;
+                    const modelsResponse = await fetch(modelsUrl);
+                    if (modelsResponse.ok) {
+                        const modelsData = await modelsResponse.json();
+                        console.log('Available Models for this API Key:', JSON.stringify(modelsData, null, 2));
+                    } else {
+                        console.error('Failed to list models:', await modelsResponse.text());
+                    }
+                } catch (listError) {
+                    console.error('Error listing models:', listError);
+                }
+            }
 
             if (response.status === 429) {
                 return res.status(429).json({
