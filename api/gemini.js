@@ -17,9 +17,10 @@ export default async function handler(req, res) {
     try {
         let { payload, model } = req.body;
 
-        // gemini-flash-latest가 2.5로 연결되어 429 에러 빈발, 1.5로 고정
-        if (model === 'gemini-flash-latest' || model === 'gemini-1.5-flash' || model === 'gemini-1.5-flash-002') {
-            model = 'gemini-1.5-flash';
+        // 모델 버전 매핑 및 폴백 처리
+        // gemini-1.5-flash가 없는 경우 gemini-2.0-flash 사용
+        if (model === 'gemini-flash-latest' || model === 'gemini-1.5-flash' || model === 'gemini-1.5-flash-001' || model === 'gemini-1.5-flash-002' || model === 'gemini-pro') {
+            model = 'gemini-2.0-flash';
         }
 
         if (!payload || !model) {
@@ -42,29 +43,6 @@ export default async function handler(req, res) {
         if (!response.ok) {
             const errorText = await response.text();
             console.error('Gemini API Error Detail:', errorText);
-
-            if (response.status === 404) {
-                // 404일 경우 사용 가능한 모델 리스트 확인 및 로그 출력
-                let availableModelsLog = '';
-                try {
-                    const modelsUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`;
-                    const modelsResponse = await fetch(modelsUrl);
-                    if (modelsResponse.ok) {
-                        const modelsData = await modelsResponse.json();
-                        const modelNames = modelsData.models ? modelsData.models.map(m => m.name) : [];
-                        availableModelsLog = `\n[DEBUG] Available Models: ${modelNames.join(', ')}`;
-                        console.log('Available Models for this API Key:', JSON.stringify(modelsData, null, 2));
-                    } else {
-                        availableModelsLog = `\n[DEBUG] Failed to list models: ${await modelsResponse.text()}`;
-                        console.error('Failed to list models:', await modelsResponse.text());
-                    }
-                } catch (listError) {
-                    availableModelsLog = `\n[DEBUG] Error listing models: ${listError.message}`;
-                    console.error('Error listing models:', listError);
-                }
-
-                throw new Error(`Gemini API Error: ${response.status} ${response.statusText} - ${errorText}${availableModelsLog}`);
-            }
 
             if (response.status === 429) {
                 return res.status(429).json({
