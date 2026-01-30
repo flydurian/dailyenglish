@@ -1,7 +1,6 @@
 // 구동사 데이터 관리 시스템
-import { 
-  markPhrasalVerbAsUsed, 
-  getUsedPhrasalVerbsInPeriod 
+import {
+  markPhrasalVerbAsUsed
 } from '../utils/usageTracker';
 
 // 구동사 데이터 로드
@@ -27,7 +26,7 @@ export const getDateSeed = (date = new Date()) => {
 // 시드 기반 랜덤 함수
 function seededRandom(seed) {
   let state = seed;
-  return function() {
+  return function () {
     state = (state * 9301 + 49297) % 233280;
     return state / 233280;
   };
@@ -37,33 +36,47 @@ function seededRandom(seed) {
 export const getDailyPhrasalVerbs = async (date = new Date()) => {
   const phrasalVerbsData = await loadPhrasalVerbsData();
   if (phrasalVerbsData.length === 0) return [];
-  
-  // 최근 30일 사용된 구동사 제외
-  const startDate = new Date(date);
-  startDate.setDate(date.getDate() - 30);
-  const recentlyUsedVerbs = await getUsedPhrasalVerbsInPeriod(startDate, date);
-  
-  const availableVerbs = phrasalVerbsData.filter(verb => 
-    !recentlyUsedVerbs.includes(verb.verb)
-  );
-  
-  const sourceVerbs = availableVerbs.length >= 3 ? availableVerbs : phrasalVerbsData;
-  
+
+  // 날짜 기반 시드 생성 (년-월-일)
   const seed = getDateSeed(date);
   const random = seededRandom(seed);
-  
-  const selected = [];
-  const used = new Set();
-  
-  while (selected.length < 3 && selected.length < sourceVerbs.length) {
-    const index = Math.floor(random() * sourceVerbs.length);
-    if (!used.has(index)) {
-      used.add(index);
-      selected.push(sourceVerbs[index]);
-    }
+
+  // 전체 리스트를 셔플 (시드 기반)
+  const shuffled = [...phrasalVerbsData];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
-  
+
+  // 날짜에 따라 3개씩 선택
+  // 매일 다른 3개를 선택하기 위해 날짜를 인덱스로 사용
+  // 전체 리스트를 순환하도록 함
+  const dayOfYear = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
+  const totalVerbs = shuffled.length;
+  const startIndex = (dayOfYear * 3) % totalVerbs;
+
+  const selected = [];
+  for (let i = 0; i < 3; i++) {
+    selected.push(shuffled[(startIndex + i) % totalVerbs]);
+  }
+
   return selected;
+};
+
+// 랜덤하게 n개의 구동사 선택 (뉴스 생성용)
+export const getRandomPhrasalVerbs = async (count = 5) => {
+  const phrasalVerbsData = await loadPhrasalVerbsData();
+  if (phrasalVerbsData.length === 0) return [];
+
+  // 전체 리스트를 셔플 (순수 랜덤)
+  const shuffled = [...phrasalVerbsData];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  // 앞에서부터 count개 선택
+  return shuffled.slice(0, count);
 };
 
 // 구동사 사용 기록 추가
