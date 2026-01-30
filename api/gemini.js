@@ -18,8 +18,8 @@ export default async function handler(req, res) {
         let { payload, model } = req.body;
 
         // gemini-flash-latest가 2.5로 연결되어 429 에러 빈발, 1.5로 고정
-        if (model === 'gemini-flash-latest') {
-            model = 'gemini-1.5-flash';
+        if (model === 'gemini-flash-latest' || model === 'gemini-1.5-flash') {
+            model = 'gemini-1.5-flash-002';
         }
 
         if (!payload || !model) {
