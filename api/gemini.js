@@ -45,18 +45,25 @@ export default async function handler(req, res) {
 
             if (response.status === 404) {
                 // 404일 경우 사용 가능한 모델 리스트 확인 및 로그 출력
+                let availableModelsLog = '';
                 try {
                     const modelsUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`;
                     const modelsResponse = await fetch(modelsUrl);
                     if (modelsResponse.ok) {
                         const modelsData = await modelsResponse.json();
+                        const modelNames = modelsData.models ? modelsData.models.map(m => m.name) : [];
+                        availableModelsLog = `\n[DEBUG] Available Models: ${modelNames.join(', ')}`;
                         console.log('Available Models for this API Key:', JSON.stringify(modelsData, null, 2));
                     } else {
+                        availableModelsLog = `\n[DEBUG] Failed to list models: ${await modelsResponse.text()}`;
                         console.error('Failed to list models:', await modelsResponse.text());
                     }
                 } catch (listError) {
+                    availableModelsLog = `\n[DEBUG] Error listing models: ${listError.message}`;
                     console.error('Error listing models:', listError);
                 }
+
+                throw new Error(`Gemini API Error: ${response.status} ${response.statusText} - ${errorText}${availableModelsLog}`);
             }
 
             if (response.status === 429) {
