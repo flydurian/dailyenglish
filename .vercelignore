@@ -1,0 +1,5 @@
+# Vercel CLI 업로드에서 비밀 값과 로컬 산출물을 제외합니다.
+.env
+.env.*
+build
+.DS_Store

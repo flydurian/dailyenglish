@@ -1,9 +1,10 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import styled from '@emotion/styled';
-import { css } from '@emotion/react';
 import { Volume2Icon, TranslateIcon, LoaderIcon } from './Icons';
 import { markPhrasalVerbUsage } from '../data/phrasalVerbsData';
 import { useFontSize } from '../contexts/FontSizeContext';
+import { phrasalVerbDetails } from '../data/phrasalVerbDetails';
+import { css } from '@emotion/react';
 
 const CardContainer = styled.div`
   background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
@@ -679,41 +680,17 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
     const phrasalVerb = expression.phrasal_verb;
     const currentSentence = expression.sentence.replace(/\*\*(.*?)\*\*/g, '$1');
 
-    const details = {
-      'figure out': {
-        nuance: '단순히 "알다"를 넘어 "이해하고 파악하는" 지적인 노력이 강조되는 뉘앙스입니다. 혼란스러운 상태에서 질서 있는 이해의 상태로 나아가는 "해결"의 느낌이 강하며, 능동적인 사고 과정을 거쳤다는 뿌듯함이나 성취감이 묻어납니다.',
-        usage: '해결책이 보이지 않는 복잡한 문제에 직면했을 때 사용합니다. 수학 문제 풀이, 고장 난 기계 원인 찾기, 엉킨 실타래 풀기, 또는 상대방의 알 수 없는 의도를 파악하려고 애쓸 때 주로 쓰입니다.'
-      },
-      'look into': {
-        nuance: '겉만 훑어보는 것이 아니라 안쪽까지 "들여다보는" 신중하고 깊이 있는 태도가 느껴집니다. 전문가답고 책임감 있는 태도로, 문제를 가볍게 넘기지 않겠다는 "진지함"과 "신뢰"의 어조를 가집니다.',
-        usage: '민원, 불만 사항, 사건, 혹은 제안된 아이디어에 대해 공식적으로 검토가 필요할 때 사용합니다. 경찰이 사건을 수사하거나, 담당자가 고객의 불만 사항을 접수하고 확인하겠다고 말할 때 전형적으로 쓰입니다.'
-      },
-      'come up with': {
-        nuance: '무(無)에서 유(有)를 만들어내는 "창의적 산고"의 느낌과, 마침내 무언가를 등작시킨다는 "제시"의 뉘앙스가 있습니다. 번뜩이는 아이디어나 기발한 해결책을 내놓았을 때의 "놀라움"이나 "감탄"의 어조가 담길 수 있습니다.',
-        usage: '회의 시간에 아이디어를 낼 때, 막다른 골목에서 해결책을 제시할 때, 혹은 핑계거리를 급조해낼 때 사용합니다. 브레인스토밍 상황이나 기획 단계에서 무언가 새로운 것을 제안해야 하는 타이밍에 적합합니다.'
-      },
-      'put up with': {
-        nuance: '마음에 들지 않지만 꾹 눌러 "참아내는" 인내와 고역의 느낌입니다. 단순히 기다리는 것이 아니라, 불쾌함이나 고통을 감수하며 "견디고 있는" 무거운 상태를 나타냅니다.',
-        usage: '지속적인 소음, 무례한 사람, 불편한 환경 등 바꾸기 힘들어서 어쩔 수 없이 감내해야 하는 상황에서 씁니다. 불평을 터뜨리기 직전의 한계 상황이나, 더 이상은 못 참겠다고 선언할 때 자주 사용됩니다.'
-      },
-      'get over': {
-        nuance: '장애물이나 높은 벽을 "넘어서는" 극복과 회복의 이미지를 가집니다. 과거의 아픔이나 실패를 딛고 일어서는 "성장"과 "해방"의 긍정적인 뉘앙스, 혹은 이제는 괜찮아졌다는 "안도감"을 줍니다.',
-        usage: '이별의 아픔, 질병, 실패의 충격, 혹은 무대 공포증 같은 트라우마에서 벗어날 때 사용합니다. 시간이 지나 마음이 정리되었거나, 병이 다 나았을 때, 혹은 충격적인 소식을 듣고 진정되었을 때 씁니다.'
-      },
-      'run out of': {
-        nuance: '잔량이 바닥을 드러내는 "소진"과 "결핍"의 다급한 느낌입니다. 예기치 않게 뚝 끊긴 흐름이나, 더 이상 공급받을 수 없는 막막함, 혹은 "큰일 났다"는 당혹감을 동반합니다.',
-        usage: '요리 중에 재료가 떨어졌을 때, 운전 중 기름이 떨어졌을 때, 혹은 끈기나 아이디어가 바닥났을 때 사용합니다. 무언가를 계속 진행해야 하는데 필수적인 자원이 고갈되어 멈춰야 하는 상황에 적합합니다.'
-      },
-    };
+    // 구동사 이름만 추출하여 매칭 (예: "come up with: 생각해내다" -> "come up with")
+    const phrasalVerbName = phrasalVerb.split(':')[0].trim().toLowerCase();
+    const defaultDetails = phrasalVerbDetails[phrasalVerbName];
 
     // 기본 예시와 중복되지 않는 예시들을 선택하는 함수
     const getUniqueExamples = (examples) => {
+      if (!examples) return [];
       return examples.filter(example =>
         example.toLowerCase() !== currentSentence.toLowerCase()
       ).slice(0, 2); // 최대 2개의 고유한 예시만 반환
     };
-
-    const defaultDetails = details[phrasalVerb];
 
     // API에서 받아온 동적 데이터가 있으면 그것을 우선 사용
     if (expression.situation || expression.nuance) {
@@ -900,4 +877,4 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
   );
 };
 
-export default ExpressionCard;
+export default React.memo(ExpressionCard);

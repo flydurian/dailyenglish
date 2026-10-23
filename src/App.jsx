@@ -18,6 +18,7 @@ const AppContainer = styled.div`
   background: #0a0a0a;
   color: #ffffff;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  padding-top: env(safe-area-inset-top); /* 아이폰 노치(Safe Area) 대응 */
 `;
 
 const MainContainer = styled.div`

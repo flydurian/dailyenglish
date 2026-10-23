@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import styled from '@emotion/styled';
 import { CloseIcon, BookOpenIcon, LoaderIcon } from './Icons';
 
@@ -252,7 +253,7 @@ const ExplanationModal = ({ isOpen, onClose, explanation, isLoading }) => {
 
   if (!isOpen) return null;
 
-  return (
+  return ReactDOM.createPortal(
     <ModalOverlay onClick={handleOverlayClick}>
       <ModalContent ref={modalRef}>
         <Header>
@@ -281,7 +282,8 @@ const ExplanationModal = ({ isOpen, onClose, explanation, isLoading }) => {
           )}
         </ScrollArea>
       </ModalContent>
-    </ModalOverlay>
+    </ModalOverlay>,
+    document.body
   );
 };
 

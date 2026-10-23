@@ -54,11 +54,8 @@ export const useDataFetching = () => {
                 rssUrl = 'https://news.google.com/rss?hl=en&gl=US&ceid=US:en';
             }
 
-            // 서버 사이드 API 엔드포인트 호출 (개발/프로덕션 모두)
-            const isDevelopment = process.env.NODE_ENV === 'development';
-            const apiUrl = isDevelopment
-                ? `http://localhost:3000/api/news?type=${type}`
-                : `/api/news?type=${type}`;
+            // 상대 경로로 호출: 개발은 setupProxy가, 배포는 Vercel이 /api 를 처리합니다.
+            const apiUrl = `/api/news?type=${type}`;
 
             let article;
 
@@ -80,16 +77,46 @@ export const useDataFetching = () => {
                 // API 호출 실패 시 CORS 프록시를 통해 RSS 피드 가져오기 시도
                 console.warn('API 호출 실패, CORS 프록시 사용:', apiError);
 
-                // CORS 프록시 사용 (무료 서비스)
-                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
-                const response = await fetch(proxyUrl);
+                // CORS 프록시 사용 (무료 서비스 중 다중 폴백 구성)
+                const proxies = [
+                    {
+                        name: 'AllOrigins',
+                        getUrl: url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+                        parse: async (res) => {
+                            const data = await res.json();
+                            return data.contents;
+                        }
+                    },
+                    {
+                        name: 'CodeTabs',
+                        getUrl: url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+                        parse: async (res) => {
+                            return await res.text();
+                        }
+                    }
+                ];
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                let xmlText = null;
+                for (const proxy of proxies) {
+                    try {
+                        const proxyUrl = proxy.getUrl(rssUrl);
+                        console.log(`CORS 프록시 시도 (${proxy.name}):`, proxyUrl);
+                        const response = await fetch(proxyUrl);
+                        if (response.ok) {
+                            xmlText = await proxy.parse(response);
+                            if (xmlText && xmlText.includes('<item>')) {
+                                console.log(`CORS 프록시 (${proxy.name}) 성공!`);
+                                break;
+                            }
+                        }
+                    } catch (err) {
+                        console.warn(`CORS 프록시 (${proxy.name}) 실패:`, err);
+                    }
                 }
 
-                const proxyData = await response.json();
-                const xmlText = proxyData.contents;
+                if (!xmlText) {
+                    throw new Error("모든 CORS 프록시 서버 호출에 실패했습니다.");
+                }
 
                 // XML 파싱
                 const items = [];

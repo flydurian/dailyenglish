@@ -67,20 +67,46 @@ npm install
 ```bash
 cp env.example .env
 ```
-`.env` 파일에 Gemini API 키를 추가하세요:
+`.env` 파일에 서버 전용 Gemini API 키를 설정하세요:
 ```
-REACT_APP_GEMINI_API_KEY=your_api_key_here
+GEMINI_API_KEY=your_api_key_here
 ```
+`REACT_APP_` 접두사를 붙이면 브라우저 번들에 키가 노출되므로 사용하지 않습니다. 배포 시에는 Vercel 프로젝트의 환경변수에 `GEMINI_API_KEY`를 등록하세요.
 
 4. **개발 서버 실행**
 ```bash
-npm start
+npm run dev
+```
+- 웹: http://localhost:3002 (`.env`의 `PORT`)
+- 뉴스/Gemini API: http://127.0.0.1:3101 (`.env`의 `DEV_API_PORT`)
+
+웹과 API를 따로 실행하려면:
+```bash
+npm run dev:api   # 터미널 1
+npm start         # 터미널 2
 ```
 
 5. **빌드**
 ```bash
 npm run build
 ```
+
+### 🔐 Gemini API 키 교체
+
+새 키는 채팅이나 코드에 붙여넣지 말고, 터미널에서 아래 명령으로 입력하세요. 입력값은 화면에 표시되지 않습니다.
+
+```bash
+npm run key:set
+```
+
+- 키 형식과 유효성을 Google API로 확인한 뒤 `.env`에 `GEMINI_API_KEY`로 저장합니다. (파일 권한 600)
+- `AIza...` 와 `AQ....` 형식 키를 모두 지원합니다. (Google Cloud/Vertex Express 키는 사용할 수 없습니다)
+- `npm run key:verify` 로 현재 키가 유효한지 확인할 수 있습니다.
+- 개발 서버를 재시작하면 적용됩니다: `npm run dev`
+- 배포 환경은 **Vercel > Project Settings > Environment Variables**에서 `GEMINI_API_KEY` 값을 갱신하고 재배포하세요.
+- 키 교체 후 Google AI Studio에서 기존 키를 삭제하세요.
+
+`npm run build`는 마지막에 `npm run key:check`를 자동 실행합니다. 빌드 결과물이나 소스에 키가 섞이면 빌드가 실패합니다.
 
 ## 🛠️ 기술 스택
 

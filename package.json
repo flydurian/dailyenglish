@@ -16,7 +16,12 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "node scripts/updateVersion.js && react-scripts build",
+    "dev": "node scripts/dev.js",
+    "dev:api": "node server/dev-api.mjs",
+    "key:set": "node scripts/set-gemini-key.js",
+    "key:verify": "node scripts/set-gemini-key.js --verify",
+    "key:check": "node scripts/check-secrets.js",
+    "build": "node scripts/updateVersion.js && react-scripts build && node scripts/check-secrets.js",
     "build:hash": "node scripts/updateVersion.js",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
@@ -41,6 +46,7 @@
   },
   "devDependencies": {
     "autoprefixer": "^10.4.14",
+    "http-proxy-middleware": "^2.0.9",
     "postcss": "^8.4.24",
     "tailwindcss": "^3.3.0"
   }
