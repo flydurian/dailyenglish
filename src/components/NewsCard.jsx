@@ -1,85 +1,57 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import styled from '@emotion/styled';
-import { Volume2Icon, TranslateIcon, LoaderIcon, BookOpenIcon } from './Icons';
+import { Volume2Icon, TranslateIcon, LoaderIcon, BookOpenIcon, CloseIcon } from './Icons';
 import { useFontSize } from '../contexts/FontSizeContext';
 import ExplanationModal from './ExplanationModal';
 import { phrasalVerbDetails } from '../data/phrasalVerbDetails';
 
 // 최신 CSS Grid와 Flexbox를 활용한 스타일드 컴포넌트들
 const CardContainer = styled.div`
-  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-  border: 2px solid #333;
-  border-radius: 24px;
-  box-shadow: 
-    0 20px 40px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(0, 212, 255, 0.1);
-  margin: 0 auto 8px;
-  max-width: 600px;
-  padding: 24px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  min-height: auto;
-  
-  &:hover {
-    transform: translateY(-2px) scale(1.02);
-    box-shadow: 
-      0 24px 48px rgba(0, 0, 0, 0.5),
-      0 0 0 1px rgba(0, 212, 255, 0.2);
-  }
-  
-  @media (max-width: 768px) {
-    padding: 20px;
-    margin: 0 auto 6px;
-    border-radius: 20px;
-  }
-  
+  position: relative;
+  width: 100%;
+  max-width: none;
+  margin: 0 auto;
+  padding: 20px;
+  background: var(--ink);
+  border: 1px solid var(--ink);
+  border-radius: 20px;
+  color: #f2ede2;
+  box-shadow: 0 18px 34px rgba(23, 20, 15, 0.18);
+  transition: box-shadow 200ms ease;
+
   @media (max-width: 480px) {
-    padding: 16px;
-    margin: 0 auto 4px;
-    border-radius: 16px;
+    padding: 18px;
+    border-radius: 18px;
   }
 `;
 
 const TitleContainer = styled.div`
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 16px;
-  
-  @media (max-width: 768px) {
-    margin-bottom: 12px;
-  }
-  
-  @media (max-width: 480px) {
-    margin-bottom: 10px;
-  }
+  gap: 10px;
+  margin-bottom: 0;
 `;
 
 const NewsTitle = styled.h3`
-  color: #ffffff;
-  font-size: clamp(18px, 4vw, 24px);
-  font-weight: 700;
+  flex: 1 1 100%;
   margin: 0;
-  line-height: 1.4;
-  flex: 1;
-  text-align: center;
+  color: #f2ede2;
+  font-size: clamp(20px, 4.8vw, 24px);
+  font-weight: 650;
+  line-height: 1.36;
+  letter-spacing: -0.03em;
+  text-align: left;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  
+  transition: color 160ms ease;
+
   &:hover {
-    color: #00d4ff;
-    transform: scale(1.02);
+    color: var(--coral);
   }
-  
+
   &:active {
-    transform: scale(0.98);
-  }
-  
-  @media (max-width: 768px) {
-    font-size: clamp(16px, 4vw, 20px);
-  }
-  
-  @media (max-width: 480px) {
-    font-size: clamp(14px, 4vw, 18px);
+    opacity: 0.8;
   }
 `;
 
@@ -87,245 +59,329 @@ const NewsSource = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
-  padding: 8px 12px;
-  background: linear-gradient(135deg, #2a2a2a 0%, #3a3a3a 100%);
-  border-radius: 12px;
-  border: 1px solid #444;
-  
-  @media (max-width: 768px) {
-    margin-bottom: 10px;
-    padding: 6px 10px;
-  }
-  
-  @media (max-width: 480px) {
-    margin-bottom: 8px;
-    padding: 4px 8px;
-  }
+  margin-bottom: 14px;
+  padding: 0;
+  background: transparent;
+  border: 0;
 `;
 
 const SourceBadge = styled.span`
-  background: linear-gradient(135deg, #00d4ff 0%, rgba(0, 212, 255, 0.8) 100%);
-  color: #000;
   padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 12px;
+  border: 1px solid rgba(242, 237, 226, 0.26);
+  border-radius: 999px;
+  color: #f2ede2;
+  font-family: var(--font-mono);
+  font-size: 8px;
   font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  
-  @media (max-width: 768px) {
-    font-size: 11px;
-    padding: 3px 6px;
-  }
-  
-  @media (max-width: 480px) {
-    font-size: 10px;
-    padding: 2px 5px;
-  }
 `;
 
 const NewsDate = styled.span`
-  color: #cccccc;
-  font-size: 12px;
-  font-weight: 500;
-  
-  @media (max-width: 768px) {
-    font-size: 11px;
-  }
-  
-  @media (max-width: 480px) {
-    font-size: 10px;
-  }
+  color: rgba(242, 237, 226, 0.52);
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.03em;
 `;
 
 const TitleActionButtons = styled.div`
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-left: 8px;
-  
-  @media (max-width: 768px) {
-    gap: 4px;
-    margin-left: 6px;
-  }
-  
-  @media (max-width: 480px) {
-    gap: 3px;
-    margin-left: 4px;
-  }
+  gap: 7px;
+  flex: 0 0 auto;
+  margin-left: auto;
 `;
 
 
 const ActionButton = styled.button`
-  background: linear-gradient(135deg, #00d4ff 0%, rgba(0, 212, 255, 0.8) 100%);
-  border: 1px solid #00d4ff;
-  border-radius: 50%;
-  color: #000;
-  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 8px rgba(0, 212, 255, 0.3);
-  touch-action: manipulation;
   min-width: 36px;
   min-height: 36px;
-  
+  padding: 6px;
+  border: 1px solid rgba(242, 237, 226, 0.22);
+  border-radius: 50%;
+  background: transparent;
+  color: #f2ede2;
+  cursor: pointer;
+  transition: 150ms ease;
+  touch-action: manipulation;
+
+  svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+
   &:hover {
-    transform: scale(1.1);
-    box-shadow: 0 4px 12px rgba(0, 212, 255, 0.4);
+    border-color: var(--coral);
+    color: var(--coral);
   }
-  
+
   &:active {
-    transform: scale(0.95);
+    transform: scale(0.94);
   }
-  
+
   &:disabled {
-    opacity: 0.6;
+    opacity: 0.4;
     cursor: not-allowed;
     transform: none;
-  }
-  
-  @media (max-width: 768px) {
-    padding: 6px;
-    min-width: 32px;
-    min-height: 32px;
-  }
-  
-  @media (max-width: 480px) {
-    padding: 4px;
-    min-width: 28px;
-    min-height: 28px;
   }
 `;
 
 const ExpandedSection = styled.div`
-    max-height: ${props => props.isActive ? 'none' : '0'};
-    opacity: ${props => props.isActive ? '1' : '0'};
-    overflow: hidden;
-    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  max-height: ${props => props.isActive ? 'none' : '0'};
+  opacity: ${props => props.isActive ? '1' : '0'};
+  overflow: hidden;
+  margin-top: ${props => props.isActive ? '16px' : '0'};
+  padding-top: ${props => props.isActive ? '14px' : '0'};
+  border-top: ${props => props.isActive ? '1px solid rgba(242, 237, 226, 0.14)' : '0 solid transparent'};
+  transition: opacity 300ms ease;
 `;
 
 const SummarySection = styled.div`
-  background: linear-gradient(135deg, #2a2a2a 0%, #3a3a3a 100%);
-  border: 2px solid #444;
-  border-radius: 16px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-  padding: 20px;
-  margin-bottom: 16px;
-  
-  @media (max-width: 768px) {
-    padding: 16px;
-    margin-bottom: 12px;
-  }
-  
-  @media (max-width: 480px) {
-    padding: 12px;
-    margin-bottom: 10px;
-  }
+  padding: 15px;
+  border: 1px solid rgba(242, 237, 226, 0.1);
+  border-radius: 14px;
+  background: rgba(242, 237, 226, 0.06);
+  box-shadow: none;
+  margin-bottom: 0;
 `;
 
 const SectionTitle = styled.h4`
-  color: #00d4ff;
-  font-size: clamp(16px, 3vw, 20px);
+  margin: 0 0 10px;
+  color: #ff8b6d;
+  font-size: 12px;
   font-weight: 600;
-  margin: 0 0 16px 0;
-  text-align: center;
-  
-  @media (max-width: 768px) {
-    font-size: clamp(14px, 3vw, 18px);
-    margin: 0 0 12px 0;
-  }
-  
-  @media (max-width: 480px) {
-    font-size: clamp(12px, 3vw, 16px);
-    margin: 0 0 10px 0;
-  }
+  letter-spacing: 0.01em;
+  text-align: left;
 `;
 
 const SummaryText = styled.p`
-    color: #ffffff;
-    font-size: clamp(16px, 3.5vw, 18px);
-    line-height: 1.6;
-    margin: 0 0 16px 0;
-    text-align: left;
-    
-    @media (max-width: 768px) {
-        font-size: clamp(15px, 3.5vw, 17px);
-        margin: 0 0 14px 0;
-    }
-    
-    @media (max-width: 480px) {
-        font-size: clamp(14px, 3.5vw, 16px);
-        margin: 0 0 12px 0;
-    }
+  margin: 0 0 14px;
+  color: rgba(242, 237, 226, 0.82);
+  font-size: clamp(14px, 3.6vw, 16px);
+  line-height: 1.7;
+  text-align: left;
 `;
 
 const KeyPointCard = styled.div`
-  background: linear-gradient(135deg, #333 0%, #444 100%);
-  border: 1px solid #555;
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 12px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  
+  margin-bottom: 4px;
+  padding: 10px;
+  border: 1px solid rgba(242, 237, 226, 0.1);
+  border-radius: 10px;
+  background: rgba(242, 237, 226, 0.05);
+  transition: border-color 150ms ease;
+
   &:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  }
-  
-  @media (max-width: 768px) {
-    padding: 12px;
-    margin-bottom: 10px;
-  }
-  
-  @media (max-width: 480px) {
-    padding: 10px;
-    margin-bottom: 8px;
+    border-color: rgba(239, 83, 46, 0.55);
   }
 `;
 
 const KeyPointText = styled.span`
-  color: #ffffff;
-  font-size: clamp(13px, 3vw, 15px);
-  line-height: 1.5;
   flex: 1;
-  padding-right: 12px;
-  
-  @media (max-width: 768px) {
-    font-size: clamp(12px, 3vw, 14px);
-    padding-right: 10px;
-  }
-  
-  @media (max-width: 480px) {
-    font-size: clamp(11px, 3vw, 13px);
-    padding-right: 8px;
-  }
+  padding-right: 8px;
+  color: rgba(242, 237, 226, 0.78);
+  font-size: 11px;
+  line-height: 1.45;
 `;
 
 
 const TranslationText = styled.div`
-    color: #00d4ff;
-    font-size: clamp(14px, 3vw, 18px);
-    line-height: 1.4;
-    margin-top: 8px;
-    padding-left: 8px;
-    border-left: 2px solid #00d4ff;
-    
-    @media (max-width: 768px) {
-        font-size: clamp(13px, 2.8vw, 16px);
-        margin-top: 6px;
-    }
-    
-    @media (max-width: 480px) {
-        font-size: clamp(12px, 2.5vw, 14px);
-        margin-top: 4px;
-    }
+  margin-top: 8px;
+  padding-left: 10px;
+  border-left: 2px solid var(--coral);
+  color: #ffab93;
+  font-size: 12.5px;
+  line-height: 1.65;
 `;
 
 
+
+const ArticleTranslationBox = styled.div`
+  margin: 12px 0;
+  padding: 12px 14px;
+  border-left: 2px solid var(--coral);
+  border-radius: 0 10px 10px 0;
+  background: rgba(242, 237, 226, 0.06);
+
+  h4 {
+    margin: 0 0 6px;
+    color: #ff8b6d;
+    font-family: var(--font-mono);
+    font-size: 8px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  p {
+    margin: 0;
+    color: rgba(242, 237, 226, 0.8);
+    font-size: 12.5px;
+    line-height: 1.7;
+  }
+`;
+
+const PvOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(23, 20, 15, 0.5);
+  backdrop-filter: blur(7px);
+
+  @media (min-width: 640px) {
+    align-items: center;
+    padding: 20px;
+  }
+`;
+
+const PvSheet = styled.div`
+  width: 100%;
+  max-width: 520px;
+  max-height: 88dvh;
+  overflow-y: auto;
+  padding: 18px 18px calc(20px + env(safe-area-inset-bottom));
+  border: 1px solid var(--line);
+  border-radius: 28px 28px 0 0;
+  background: var(--card-paper);
+  color: var(--ink);
+  box-shadow: 0 -24px 60px rgba(23, 20, 15, 0.28);
+
+  @media (min-width: 640px) {
+    padding: 24px;
+    border-radius: 24px;
+  }
+`;
+
+const PvHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+`;
+
+const PvTitle = styled.h3`
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+`;
+
+const PvCloseButton = styled.button`
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+
+  svg { width: 15px; height: 15px; }
+
+  &:hover { border-color: var(--ink); color: var(--ink); }
+`;
+
+const PvLabel = styled.h4`
+  margin: 14px 0 4px;
+  color: var(--coral);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+`;
+
+const PvText = styled.p`
+  margin: 0;
+  color: #4f4a40;
+  font-size: 12.5px;
+  line-height: 1.7;
+`;
+
+const PvExample = styled.div`
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f8f3e8;
+`;
+
+const PvExampleRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+`;
+
+const PvExampleText = styled.p`
+  flex: 1;
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+`;
+
+const PvActions = styled.div`
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+`;
+
+const PvIconButton = styled.button`
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--card-paper);
+  color: var(--forest);
+  cursor: pointer;
+
+  svg { width: 12px; height: 12px; }
+
+  &:disabled { opacity: 0.4; cursor: not-allowed; }
+`;
+
+const PvTranslation = styled.p`
+  margin: 8px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.6;
+`;
+
+const PvDoneButton = styled.button`
+  width: 100%;
+  height: 44px;
+  margin-top: 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+
+  &:active { opacity: 0.85; }
+`;
 
 const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudio, onWordClick, onTranslate, onSummarize, onExplain, translations, handleTranslationClick }) => {
     const { fontSize } = useFontSize();
@@ -344,6 +400,13 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
     // 정리된 텍스트들
     const cleanTitle = newsItem?.title?.replace(/\*\*(.*?)\*\*/g, '$1') || '';
     const textToRead = newsItem?.summary || newsItem?.full_text?.replace(/\*\*(.*?)\*\*/g, '$1') || '';
+
+    useEffect(() => {
+        if (!selectedPhrasalVerb) return undefined;
+        const previous = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => { document.body.style.overflow = previous; };
+    }, [selectedPhrasalVerb]);
 
     const handleCardClick = useCallback(() => {
         onToggle(index);
@@ -554,8 +617,8 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
 
             <ExpandedSection isActive={isActive}>
                 <SummarySection>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px', position: 'relative' }}>
-                        <SectionTitle style={{ margin: 0, textAlign: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', position: 'relative' }}>
+                        <SectionTitle style={{ margin: 0, textAlign: 'left' }}>
                             {newsItem?.category === 'korean' ? '한국 뉴스 요약' : '세계 뉴스 요약'}
                         </SectionTitle>
 
@@ -567,7 +630,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                                 }}
                                 disabled={audioStates[textToRead] === 'loading'}
                                 aria-label="기사 음성 재생"
-                                style={{ minWidth: '20px', minHeight: '20px', padding: '3px' }}
+
                             >
                                 {audioStates[textToRead] === 'loading' ? (
                                     <LoaderIcon size="h-2 w-2" />
@@ -582,7 +645,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                                 }}
                                 disabled={isTranslatingArticle}
                                 aria-label="기사 번역 보기"
-                                style={{ minWidth: '20px', minHeight: '20px', padding: '3px' }}
+
                             >
                                 {isTranslatingArticle ? (
                                     <LoaderIcon size="h-2 w-2" />
@@ -593,9 +656,9 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                         </div>
                     </div>
 
-                    <SummaryText style={{ fontSize: `${fontSize}em`, lineHeight: '1.6', marginBottom: '16px' }}>
+                    <SummaryText style={{ fontSize: `calc(${fontSize} * 14.5px)`, lineHeight: '1.7', marginBottom: '14px' }}>
                         {newsItem?.summary || (
-                            <span style={{ color: '#888', fontStyle: 'italic' }}>
+                            <span style={{ color: 'rgba(242, 237, 226, 0.6)', fontStyle: 'italic' }}>
                                 {newsItem?.category === 'korean' ? '한국 뉴스 요약을 생성하고 있습니다...' : '세계 뉴스 요약을 생성하고 있습니다...'}
                             </span>
                         )}
@@ -603,32 +666,10 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
 
                     {/* 기사 번역 표시 */}
                     {showArticleTranslation && (
-                        <div style={{
-                            background: 'linear-gradient(135deg, #2a2a2a 0%, #3a3a3a 100%)',
-                            border: '1px solid #555',
-                            borderRadius: '12px',
-                            padding: '16px',
-                            marginBottom: '16px'
-                        }}>
-                            <h4 style={{
-                                color: '#00d4ff',
-                                fontSize: '14px',
-                                fontWeight: '600',
-                                margin: '0 0 12px 0',
-                                textAlign: 'center'
-                            }}>
-                                기사 번역
-                            </h4>
-                            <p style={{
-                                color: '#ffffff',
-                                fontSize: '16px',
-                                lineHeight: '1.6',
-                                margin: '0',
-                                textAlign: 'left'
-                            }}>
-                                {articleTranslation || '번역을 불러오는 중...'}
-                            </p>
-                        </div>
+                        <ArticleTranslationBox>
+                            <h4>기사 번역</h4>
+                            <p>{articleTranslation || '번역을 불러오는 중...'}</p>
+                        </ArticleTranslationBox>
                     )}
 
                     {/* 핵심 포인트와 어휘 노트를 한 줄에 배치 */}
@@ -637,11 +678,14 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                         <div style={{ flex: 1 }}>
                             {newsItem?.key_points && newsItem.key_points.length > 0 ? (
                                 <>
-                                    <SectionTitle style={{ fontSize: '12px', marginBottom: '8px', textAlign: 'center' }}>구동사</SectionTitle>
+                                    <SectionTitle style={{ fontSize: '12px', marginBottom: '8px', textAlign: 'left' }}>구동사</SectionTitle>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                         {newsItem?.key_points?.map((point, index) => (
                                             <KeyPointCard
                                                 key={index}
+                                                role="button"
+                                                tabIndex={0}
+                                                aria-label={`구동사 상세: ${point}`}
                                                 style={{ padding: '8px', marginBottom: '4px', cursor: 'pointer' }}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -664,7 +708,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                         <div style={{ flex: 1 }}>
                             {newsItem?.vocabulary_notes && newsItem.vocabulary_notes.length > 0 ? (
                                 <>
-                                    <SectionTitle style={{ fontSize: '12px', marginBottom: '8px', textAlign: 'center' }}>주요 단어</SectionTitle>
+                                    <SectionTitle style={{ fontSize: '12px', marginBottom: '8px', textAlign: 'left' }}>주요 단어</SectionTitle>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                         {newsItem?.vocabulary_notes?.map((note, index) => (
                                             <KeyPointCard key={index} style={{ padding: '8px', marginBottom: '4px' }}>
@@ -686,185 +730,66 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
             </ExpandedSection>
 
             {/* 구동사 상세 정보 팝업 모달 */}
-            {selectedPhrasalVerb && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0, 0, 0, 0.8)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000,
-                    padding: '20px'
-                }} onClick={() => setSelectedPhrasalVerb(null)}>
-                    <div style={{
-                        background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
-                        border: '2px solid #333',
-                        borderRadius: '20px',
-                        padding: '24px',
-                        maxWidth: '500px',
-                        width: '100%',
-                        maxHeight: '90vh',
-                        overflowY: 'auto',
-                        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5)',
-                        minHeight: 'auto'
-                    }} onClick={(e) => e.stopPropagation()}>
-                        <h3 style={{
-                            color: '#00d4ff',
-                            fontSize: '18px',
-                            fontWeight: '700',
-                            margin: '0 0 8px 0',
-                            textAlign: 'center'
-                        }}>
-                            구동사 상세 설명
-                        </h3>
+            {selectedPhrasalVerb && (() => {
+                const details = getPhrasalVerbDetails(selectedPhrasalVerb);
+                return (
+                    <PvOverlay onClick={() => setSelectedPhrasalVerb(null)}>
+                        <PvSheet
+                            role="dialog"
+                            aria-modal="true"
+                            aria-label="구동사 상세 설명"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <PvHeader>
+                                <PvTitle>{selectedPhrasalVerb}</PvTitle>
+                                <PvCloseButton onClick={() => setSelectedPhrasalVerb(null)} aria-label="닫기">
+                                    <CloseIcon />
+                                </PvCloseButton>
+                            </PvHeader>
 
-                        <div style={{
-                            textAlign: 'center',
-                            marginBottom: '20px'
-                        }}>
-                            <h4 style={{
-                                color: '#ffffff',
-                                fontSize: '16px',
-                                fontWeight: '600',
-                                margin: '0 0 4px 0'
-                            }}>
-                                {selectedPhrasalVerb}
-                            </h4>
-                        </div>
+                            <PvLabel>Nuance</PvLabel>
+                            <PvText>{details.nuance}</PvText>
 
-                        {(() => {
-                            const details = getPhrasalVerbDetails(selectedPhrasalVerb);
-                            return (
-                                <>
-                                    <div style={{ marginBottom: '20px' }}>
-                                        <strong style={{ color: '#ffffff', fontSize: '14px' }}>뉘앙스:</strong>
-                                        <p style={{ color: '#ffffff', fontSize: '14px', lineHeight: '1.5', margin: '8px 0 0 0' }}>
-                                            {details.nuance}
-                                        </p>
-                                    </div>
+                            <PvLabel>Usage</PvLabel>
+                            <PvText>{details.usage}</PvText>
 
-                                    <div style={{ marginBottom: '20px' }}>
-                                        <strong style={{ color: '#ffffff', fontSize: '14px' }}>사용법:</strong>
-                                        <p style={{ color: '#ffffff', fontSize: '14px', lineHeight: '1.5', margin: '8px 0 0 0' }}>
-                                            {details.usage}
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <h4 style={{ color: '#00d4ff', fontSize: '16px', fontWeight: '600', margin: '0 0 12px 0' }}>
-                                            사용 상황 예시
-                                        </h4>
-                                        {details.situations.map((situation, index) => (
-                                            <div key={index} style={{
-                                                background: 'linear-gradient(135deg, #333 0%, #444 100%)',
-                                                border: '1px solid #555',
-                                                borderRadius: '8px',
-                                                padding: '12px',
-                                                marginBottom: '8px'
-                                            }}>
-                                                <div style={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'space-between',
-                                                    marginBottom: exampleTranslations[situation] ? '8px' : '0'
-                                                }}>
-                                                    <p style={{
-                                                        color: '#ffffff',
-                                                        fontSize: '13px',
-                                                        lineHeight: '1.4',
-                                                        margin: '0',
-                                                        fontWeight: '500',
-                                                        flex: 1
-                                                    }}>
-                                                        {situation}
-                                                    </p>
-                                                    <div style={{ display: 'flex', gap: '8px', marginLeft: '12px' }}>
-                                                        <button style={{
-                                                            background: 'linear-gradient(135deg, #00d4ff 0%, #0099cc 100%)',
-                                                            border: 'none',
-                                                            borderRadius: '50%',
-                                                            width: '32px',
-                                                            height: '32px',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            cursor: 'pointer',
-                                                            transition: 'all 0.2s ease'
-                                                        }} onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            onPlayAudio(situation);
-                                                        }}>
-                                                            <Volume2Icon className="h-3 w-3" style={{ color: '#000' }} />
-                                                        </button>
-                                                        <button style={{
-                                                            background: 'linear-gradient(135deg, #00d4ff 0%, #0099cc 100%)',
-                                                            border: 'none',
-                                                            borderRadius: '50%',
-                                                            width: '32px',
-                                                            height: '32px',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            cursor: 'pointer',
-                                                            transition: 'all 0.2s ease'
-                                                        }} onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleExampleTranslation(situation);
-                                                        }}>
-                                                            {exampleTranslations[situation]?.loading ? (
-                                                                <LoaderIcon size="h-3 w-3" />
-                                                            ) : (
-                                                                <TranslateIcon className="h-3 w-3" style={{ color: '#000' }} />
-                                                            )}
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                                {exampleTranslations[situation] && !exampleTranslations[situation]?.loading && (
-                                                    <div style={{
-                                                        paddingTop: '8px',
-                                                        borderTop: '1px solid #555',
-                                                        marginTop: '8px'
-                                                    }}>
-                                                        <p style={{
-                                                            color: '#00d4ff',
-                                                            fontSize: '12px',
-                                                            lineHeight: '1.4',
-                                                            margin: '0',
-                                                            fontStyle: 'italic'
-                                                        }}>
-                                                            {exampleTranslations[situation]}
-                                                        </p>
-                                                    </div>
+                            <PvLabel>Examples</PvLabel>
+                            {details.situations.map((situation, index) => (
+                                <PvExample key={index}>
+                                    <PvExampleRow>
+                                        <PvExampleText>{situation}</PvExampleText>
+                                        <PvActions>
+                                            <PvIconButton
+                                                onClick={() => onPlayAudio(situation)}
+                                                aria-label="예문 음성 재생"
+                                            >
+                                                <Volume2Icon />
+                                            </PvIconButton>
+                                            <PvIconButton
+                                                onClick={() => handleExampleTranslation(situation)}
+                                                aria-label="예문 번역"
+                                            >
+                                                {exampleTranslations[situation]?.loading ? (
+                                                    <LoaderIcon size="h-3 w-3" />
+                                                ) : (
+                                                    <TranslateIcon />
                                                 )}
-                                            </div>
-                                        ))}
-                                    </div>
+                                            </PvIconButton>
+                                        </PvActions>
+                                    </PvExampleRow>
+                                    {exampleTranslations[situation] && !exampleTranslations[situation]?.loading && (
+                                        <PvTranslation>{exampleTranslations[situation]}</PvTranslation>
+                                    )}
+                                </PvExample>
+                            ))}
 
-                                    <button style={{
-                                        background: 'linear-gradient(135deg, #00d4ff 0%, rgba(0, 212, 255, 0.8) 100%)',
-                                        border: '1px solid #00d4ff',
-                                        borderRadius: '8px',
-                                        color: '#000',
-                                        cursor: 'pointer',
-                                        fontSize: '14px',
-                                        fontWeight: '600',
-                                        padding: '12px 24px',
-                                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                                        width: '100%',
-                                        marginTop: '16px'
-                                    }} onClick={() => setSelectedPhrasalVerb(null)}>
-                                        닫기
-                                    </button>
-                                </>
-                            );
-                        })()}
-                    </div>
-                </div>
-            )}
+                            <PvDoneButton onClick={() => setSelectedPhrasalVerb(null)}>
+                                닫기
+                            </PvDoneButton>
+                        </PvSheet>
+                    </PvOverlay>
+                );
+            })()}
             <ExplanationModal
                 isOpen={showExplanation}
                 onClose={() => setShowExplanation(false)}

@@ -5,56 +5,68 @@ import { CloseIcon, BookOpenIcon, LoaderIcon } from './Icons';
 
 const ModalOverlay = styled.div`
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  inset: 0;
   z-index: 2000;
-  animation: fadeIn 0.2s ease-out;
-  backdrop-filter: blur(5px);
-  padding: 16px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  background: rgba(23, 20, 15, 0.5);
+  backdrop-filter: blur(7px);
+  animation: fadeIn 200ms ease-out;
 
   @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
   }
+
+  @media (min-width: 640px) {
+    align-items: center;
+    padding: 20px;
+  }
 `;
 
 const ModalContent = styled.div`
-  background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
-  border: 2px solid #00d4ff;
-  border-radius: 24px;
-  width: 100%;
-  max-width: 600px;
-  max-height: 85vh;
+  position: relative;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-  animation: slideIn 0.3s ease-out;
-  position: relative;
+  width: 100%;
+  max-width: 580px;
+  max-height: 88dvh;
+  border: 1px solid var(--line);
+  border-radius: 28px 28px 0 0;
+  background: var(--card-paper);
+  color: var(--ink);
+  box-shadow: 0 -24px 60px rgba(23, 20, 15, 0.28);
+  animation: sheetUp 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
 
-  @keyframes slideIn {
-    from { 
-      transform: translateY(20px); 
-      opacity: 0;
-    }
-    to { 
-      transform: translateY(0); 
-      opacity: 1;
-    }
+  @keyframes sheetUp {
+    from { transform: translateY(36px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  @media (min-width: 640px) {
+    border-radius: 24px;
+    animation: popIn 240ms ease-out;
+  }
+
+  @keyframes popIn {
+    from { transform: translateY(10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
   }
 `;
 
 const Header = styled.div`
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
 `;
 
 const TitleWrapper = styled.div`
@@ -64,65 +76,57 @@ const TitleWrapper = styled.div`
 `;
 
 const IconWrapper = styled.div`
-  background: rgba(0, 212, 255, 0.1);
-  padding: 8px;
-  border-radius: 12px;
-  color: #00d4ff;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 7px;
+  border-radius: 10px;
+  background: rgba(239, 83, 46, 0.1);
+  color: var(--coral);
+
+  svg { width: 18px; height: 18px; }
 `;
 
 const Title = styled.h2`
-  color: #00d4ff;
   margin: 0;
-  font-size: 20px;
-  font-weight: 700;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
 `;
 
 const CloseButton = styled.button`
-  background: transparent;
-  border: none;
-  color: #888;
-  cursor: pointer;
-  padding: 8px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--line);
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: 150ms ease;
+
+  svg { width: 15px; height: 15px; }
 
   &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
+    border-color: var(--ink);
+    color: var(--ink);
   }
 `;
 
 const ScrollArea = styled.div`
-  padding: 24px;
-  overflow-y: auto;
   flex: 1;
-  color: #e0e0e0;
-  font-size: 16px;
-  line-height: 1.7;
+  overflow-y: auto;
+  padding: 18px 18px calc(22px + env(safe-area-inset-bottom));
+  color: #4f4a40;
+  font-size: 13px;
+  line-height: 1.75;
 
-  /* Custom Scrollbar */
-  &::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.2);
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: #444;
-    border-radius: 4px;
-  }
-
-  &::-webkit-scrollbar-thumb:hover {
-    background: #555;
-  }
+  &::-webkit-scrollbar { width: 6px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb { background: rgba(23, 20, 15, 0.2); border-radius: 4px; }
 `;
 
 const LoadingContainer = styled.div`
@@ -130,15 +134,14 @@ const LoadingContainer = styled.div`
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px 0;
-  color: #00d4ff;
-  gap: 16px;
+  gap: 12px;
+  padding: 52px 0;
+  color: var(--coral);
 
   p {
-    color: #aaaaaa;
-    font-size: 14px;
     margin: 0;
-    animation: pulse 1.5s infinite;
+    color: var(--muted);
+    font-size: 12px;
   }
 
   @keyframes pulse {
@@ -150,11 +153,13 @@ const LoadingContainer = styled.div`
 
 const MarkdownContent = styled.div`
   h3 {
-    color: #ffffff;
-    font-size: 18px;
-    margin: 24px 0 12px 0;
-    padding-bottom: 8px;
-    border-bottom: 2px solid rgba(0, 212, 255, 0.3);
+    margin: 22px 0 10px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid var(--line);
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
   }
 
   h3:first-of-type {
@@ -162,29 +167,29 @@ const MarkdownContent = styled.div`
   }
 
   p {
-    margin-bottom: 16px;
+    margin-bottom: 14px;
   }
 
   ul, ol {
-    margin-bottom: 16px;
-    padding-left: 24px;
+    margin-bottom: 14px;
+    padding-left: 20px;
   }
 
   li {
-    margin-bottom: 8px;
+    margin-bottom: 6px;
   }
 
   strong {
-    color: #00d4ff;
-    font-weight: 600;
+    color: var(--coral);
+    font-weight: 650;
   }
 
   blockquote {
-    border-left: 4px solid #00d4ff;
-    margin: 16px 0;
-    padding: 12px 16px;
-    background: rgba(0, 212, 255, 0.05);
+    margin: 14px 0;
+    padding: 11px 14px;
+    border-left: 2px solid var(--coral);
     border-radius: 0 8px 8px 0;
+    background: #f8f3e8;
   }
 `;
 
@@ -220,15 +225,16 @@ const ExplanationModal = ({ isOpen, onClose, explanation, isLoading }) => {
 
     return text.split('\n').map((line, index) => {
       // Headers
-      if (line.startsWith('### ')) return <h3 key={index}>{line.replace('### ', '')}</h3>;
-      if (line.startsWith('## ')) return <h2 key={index}>{line.replace('## ', '')}</h2>;
+      const headingMatch = line.match(/^#{1,6}\s+(.*)$/);
+      if (headingMatch) return <h3 key={index}>{headingMatch[1]}</h3>;
+      if (/^-{3,}$/.test(line.trim())) return <hr key={index} style={{ border: 0, borderTop: '1px solid var(--line)', margin: '18px 0' }} />;
       if (line.startsWith('**') && line.endsWith('**')) return <h3 key={index}>{line.replace(/\*\*/g, '')}</h3>;
 
       // Bullets
       if (line.trim().startsWith('- ')) {
         return (
           <li key={index} style={{ listStyle: 'none', position: 'relative', paddingLeft: '16px' }}>
-            <span style={{ position: 'absolute', left: 0, color: '#00d4ff' }}>•</span>
+            <span style={{ position: 'absolute', left: 0, color: 'var(--coral)' }}>•</span>
             {line.replace('- ', '').split(/(\*\*.*?\*\*)/).map((part, i) =>
               part.startsWith('**') && part.endsWith('**')
                 ? <strong key={i}>{part.slice(2, -2)}</strong>
@@ -273,7 +279,7 @@ const ExplanationModal = ({ isOpen, onClose, explanation, isLoading }) => {
             <LoadingContainer>
               <LoaderIcon size="h-10 w-10" />
               <p>선생님이 문장을 분석하고 있어요...</p>
-              <p style={{ fontSize: '12px', color: '#666' }}>잠시만 기다려주세요</p>
+              <p style={{ fontSize: '11px', color: 'var(--muted)' }}>잠시만 기다려주세요</p>
             </LoadingContainer>
           ) : (
             <MarkdownContent>

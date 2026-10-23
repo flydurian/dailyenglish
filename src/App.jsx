@@ -12,301 +12,248 @@ import { FontSizeProvider } from './contexts/FontSizeContext';
 import { levelDescriptions } from './utils/apiUtils';
 import { detectHotReload } from './utils/versionUtils';
 
-// 최신 CSS Grid와 Flexbox를 활용한 스타일드 컴포넌트들
+// Editorial Paper 디자인 시스템
 const AppContainer = styled.div`
-  min-height: 100vh;
-  background: #0a0a0a;
-  color: #ffffff;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-  padding-top: env(safe-area-inset-top); /* 아이폰 노치(Safe Area) 대응 */
+  min-height: 100dvh;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  padding-top: env(safe-area-inset-top);
+  position: relative;
+  z-index: 1;
 `;
 
 const MainContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
   width: 100%;
-  text-align: center;
-  max-width: 1200px;
+  max-width: 620px;
   margin: 0 auto;
-  padding: 0 16px;
-  
-  @media (max-width: 768px) {
-    padding: 0 12px;
-  }
-  
+  padding: 0 21px calc(44px + env(safe-area-inset-bottom));
+  text-align: left;
+
   @media (max-width: 480px) {
-    padding: 0 8px;
+    padding: 0 18px calc(38px + env(safe-area-inset-bottom));
   }
 `;
 
 const Header = styled.header`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   width: 100%;
-  padding: 32px 0;
-  position: relative;
-  
-  @media (max-width: 768px) {
-    padding: 20px 0;
-  }
-  
-  @media (max-width: 480px) {
-    padding: 16px 0;
-  }
+  padding: 24px 0 0;
 `;
-
-
 
 const HeaderContent = styled.div`
   display: flex;
   flex-direction: column;
-  align-items: center;
   width: 100%;
+`;
+
+const Kicker = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--ink);
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
 `;
 
 const TitleRow = styled.div`
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
   width: 100%;
-  max-width: 600px;
-  margin-bottom: 20px;
-  position: relative;
-  
-  @media (max-width: 768px) {
-    margin-bottom: 16px;
-  }
-  
-  @media (max-width: 480px) {
-    margin-bottom: 12px;
-  }
+  margin-top: 17px;
 `;
 
-const FontControlWrapper = styled.div`
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
+const TitleBlock = styled.div`
+  min-width: 0;
 `;
 
 const Title = styled.h1`
-  background: linear-gradient(135deg, #00d4ff 0%, #ffffff 50%, #00d4ff 100%);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  font-size: clamp(2rem, 6vw, 3.5rem);
-  font-weight: 800;
   margin: 0;
-  text-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
-  letter-spacing: -0.02em;
-  
-  @media (max-width: 768px) {
-    font-size: clamp(1.8rem, 5vw, 2.5rem);
+  color: var(--ink);
+  font-size: clamp(2.6rem, 10vw, 4rem);
+  font-weight: 730;
+  line-height: 0.9;
+  letter-spacing: -0.055em;
+
+  em {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 400;
+    letter-spacing: -0.04em;
   }
-  
+
   @media (max-width: 480px) {
-    font-size: clamp(1.5rem, 4vw, 2rem);
+    font-size: clamp(2.5rem, 12vw, 3.4rem);
   }
+`;
+
+const Subtitle = styled.p`
+  margin: 11px 0 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+`;
+
+const FontControlWrapper = styled.div`
+  flex: 0 0 auto;
+  padding-bottom: 2px;
 `;
 
 const TabNavigation = styled.div`
   display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 12px;
+  gap: 26px;
   width: 100%;
-  margin-bottom: 8px;
-  
-  @media (max-width: 768px) {
-    gap: 10px;
-    margin-bottom: 6px;
-  }
-  
-  @media (max-width: 640px) {
-    gap: 8px;
-    margin-bottom: 4px;
-  }
-  
+  margin-top: 18px;
+  border-bottom: 1px solid var(--line);
+
   @media (max-width: 480px) {
-    gap: 6px;
-    margin-bottom: 4px;
+    gap: 22px;
   }
 `;
 
 const TabButton = styled.button`
-  background: ${props => props.isActive
-    ? 'linear-gradient(135deg, #00d4ff 0%, rgba(0, 212, 255, 0.8) 100%)'
-    : 'linear-gradient(135deg, #2a2a2a 0%, rgba(0, 212, 255, 0.05) 100%)'
-  };
-  border: 2px solid ${props => props.isActive ? '#00d4ff' : '#444'};
-  border-radius: 16px;
-  color: ${props => props.isActive ? '#000000' : '#ffffff'};
+  position: relative;
+  margin-bottom: -1px;
+  padding: 2px 0 10px;
+  border: 0;
+  border-bottom: 2px solid ${props => props.isActive ? 'var(--coral)' : 'transparent'};
+  background: none;
+  color: ${props => props.isActive ? 'var(--ink)' : 'var(--muted)'};
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
   cursor: pointer;
-  font-size: clamp(14px, 3vw, 16px);
-  font-weight: 700;
-  min-height: 44px;
-  padding: 8px 20px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: ${props => props.isActive
-    ? '0 8px 32px rgba(0, 212, 255, 0.3)'
-    : '0 4px 16px rgba(0, 0, 0, 0.1)'
-  };
+  transition: color 160ms ease, border-color 160ms ease;
   touch-action: manipulation;
-  
-  &:hover {
-    transform: scale(1.02);
-    box-shadow: ${props => props.isActive
-    ? '0 12px 40px rgba(0, 212, 255, 0.4)'
-    : '0 6px 20px rgba(0, 0, 0, 0.2)'
-  };
-  }
-  
+
   &:active {
-    transform: scale(0.98);
-  }
-  
-  @media (max-width: 768px) {
-    padding: 8px 16px;
-    min-height: 40px;
-    font-size: 15px;
-  }
-  
-  @media (max-width: 640px) {
-    padding: 6px 12px;
-    min-height: 36px;
-    font-size: 14px;
-  }
-  
-  @media (max-width: 480px) {
-    padding: 6px 10px;
-    min-height: 32px;
-    font-size: 13px;
+    opacity: 0.7;
   }
 `;
 
-
 const LevelSelection = styled.div`
-  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-  border: 2px solid #333;
-  border-radius: 20px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
-  margin: 0 auto 8px;
-  padding: 20px;
   width: 100%;
-  max-width: 600px;
-  
-  @media (max-width: 768px) {
-    padding: 16px;
-    margin: 0 auto 6px;
-    border-radius: 16px;
-  }
-  
-  @media (max-width: 480px) {
-    padding: 12px;
-    margin: 0 auto 4px;
-    border-radius: 12px;
-  }
+  margin: 0;
 `;
 
 const LevelGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 12px;
-  
-  @media (max-width: 768px) {
-    gap: 10px;
+  display: flex;
+  gap: 7px;
+  margin: 13px -21px 0;
+  padding: 2px 21px 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+
+  &::-webkit-scrollbar {
+    display: none;
   }
-  
-  @media (max-width: 640px) {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-  }
-  
+
   @media (max-width: 480px) {
-    gap: 6px;
+    margin-left: -18px;
+    margin-right: -18px;
+    padding-left: 18px;
+    padding-right: 18px;
   }
 `;
 
 const LevelButton = styled.button`
-  background: ${props => props.isActive
-    ? 'linear-gradient(135deg, #00d4ff 0%, rgba(0, 212, 255, 0.8) 100%)'
-    : 'linear-gradient(135deg, #2a2a2a 0%, #3a3a3a 100%)'
-  };
-  border: 2px solid ${props => props.isActive ? '#00d4ff' : '#444'};
-  border-radius: 12px;
-  color: ${props => props.isActive ? '#000000' : '#ffffff'};
+  flex: 0 0 auto;
+  min-width: 44px;
+  height: 36px;
+  padding: 0 13px;
+  border: 1px solid ${props => props.isActive ? 'var(--ink)' : 'var(--line)'};
+  border-radius: 999px;
+  background: ${props => props.isActive ? 'var(--ink)' : 'transparent'};
+  color: ${props => props.isActive ? '#f8f3e6' : 'var(--muted)'};
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   cursor: pointer;
-  font-size: clamp(14px, 2.5vw, 16px);
-  font-weight: 700;
-  min-height: 36px;
-  padding: 8px 8px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: ${props => props.isActive
-    ? '0 4px 16px rgba(0, 212, 255, 0.3)'
-    : '0 2px 8px rgba(0, 0, 0, 0.2)'
-  };
+  transition: 150ms ease;
   touch-action: manipulation;
-  
-  &:hover {
-    transform: scale(1.05);
-    box-shadow: ${props => props.isActive
-    ? '0 6px 20px rgba(0, 212, 255, 0.4)'
-    : '0 4px 12px rgba(0, 0, 0, 0.3)'
-  };
+
+  &:active {
+    transform: scale(0.95);
   }
-  
-  @media (max-width: 768px) {
-    min-height: 32px;
-    padding: 6px 6px;
-    font-size: 14px;
+`;
+
+const SectionHead = styled.div`
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 25px 0 12px;
+`;
+
+const Eyebrow = styled.p`
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--coral);
+`;
+
+const SectionTitle = styled.h2`
+  margin: 5px 0 0;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 720;
+  letter-spacing: -0.03em;
+
+  span {
+    color: var(--muted);
+    font-weight: 500;
   }
-  
-  @media (max-width: 640px) {
-    min-height: 28px;
-    padding: 4px 4px;
-    font-size: 13px;
-  }
-  
-  @media (max-width: 480px) {
-    min-height: 24px;
-    padding: 2px 2px;
-    font-size: 12px;
-  }
+`;
+
+const SectionMeta = styled.span`
+  padding-bottom: 2px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 `;
 
 const MainContent = styled.main`
   width: 100%;
-  max-width: 800px;
-  margin: 0 auto;
   position: relative;
 `;
-
 
 const ContentList = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 11px;
 `;
 
 const LoadingContainer = styled.div`
   display: flex;
-  justify-content: center;
   align-items: center;
-  height: 200px;
+  justify-content: center;
+  min-height: 220px;
+  padding: 28px 0;
   text-align: center;
 `;
 
 const Spinner = styled.div`
-  width: 40px;
-  height: 40px;
-  border: 3px solid #333;
-  border-top: 3px solid #00d4ff;
+  width: 30px;
+  height: 30px;
+  margin: 0 auto;
+  border: 2px solid rgba(23, 20, 15, 0.14);
+  border-top-color: var(--coral);
   border-radius: 50%;
-  animation: spin 1s linear infinite;
-  
+  animation: spin 0.9s linear infinite;
+
   @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
@@ -314,102 +261,94 @@ const Spinner = styled.div`
 `;
 
 const LoadingText = styled.div`
-  margin-top: 16px;
-  
+  margin-top: 14px;
+
   h3 {
-    color: #ffffff;
-    font-size: 18px;
-    font-weight: 600;
-    margin: 0 0 8px 0;
+    margin: 0 0 7px;
+    color: var(--ink);
+    font-size: 15px;
+    font-weight: 650;
+    letter-spacing: -0.02em;
   }
-  
+
   p {
-    color: #cccccc;
-    font-size: 14px;
     margin: 0;
+    color: var(--muted);
+    font-size: 11.5px;
+    line-height: 1.6;
   }
 `;
 
 const ErrorContainer = styled.div`
-  background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%);
-  border: 2px solid #ff6666;
-  border-radius: 16px;
-  color: #ffffff;
-  padding: 20px;
-  text-align: center;
-  
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--coral);
+  border-radius: 0 14px 14px 0;
+  background: var(--card-paper);
+  text-align: left;
+
   h3 {
-    font-size: 18px;
-    font-weight: 600;
-    margin: 0 0 8px 0;
-  }
-  
-  p {
+    margin: 0 0 6px;
+    color: var(--ink);
     font-size: 14px;
+    font-weight: 650;
+  }
+
+  p {
     margin: 0;
-    opacity: 0.9;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.6;
   }
 `;
 
 const ScrollToTopButton = styled.button`
   position: fixed;
-  bottom: 24px;
-  right: 24px;
-  background: linear-gradient(135deg, #00d4ff 0%, rgba(0, 212, 255, 0.8) 100%);
-  border: 2px solid #00d4ff;
-  border-radius: 50%;
-  color: #000000;
-  cursor: pointer;
+  right: 18px;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 56px;
-  height: 56px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 8px 24px rgba(0, 212, 255, 0.3);
-  z-index: 1000;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+  background: var(--card-paper);
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(23, 20, 15, 0.16);
+  transition: 160ms ease;
   touch-action: manipulation;
-  
+
   &:hover {
-    transform: translateY(-2px) scale(1.1);
-    box-shadow: 0 12px 32px rgba(0, 212, 255, 0.4);
+    background: var(--ink);
+    color: var(--paper);
   }
-  
+
   &:active {
-    transform: scale(0.95);
-  }
-  
-  @media (max-width: 768px) {
-    width: 52px;
-    height: 52px;
-    bottom: 20px;
-    right: 20px;
-  }
-  
-  @media (max-width: 640px) {
-    width: 48px;
-    height: 48px;
-    bottom: 16px;
-    right: 16px;
-  }
-  
-  @media (max-width: 480px) {
-    width: 44px;
-    height: 44px;
-    bottom: 12px;
-    right: 12px;
+    transform: scale(0.94);
   }
 `;
 
 const Footer = styled.footer`
-  text-align: center;
-  margin-top: 48px;
-  padding: 24px 0;
-  
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 28px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+
   p {
-    color: #888888;
-    font-size: 12px;
     margin: 0;
+    color: inherit;
+    font-size: inherit;
   }
 `;
 
@@ -422,6 +361,10 @@ export default function App() {
   const [activeCardIndex, setActiveCardIndex] = useState(null);
   const [activeNewsIndex, setActiveNewsIndex] = useState(null);
   const [wordModal, setWordModal] = useState({ isOpen: false, word: '', meaning: '', example: '', detailedInfo: null });
+
+  const openWordModal = useCallback((word, meaning, example, detailedInfo) => {
+    setWordModal({ isOpen: true, word, meaning, example, detailedInfo });
+  }, []);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
 
   // 커스텀 훅 사용
@@ -435,6 +378,11 @@ export default function App() {
   const { loading, error, fetchExpressions, fetchNews, initializeData } = useDataFetching();
 
   const levels = useMemo(() => ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'], []);
+
+  const formattedDate = useMemo(() => {
+    const d = currentDate;
+    return `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, '0')}. ${String(d.getDate()).padStart(2, '0')}`;
+  }, [currentDate]);
 
 
   // 데이터 가져오기
@@ -516,6 +464,9 @@ export default function App() {
           meaning={wordModal.meaning}
           example={wordModal.example}
           detailedInfo={wordModal.detailedInfo}
+          onPlayAudio={playAudio}
+          audioStates={audioStates}
+          onGenerateExamples={generateExamples}
           onClose={() => setWordModal({ ...wordModal, isOpen: false })}
         />
 
@@ -531,24 +482,38 @@ export default function App() {
         <MainContainer>
           <Header>
             <HeaderContent>
+              <Kicker>
+                <span>Daily practice</span>
+                <span>{formattedDate}</span>
+              </Kicker>
+
               <TitleRow>
-                <Title>
-                  Daily English
-                </Title>
+                <TitleBlock>
+                  <Title>
+                    Daily<br /><em>English</em>
+                  </Title>
+                  <Subtitle>
+                    매일 세 개의 표현으로<br />영어의 결을 익히세요.
+                  </Subtitle>
+                </TitleBlock>
                 <FontControlWrapper>
                   <FontSizeControl />
                 </FontControlWrapper>
               </TitleRow>
 
-              <TabNavigation>
+              <TabNavigation role="tablist" aria-label="학습 모드">
                 <TabButton
                   isActive={activeTab === 'expressions'}
+                  role="tab"
+                  aria-selected={activeTab === 'expressions'}
                   onClick={() => setActiveTab('expressions')}
                 >
                   오늘의 표현
                 </TabButton>
                 <TabButton
                   isActive={activeTab === 'news'}
+                  role="tab"
+                  aria-selected={activeTab === 'news'}
                   onClick={() => setActiveTab('news')}
                 >
                   뉴스 학습
@@ -560,11 +525,12 @@ export default function App() {
 
           {/* 레벨 선택 */}
           <LevelSelection>
-            <LevelGrid>
+            <LevelGrid role="group" aria-label="난이도">
               {levels.map(l => (
                 <LevelButton
                   key={l}
                   isActive={level === l}
+                  aria-pressed={level === l}
                   onClick={() => setLevel(l)}
                 >
                   {l}
@@ -572,6 +538,16 @@ export default function App() {
               ))}
             </LevelGrid>
           </LevelSelection>
+
+          <SectionHead>
+            <div>
+              <Eyebrow>{activeTab === 'expressions' ? "Today's selection" : 'News briefing'}</Eyebrow>
+              <SectionTitle>
+                {activeTab === 'expressions' ? <>오늘의 표현 <span>· 3</span></> : '뉴스로 배우기'}
+              </SectionTitle>
+            </div>
+            <SectionMeta>{activeTab === 'expressions' ? '3 MIN READ' : 'AI SUMMARY'}</SectionMeta>
+          </SectionHead>
 
           {/* 메인 컨텐츠 */}
           <MainContent>
@@ -609,7 +585,7 @@ export default function App() {
                       }}
                       audioStates={audioStates}
                       onPlayAudio={playAudio}
-                      onWordClick={setWordModal}
+                      onWordClick={openWordModal}
                       onTranslate={translateText}
                       level={level}
                       translations={translations}
@@ -629,7 +605,7 @@ export default function App() {
                       }}
                       audioStates={audioStates}
                       onPlayAudio={playAudio}
-                      onWordClick={setWordModal}
+                      onWordClick={openWordModal}
                       onTranslate={translateText}
                       onSummarize={summarizeText}
                       onGenerateExamples={generateExamples}
@@ -638,13 +614,15 @@ export default function App() {
                       handleTranslationClick={translateText}
                     />
                   )) : (
-                    <div className="text-center py-8">
-                      <div className="text-gray-500 mb-4">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-                        <p className="text-lg font-medium">뉴스를 불러오는 중...</p>
-                        <p className="text-sm">AI가 최신 뉴스를 분석하고 있습니다</p>
+                    <LoadingContainer>
+                      <div>
+                        <Spinner />
+                        <LoadingText>
+                          <h3>뉴스를 불러오는 중...</h3>
+                          <p>AI가 최신 뉴스를 분석하고 있습니다</p>
+                        </LoadingText>
                       </div>
-                    </div>
+                    </LoadingContainer>
                   )
                 )}
               </ContentList>
@@ -653,6 +631,7 @@ export default function App() {
 
           <Footer>
             <p>Powered by Gemini AI</p>
+            <p>Seoul · 2026</p>
           </Footer>
         </MainContainer>
       </AppContainer>

@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Daily English — Editorial Paper</title>
+  <style>
+    :root {
+      --font-scale: 1;
+      --paper: #f2ede2;
+      --card: #fffdf6;
+      --ink: #17140f;
+      --muted: #6e6559;
+      --line: rgba(23, 20, 15, 0.14);
+      --coral: #ef532e;
+      --forest: #2f5d50;
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      overflow-x: hidden;
+      background:
+        radial-gradient(90% 50% at 85% -10%, rgba(239, 83, 46, 0.09), transparent 65%),
+        radial-gradient(70% 40% at 0% 40%, rgba(47, 93, 80, 0.06), transparent 60%),
+        var(--paper);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Apple SD Gothic Neo", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body::before {
+      content: "";
+      position: fixed; inset: 0; pointer-events: none; opacity: 0.28; mix-blend-mode: multiply;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)' opacity='.09'/%3E%3C/svg%3E");
+    }
+    button:focus-visible, a:focus-visible { outline: 2px solid var(--coral); outline-offset: 3px; }
+    button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+    svg { display: block; }
+    [hidden] { display: none !important; }
+    .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+    .shell {
+      width: 100%; max-width: 430px; margin: 0 auto;
+      padding: calc(20px + env(safe-area-inset-top)) 21px calc(38px + env(safe-area-inset-bottom));
+    }
+
+    /* ── masthead ── */
+    .masthead { padding-bottom: 12px; border-bottom: 1px solid var(--ink); }
+    .kicker {
+      display: flex; justify-content: space-between; align-items: center;
+      font-family: "SF Mono", Menlo, monospace;
+      font-size: 8.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
+    }
+    .brandline { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin-top: 17px; }
+    h1 {
+      margin: 0;
+      font-size: 40px; line-height: 0.9; letter-spacing: -0.055em; font-weight: 730;
+    }
+    h1 em {
+      font-family: Georgia, "Times New Roman", "Apple SD Gothic Neo", serif;
+      font-style: italic; font-weight: 400; letter-spacing: -0.04em;
+    }
+    .sub { margin: 11px 0 0; font-size: 11.5px; line-height: 1.6; color: var(--muted); letter-spacing: -0.01em; }
+    .font-btn {
+      flex: 0 0 auto;
+      width: 44px; height: 44px; border: 1px solid var(--ink); border-radius: 50%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+      font-family: Georgia, serif; font-size: 15px; font-style: italic; line-height: 1;
+      transition: 160ms ease;
+    }
+    .font-btn small { font-family: "SF Mono", Menlo, monospace; font-style: normal; font-size: 7px; letter-spacing: 0; color: var(--muted); }
+    .font-btn:active { transform: scale(0.94); }
+    .font-btn.scaled { background: var(--ink); color: var(--paper); }
+    .font-btn.scaled small { color: rgba(242, 237, 226, 0.6); }
+
+    /* ── tabs ── */
+    .tabs { display: flex; gap: 26px; margin-top: 18px; border-bottom: 1px solid var(--line); }
+    .tabs button {
+      position: relative; padding: 2px 0 10px;
+      color: var(--muted); font-size: 12.5px; font-weight: 650; letter-spacing: 0.01em;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+      transition: 160ms ease;
+    }
+    .tabs button.active { color: var(--ink); border-color: var(--coral); }
+
+    /* ── levels ── */
+    .levels {
+      display: flex; gap: 7px; margin: 13px -21px 0; padding: 2px 21px 4px;
+      overflow-x: auto; scrollbar-width: none;
+    }
+    .levels::-webkit-scrollbar { display: none; }
+    .levels button {
+      flex: 0 0 auto; min-width: 42px; height: 31px; padding: 0 12px;
+      border: 1px solid var(--line); border-radius: 999px;
+      font-family: "SF Mono", Menlo, monospace; font-size: 9.5px; font-weight: 600; letter-spacing: 0.08em;
+      color: var(--muted); transition: 160ms ease;
+    }
+    .levels button.active { background: var(--ink); color: #f8f3e6; border-color: var(--ink); }
+    .levels button:active { transform: scale(0.95); }
+
+    /* ── section head ── */
+    .section-head { display: flex; align-items: flex-end; justify-content: space-between; margin: 25px 0 12px; }
+    .eyebrow {
+      margin: 0; font-family: "SF Mono", Menlo, monospace;
+      font-size: 8.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--coral);
+    }
+    .section-head h2 { margin: 5px 0 0; font-size: 17px; font-weight: 720; letter-spacing: -0.03em; }
+    .section-head h2 span { color: var(--muted); font-weight: 500; }
+    .date { font-family: "SF Mono", Menlo, monospace; font-size: 9px; color: var(--muted); letter-spacing: 0.04em; }
+
+    /* ── cards ── */
+    .card {
+      position: relative;
+      padding: 18px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      box-shadow: 0 16px 30px rgba(63, 46, 22, 0.07);
+      animation: rise 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+      animation-delay: calc(var(--i, 0) * 70ms);
+    }
+    .card + .card { margin-top: 11px; }
+    .card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .num { font-family: Georgia, "Times New Roman", serif; font-size: 27px; line-height: 0.9; color: var(--coral); }
+    .label {
+      padding-top: 4px; font-family: "SF Mono", Menlo, monospace;
+      font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
+    }
+    .sentence {
+      margin: 9px 0 0;
+      font-size: calc(18.5px * var(--font-scale));
+      line-height: 1.52; font-weight: 600; letter-spacing: -0.024em; text-wrap: pretty;
+    }
+    .sentence em {
+      font-family: Georgia, "Times New Roman", serif;
+      font-style: italic; font-weight: 500; letter-spacing: -0.01em;
+      border-bottom: 1.5px solid var(--coral); padding-bottom: 1px;
+    }
+    .translation {
+      margin-top: 12px; padding: 2px 0 2px 12px;
+      border-left: 2px solid var(--coral);
+      color: #5f574a; font-size: calc(12.5px * var(--font-scale)); line-height: 1.7;
+    }
+    .card-foot {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line);
+    }
+    .pv { display: flex; align-items: baseline; gap: 7px; min-width: 0; }
+    .pv b { font-size: 12px; font-weight: 720; letter-spacing: -0.01em; white-space: nowrap; }
+    .pv span { font-size: 10px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .actions { display: flex; align-items: center; gap: 13px; flex: 0 0 auto; }
+    .actions button {
+      display: flex; align-items: center; gap: 4px;
+      min-height: 34px; padding: 6px 0;
+      font-family: "SF Mono", Menlo, monospace;
+      font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+      transition: 150ms ease;
+    }
+    .actions button svg { width: 13px; height: 13px; }
+    .actions button.on { color: var(--coral); }
+    .actions button:active { transform: scale(0.94); }
+
+    .details {
+      margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line);
+      display: grid; gap: 10px; animation: fade 200ms ease both;
+    }
+    .details span {
+      display: block; margin-bottom: 3px;
+      font-family: "SF Mono", Menlo, monospace; font-size: 8px;
+      letter-spacing: 0.14em; text-transform: uppercase; color: var(--forest);
+    }
+    .details p { margin: 0; font-size: 12px; line-height: 1.65; color: #625a4d; }
+
+    /* ── news ── */
+    .news-card {
+      position: relative; padding: 20px;
+      background: var(--ink); color: #f7f1e3;
+      border-radius: 20px; overflow: hidden;
+      animation: rise 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    }
+    .news-card::after {
+      content: ""; position: absolute; right: -50px; top: -70px;
+      width: 190px; height: 190px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(239, 83, 46, 0.3), transparent 66%);
+    }
+    .news-top { position: relative; display: flex; justify-content: space-between; align-items: center; }
+    .news-tag {
+      padding: 5px 9px; border-radius: 999px;
+      background: rgba(247, 241, 227, 0.1); border: 1px solid rgba(247, 241, 227, 0.18);
+      font-family: "SF Mono", Menlo, monospace; font-size: 8px; letter-spacing: 0.14em;
+    }
+    .news-date { font-family: "SF Mono", Menlo, monospace; font-size: 8.5px; color: rgba(247, 241, 227, 0.55); }
+    .news-title {
+      position: relative; margin: 16px 0 0;
+      font-size: calc(21px * var(--font-scale)); line-height: 1.38;
+      font-weight: 650; letter-spacing: -0.03em;
+    }
+    .news-meta { margin: 9px 0 0; font-family: "SF Mono", Menlo, monospace; font-size: 8.5px; letter-spacing: 0.05em; color: rgba(247, 241, 227, 0.55); }
+    .summary {
+      margin-top: 16px; padding: 14px; border-radius: 14px;
+      background: rgba(247, 241, 227, 0.07); border: 1px solid rgba(247, 241, 227, 0.1);
+    }
+    .summary span {
+      display: block; margin-bottom: 6px;
+      font-family: "SF Mono", Menlo, monospace; font-size: 8px; letter-spacing: 0.14em; color: var(--coral);
+    }
+    .summary p { margin: 0; font-size: 12px; line-height: 1.7; color: rgba(247, 241, 227, 0.82); }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .chips span {
+      padding: 5px 9px; border-radius: 999px;
+      background: rgba(247, 241, 227, 0.07); border: 1px solid rgba(247, 241, 227, 0.12);
+      font-size: 9.5px; color: rgba(247, 241, 227, 0.72);
+    }
+    .news-card .translation { border-color: var(--coral); color: rgba(247, 241, 227, 0.72); }
+    .news-card .card-foot { border-color: rgba(247, 241, 227, 0.14); }
+    .news-card .pv b { color: #f7f1e3; }
+    .news-card .pv span, .news-card .actions button { color: rgba(247, 241, 227, 0.55); }
+    .news-card .actions button.on { color: var(--coral); }
+    .news-card .details { border-color: rgba(247, 241, 227, 0.16); }
+    .news-card .details span { color: #ff8b6d; }
+    .news-card .details p { color: rgba(247, 241, 227, 0.75); }
+
+    footer {
+      display: flex; justify-content: space-between; margin-top: 28px;
+      padding-top: 10px; border-top: 1px solid var(--line);
+      font-family: "SF Mono", Menlo, monospace; font-size: 8px;
+      letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+    }
+
+    @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+  </style>
+</head>
+<body>
+  <svg class="sprite" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-volume" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M11 5 6 9H3v6h3l5 4V5Z" /><path d="M15.5 8.5a5 5 0 0 1 0 7" /><path d="M18.5 5.5a9 9 0 0 1 0 13" />
+    </symbol>
+    <symbol id="i-translate" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 5h8M8 3v2c0 4-2 7-5 8" /><path d="M4 9c1.5 2 4 4 7 5" /><path d="m13 21 4-10 4 10" /><path d="M14.5 17h5" />
+    </symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="m6 9 6 6 6-6" />
+    </symbol>
+  </svg>
+
+  <main class="shell">
+    <header class="masthead">
+      <div class="kicker">
+        <span>Daily practice · No. 297</span>
+        <span>2026. 10. 23</span>
+      </div>
+      <div class="brandline">
+        <div>
+          <h1>Daily<br /><em>English</em></h1>
+          <p class="sub">매일 세 개의 표현으로<br />영어의 결을 익히세요.</p>
+        </div>
+        <button class="font-btn" data-font aria-label="글자 크기 조절">Aa<small data-font-label>100%</small></button>
+      </div>
+    </header>
+
+    <nav class="tabs" role="tablist" aria-label="학습 모드">
+      <button class="active" data-tab="expressions" role="tab" aria-selected="true">오늘의 표현</button>
+      <button data-tab="news" role="tab" aria-selected="false">뉴스 학습</button>
+    </nav>
+
+    <div class="levels" role="group" aria-label="난이도">
+      <button data-level="A1" aria-pressed="false">A1</button>
+      <button data-level="A2" aria-pressed="false">A2</button>
+      <button class="active" data-level="B1" aria-pressed="true">B1</button>
+      <button data-level="B2" aria-pressed="false">B2</button>
+      <button data-level="C1" aria-pressed="false">C1</button>
+      <button data-level="C2" aria-pressed="false">C2</button>
+    </div>
+
+    <section data-view="expressions">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Today's selection</p>
+          <h2>오늘의 표현 <span>· 3</span></h2>
+        </div>
+        <span class="date">8 MIN READ</span>
+      </div>
+
+      <article class="card" data-card style="--i:0">
+        <div class="card-top">
+          <span class="num">01</span>
+          <span class="label">Phrasal verb</span>
+        </div>
+        <p class="sentence">Feel free to <em>drop by</em> my office if you have any questions about the project.</p>
+        <div class="translation" data-translation>프로젝트에 대해 궁금한 점이 있으시면 언제든지 제 사무실로 들러주세요.</div>
+        <div class="card-foot">
+          <div class="pv"><b>drop by</b><span>잠깐 들르다</span></div>
+          <div class="actions">
+            <button aria-label="음성 재생"><svg><use href="#i-volume" /></svg>듣기</button>
+            <button class="on" data-translate aria-label="번역 보기" aria-expanded="true"><svg><use href="#i-translate" /></svg>번역</button>
+            <button data-details-toggle aria-label="상세 보기" aria-expanded="false"><svg><use href="#i-chevron" /></svg>더보기</button>
+          </div>
+        </div>
+        <div class="details" data-details hidden>
+          <div><span>Nuance</span><p>격식 없이 가볍게 들른다는 느낌. 짧은 방문이나 인사에 잘 어울립니다.</p></div>
+          <div><span>Example</span><p>Drop by anytime if you're around.</p></div>
+        </div>
+      </article>
+
+      <article class="card" data-card style="--i:1">
+        <div class="card-top">
+          <span class="num">02</span>
+          <span class="label">Phrasal verb</span>
+        </div>
+        <p class="sentence">I decided to <em>cut out</em> sugar from my diet to improve my health.</p>
+        <div class="translation" data-translation hidden>건강을 위해 식단에서 설탕을 끊기로 했어요.</div>
+        <div class="card-foot">
+          <div class="pv"><b>cut out</b><span>끊다, 제거하다</span></div>
+          <div class="actions">
+            <button aria-label="음성 재생"><svg><use href="#i-volume" /></svg>듣기</button>
+            <button data-translate aria-label="번역 보기" aria-expanded="false"><svg><use href="#i-translate" /></svg>번역</button>
+            <button data-details-toggle aria-label="상세 보기" aria-expanded="false"><svg><use href="#i-chevron" /></svg>더보기</button>
+          </div>
+        </div>
+        <div class="details" data-details hidden>
+          <div><span>Nuance</span><p>습관이나 음식 등 무언가를 완전히 멈출 때 자연스럽게 씁니다.</p></div>
+          <div><span>Example</span><p>I'm trying to cut out late-night snacks.</p></div>
+        </div>
+      </article>
+
+      <article class="card" data-card style="--i:2">
+        <div class="card-top">
+          <span class="num">03</span>
+          <span class="label">Phrasal verb</span>
+        </div>
+        <p class="sentence">There is a bad flu <em>going around</em> the office these days.</p>
+        <div class="translation" data-translation hidden>요즘 사무실에 독감이 돌고 있어요.</div>
+        <div class="card-foot">
+          <div class="pv"><b>go around</b><span>(병이) 돌다</span></div>
+          <div class="actions">
+            <button aria-label="음성 재생"><svg><use href="#i-volume" /></svg>듣기</button>
+            <button data-translate aria-label="번역 보기" aria-expanded="false"><svg><use href="#i-translate" /></svg>번역</button>
+            <button data-details-toggle aria-label="상세 보기" aria-expanded="false"><svg><use href="#i-chevron" /></svg>더보기</button>
+          </div>
+        </div>
+        <div class="details" data-details hidden>
+          <div><span>Nuance</span><p>소문이나 질병이 사람들 사이에 퍼지는 상황에서 자주 사용합니다.</p></div>
+          <div><span>Example</span><p>A cold is going around the office.</p></div>
+        </div>
+      </article>
+    </section>
+
+    <section data-view="news" hidden>
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">News briefing</p>
+          <h2>뉴스로 배우기</h2>
+        </div>
+        <span class="date">AI SUMMARY</span>
+      </div>
+
+      <article class="news-card" data-card>
+        <div class="news-top">
+          <span class="news-tag">NEWS SOURCE</span>
+          <span class="news-date">2026. 10. 23</span>
+        </div>
+        <h3 class="news-title">Nintendo releases 'Switch Sports Resort' with open world in Korea</h3>
+        <p class="news-meta">News2On · B1 · 2 MIN</p>
+        <div class="summary">
+          <span>AI SUMMARY</span>
+          <p>닌텐도가 한국에서 오픈 월드를 도입한 신작을 출시했습니다. 가족이 함께 즐길 수 있는 스포츠 게임으로, 새로운 섬 리조트를 탐험하며 테니스·볼링·골프를 즐길 수 있습니다.</p>
+        </div>
+        <div class="chips"><span>release</span><span>open world</span><span>explore</span></div>
+        <div class="translation" data-translation hidden>닌텐도가 한국에서 '스위치 스포츠 리조트'를 출시했습니다. 오픈 월드 섬에서 다양한 스포츠를 즐길 수 있습니다.</div>
+        <div class="card-foot">
+          <div class="pv"><b>News2On</b><span>B1 레벨</span></div>
+          <div class="actions">
+            <button aria-label="음성 재생"><svg><use href="#i-volume" /></svg>듣기</button>
+            <button data-translate aria-label="번역 보기" aria-expanded="false"><svg><use href="#i-translate" /></svg>번역</button>
+            <button data-details-toggle aria-label="상세 보기" aria-expanded="false"><svg><use href="#i-chevron" /></svg>더보기</button>
+          </div>
+        </div>
+        <div class="details" data-details hidden>
+          <div><span>Key expression</span><p>release a game — 게임을 출시하다</p></div>
+          <div><span>Example</span><p>The game was released worldwide last week.</p></div>
+        </div>
+      </article>
+    </section>
+
+    <footer>
+      <span>Powered by Gemini AI</span>
+      <span>Seoul · 2026</span>
+    </footer>
+  </main>
+
+  <script src="./mockup.js"></script>
+</body>
+</html>

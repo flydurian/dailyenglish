@@ -6,128 +6,102 @@ const FontControlContainer = styled.div`
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: linear-gradient(135deg, #2a2a2a 0%, #3a3a3a 100%);
-  border-radius: 12px;
-  padding: 8px 12px;
-  border: 1px solid #444;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  
-  @media (max-width: 768px) {
-    padding: 6px 10px;
-    gap: 6px;
-  }
-  
-  @media (max-width: 480px) {
-    padding: 4px 8px;
-    gap: 4px;
-  }
 `;
 
 const FontIconButton = styled.button`
-  background: linear-gradient(135deg, #00d4ff 0%, rgba(0, 212, 255, 0.8) 100%);
-  color: #000;
-  border: none;
-  border-radius: 8px;
-  width: 40px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
-  font-weight: bold;
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-style: italic;
+  line-height: 1;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0, 212, 255, 0.3);
-  
-  &:hover {
-    background: linear-gradient(135deg, #00b8e6 0%, rgba(0, 184, 230, 0.9) 100%);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0, 212, 255, 0.4);
+  transition: 160ms ease;
+  touch-action: manipulation;
+
+  &:hover,
+  &[aria-expanded="true"] {
+    background: var(--ink);
+    color: var(--paper);
   }
-  
+
   &:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 4px rgba(0, 212, 255, 0.3);
+    transform: scale(0.94);
   }
-  
-  @media (max-width: 768px) {
-    width: 36px;
-    height: 28px;
-    font-size: 12px;
-  }
-  
-  @media (max-width: 480px) {
-    width: 32px;
-    height: 24px;
-    font-size: 10px;
+`;
+
+const FontPanel = styled.div`
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card-paper);
+  box-shadow: 0 14px 30px rgba(23, 20, 15, 0.16);
+  white-space: nowrap;
+  animation: panel-in 160ms ease-out;
+
+  @keyframes panel-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 `;
 
 const FontButton = styled.button`
-  background: linear-gradient(135deg, #00d4ff 0%, rgba(0, 212, 255, 0.8) 100%);
-  color: #000;
-  border: none;
-  border-radius: 8px;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
-  font-weight: bold;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0, 212, 255, 0.3);
-  
+  transition: 150ms ease;
+  touch-action: manipulation;
+
   &:hover {
-    background: linear-gradient(135deg, #00b8e6 0%, rgba(0, 184, 230, 0.9) 100%);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0, 212, 255, 0.4);
+    border-color: var(--ink);
   }
-  
+
   &:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 4px rgba(0, 212, 255, 0.3);
+    transform: scale(0.94);
   }
-  
+
   &:disabled {
-    background: linear-gradient(135deg, #666 0%, #555 100%);
-    color: #999;
+    color: var(--line);
+    border-color: var(--line);
     cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
   }
-  
-  @media (max-width: 768px) {
-    width: 28px;
-    height: 28px;
-    font-size: 14px;
-  }
-  
-  @media (max-width: 480px) {
-    width: 24px;
-    height: 24px;
+
+  &[data-reset="true"] {
+    color: var(--muted);
     font-size: 12px;
   }
 `;
 
 const FontSizeDisplay = styled.span`
-  color: #cccccc;
-  font-size: 12px;
-  font-weight: 500;
-  min-width: 40px;
+  min-width: 34px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.02em;
   text-align: center;
-  
-  @media (max-width: 768px) {
-    font-size: 11px;
-    min-width: 35px;
-  }
-  
-  @media (max-width: 480px) {
-    font-size: 10px;
-    min-width: 30px;
-  }
 `;
 
 const FontSizeControl = () => {
@@ -138,7 +112,6 @@ const FontSizeControl = () => {
     const isMaxSize = fontSize >= 1.5;
     const isMinSize = fontSize <= 0.7;
 
-    // 외부 클릭 감지
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (containerRef.current && !containerRef.current.contains(event.target)) {
@@ -157,28 +130,20 @@ const FontSizeControl = () => {
         };
     }, [isExpanded]);
 
-    const handleIconClick = () => {
-        setIsExpanded(!isExpanded);
-    };
-
-    const handleFontChange = (action) => {
-        action();
-        // 폰트 크기 변경 후 메뉴를 닫지 않고 계속 열어둠
-    };
-
     return (
         <FontControlContainer ref={containerRef}>
-            {!isExpanded ? (
-                <FontIconButton 
-                    onClick={handleIconClick}
-                    aria-label="폰트 크기 조절"
-                >
-                    Aa
-                </FontIconButton>
-            ) : (
-                <>
-                    <FontButton 
-                        onClick={() => handleFontChange(decreaseFontSize)} 
+            <FontIconButton
+                onClick={() => setIsExpanded(!isExpanded)}
+                aria-label="폰트 크기 조절"
+                aria-expanded={isExpanded}
+            >
+                Aa
+            </FontIconButton>
+
+            {isExpanded && (
+                <FontPanel role="group" aria-label="폰트 크기">
+                    <FontButton
+                        onClick={decreaseFontSize}
                         disabled={isMinSize}
                         aria-label="폰트 크기 줄이기"
                     >
@@ -187,25 +152,21 @@ const FontSizeControl = () => {
                     <FontSizeDisplay>
                         {Math.round(fontSize * 100)}%
                     </FontSizeDisplay>
-                    <FontButton 
-                        onClick={() => handleFontChange(increaseFontSize)} 
+                    <FontButton
+                        onClick={increaseFontSize}
                         disabled={isMaxSize}
                         aria-label="폰트 크기 늘리기"
                     >
                         +
                     </FontButton>
-                    <FontButton 
-                        onClick={() => handleFontChange(resetFontSize)}
+                    <FontButton
+                        onClick={resetFontSize}
                         aria-label="폰트 크기 초기화"
-                        style={{ 
-                            fontSize: '10px',
-                            background: 'linear-gradient(135deg, #666 0%, #555 100%)',
-                            color: '#ccc'
-                        }}
+                        data-reset="true"
                     >
                         ↺
                     </FontButton>
-                </>
+                </FontPanel>
             )}
         </FontControlContainer>
     );
