@@ -1,289 +1,125 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { callGeminiAPI } from '../utils/apiUtils';
 import { base64ToArrayBuffer, pcmToWav } from '../utils/audioUtils';
+import { getCachedAudio, setCachedAudio, clearAudioCache } from '../utils/audioCache';
 
-// TTS 캐시 관리 유틸리티
-const TTS_CACHE_KEY = 'tts_audio_cache';
-const MAX_CACHE_SIZE = 50; // 최대 50개 오디오 캐시
-const CACHE_EXPIRY_DAYS = 7; // 7일 후 캐시 만료
-
-// 로컬 스토리지에서 캐시 로드
-const loadAudioCache = () => {
-    try {
-        const cached = localStorage.getItem(TTS_CACHE_KEY);
-        if (cached) {
-            const cacheData = JSON.parse(cached);
-            const now = Date.now();
-            const validCache = {};
-            
-            // 만료된 캐시 제거
-            Object.keys(cacheData).forEach(key => {
-                if (cacheData[key].timestamp && (now - cacheData[key].timestamp) < (CACHE_EXPIRY_DAYS * 24 * 60 * 60 * 1000)) {
-                    validCache[key] = cacheData[key];
-                }
-            });
-            
-            return validCache;
-        }
-    } catch (error) {
-        console.error('TTS 캐시 로드 실패:', error);
-    }
-    return {};
-};
-
-// 로컬 스토리지에 캐시 저장
-const saveAudioCache = (cache) => {
-    try {
-        localStorage.setItem(TTS_CACHE_KEY, JSON.stringify(cache));
-    } catch (error) {
-        console.error('TTS 캐시 저장 실패:', error);
-    }
-};
+const TTS_MODEL = 'gemini-2.5-flash-preview-tts';
 
 export const useAudio = () => {
     const [audioStates, setAudioStates] = useState({});
-    const [audioCache, setAudioCache] = useState({});
+    const audioElements = useRef(new Map());
+    const objectUrls = useRef(new Map());
 
-    // 컴포넌트 마운트 시 영구 캐시 로드
-    useEffect(() => {
-        const loadedCache = loadAudioCache();
-        
-        // 메모리 캐시에 영구 캐시 데이터 로드
-        const memoryCache = {};
-        Object.keys(loadedCache).forEach(key => {
-            if (loadedCache[key].audioUrl) {
-                const audio = new Audio(loadedCache[key].audioUrl);
-                audio.preload = 'auto';
-                memoryCache[key] = audio;
-            }
-        });
-        setAudioCache(memoryCache);
+    const updateState = useCallback((text, state) => {
+        setAudioStates((prev) => (prev[text] === state ? prev : { ...prev, [text]: state }));
     }, []);
+
+    const playBlob = useCallback(async (text, blob) => {
+        const previousUrl = objectUrls.current.get(text);
+        if (previousUrl) URL.revokeObjectURL(previousUrl);
+
+        const url = URL.createObjectURL(blob);
+        objectUrls.current.set(text, url);
+
+        const audio = new Audio(url);
+        audio.preload = 'auto';
+        audioElements.current.set(text, audio);
+
+        audio.onplay = () => updateState(text, 'playing');
+        audio.onended = () => updateState(text, 'idle');
+        audio.onerror = () => {
+            updateState(text, 'idle');
+            audioElements.current.delete(text);
+        };
+
+        await audio.play();
+    }, [updateState]);
 
     const playAudio = useCallback(async (sentence) => {
+        if (!sentence) return;
         if (audioStates[sentence] === 'loading') return;
-        
-        // 메모리 캐시에서 먼저 확인
-        if (audioCache[sentence]) {
-            const cachedAudio = audioCache[sentence];
-            setAudioStates(prev => ({ ...prev, [sentence]: 'playing' }));
-            
+
+        const existing = audioElements.current.get(sentence);
+        if (existing) {
             try {
-                // blob URL이 유효한지 확인하고 재생
-                if (cachedAudio.src && cachedAudio.src.startsWith('blob:')) {
-                    // 오디오 상태 이벤트 리스너 설정
-                    cachedAudio.onplay = () => setAudioStates(prev => ({ ...prev, [sentence]: 'playing' }));
-                    cachedAudio.onended = () => {
-                        setAudioStates(prev => ({ ...prev, [sentence]: 'idle' }));
-                    };
-                    cachedAudio.onerror = (error) => {
-                        console.error('캐시된 오디오 재생 에러:', error);
-                        setAudioStates(prev => ({ ...prev, [sentence]: 'idle' }));
-                        // 에러 발생 시 캐시에서 제거
-                        setAudioCache(prev => {
-                            const newCache = { ...prev };
-                            delete newCache[sentence];
-                            return newCache;
-                        });
-                    };
-                    
-                    await cachedAudio.play();
-                } else {
-                    throw new Error('Invalid audio source');
-                }
+                existing.currentTime = 0;
+                updateState(sentence, 'playing');
+                await existing.play();
                 return;
-            } catch (e) {
-                console.error("캐시된 음성 재생 실패:", e);
-                setAudioStates(prev => ({ ...prev, [sentence]: 'idle' }));
-                // 캐시된 음성 재생에 실패하면 새로 불러오기
-                setAudioCache(prev => {
-                    const newCache = { ...prev };
-                    delete newCache[sentence];
-                    return newCache;
-                });
+            } catch (error) {
+                audioElements.current.delete(sentence);
+                updateState(sentence, 'idle');
             }
         }
-        
-        setAudioStates(prev => ({ ...prev, [sentence]: 'loading' }));
-        
+
+        updateState(sentence, 'loading');
+
         try {
-            const payload = {
-                contents: [{ parts: [{ text: sentence }] }],
-                generationConfig: { responseModalities: ["AUDIO"] },
-                model: "gemini-2.5-flash-preview-tts"
-            };
-            
-            const result = await callGeminiAPI(payload, 'gemini-2.5-flash-preview-tts');
-            const part = result?.candidates?.[0]?.content?.parts?.[0];
-            const audioData = part?.inlineData?.data;
-            const mimeType = part?.inlineData?.mimeType;
-            
-            if (audioData && mimeType?.startsWith("audio/")) {
-                try {
-                    const sampleRate = parseInt(mimeType.match(/rate=(\d+)/)?.[1] || "24000", 10);
-                    const pcmData = base64ToArrayBuffer(audioData);
-                    
-                    // 오디오 데이터 유효성 검사
-                    if (!pcmData || pcmData.byteLength === 0) {
-                        throw new Error('빈 오디오 데이터');
-                    }
-                    
-                    const pcm16 = new Int16Array(pcmData);
-                    if (pcm16.length === 0) {
-                        throw new Error('유효하지 않은 PCM 데이터');
-                    }
-                    
-                    const wavBlob = pcmToWav(pcm16, sampleRate);
-                    
-                    // WAV 블롭 유효성 검사
-                    if (!wavBlob || wavBlob.size === 0) {
-                        throw new Error('유효하지 않은 WAV 데이터');
-                    }
-                    
-                    const audioUrl = URL.createObjectURL(wavBlob);
-                    const audio = new Audio(audioUrl);
-                    
-                    // 오디오 객체 유효성 검사
-                    if (!audio) {
-                        throw new Error('오디오 객체 생성 실패');
-                    }
-                
-                // 오디오를 메모리 캐시에 저장
-                setAudioCache(prev => ({ ...prev, [sentence]: audio }));
-                
-                // 영구 캐시에 저장 (blob 데이터 직접 저장)
-                const cacheEntry = {
-                    blobData: Array.from(new Uint8Array(await wavBlob.arrayBuffer())),
-                    timestamp: Date.now(),
-                    text: sentence,
-                    mimeType: 'audio/wav'
+            // 1) IndexedDB 캐시 → 2) Gemini TTS 순서로 확인합니다.
+            let blob = await getCachedAudio(sentence);
+
+            if (!blob) {
+                const payload = {
+                    contents: [{ parts: [{ text: sentence }] }],
+                    generationConfig: { responseModalities: ['AUDIO'] },
+                    model: TTS_MODEL
                 };
-                
-                // 영구 캐시에 직접 저장
-                const currentCache = loadAudioCache();
-                const newCache = { ...currentCache, [sentence]: cacheEntry };
-                
-                // 캐시 크기 제한
-                const keys = Object.keys(newCache);
-                if (keys.length > MAX_CACHE_SIZE) {
-                    // 가장 오래된 항목 제거
-                    const sortedKeys = keys.sort((a, b) => 
-                        newCache[a].timestamp - newCache[b].timestamp
-                    );
-                    delete newCache[sortedKeys[0]];
+
+                const result = await callGeminiAPI(payload, TTS_MODEL, 2);
+                const part = result?.candidates?.[0]?.content?.parts?.[0];
+                const audioData = part?.inlineData?.data;
+                const mimeType = part?.inlineData?.mimeType;
+
+                if (!audioData || !mimeType?.startsWith('audio/')) {
+                    throw new Error('유효한 오디오 데이터를 받지 못했습니다.');
                 }
-                
-                // 영구 캐시에 저장
-                saveAudioCache(newCache);
-                
-                audio.onplay = () => setAudioStates(prev => ({ ...prev, [sentence]: 'playing' }));
-                audio.onended = () => {
-                    setAudioStates(prev => ({ ...prev, [sentence]: 'idle' }));
-                };
-                audio.onerror = (error) => {
-                    console.error('새 오디오 재생 에러:', error);
-                    setAudioStates(prev => ({ ...prev, [sentence]: 'idle' }));
-                    // 에러 발생 시 캐시에서 제거
-                    setAudioCache(prev => {
-                        const newCache = { ...prev };
-                        delete newCache[sentence];
-                        return newCache;
-                    });
-                };
-                
-                    try {
-                        await audio.play();
-                    } catch (playError) {
-                        console.error('오디오 재생 실패:', playError);
-                        setAudioStates(prev => ({ ...prev, [sentence]: 'idle' }));
-                        throw new Error(`오디오 재생 실패: ${playError.message}`);
-                    }
-                } catch (audioError) {
-                    console.error('오디오 생성 실패:', audioError);
-                    setAudioStates(prev => ({ ...prev, [sentence]: 'idle' }));
-                    throw new Error(`오디오 생성 실패: ${audioError.message}`);
+
+                const sampleRate = parseInt(mimeType.match(/rate=(\d+)/)?.[1] || '24000', 10);
+                const pcmData = base64ToArrayBuffer(audioData);
+                const pcm16 = new Int16Array(pcmData);
+
+                if (pcm16.length === 0) {
+                    throw new Error('유효하지 않은 PCM 데이터');
                 }
-            } else {
-                throw new Error("유효한 오디오 데이터를 받지 못했습니다.");
+
+                blob = pcmToWav(pcm16, sampleRate);
+                if (!blob || blob.size === 0) {
+                    throw new Error('유효하지 않은 WAV 데이터');
+                }
+
+                await setCachedAudio(sentence, blob);
             }
-        } catch (e) {
-            console.error("음성을 재생하는 데 실패했습니다:", e);
-            setAudioStates(prev => ({ ...prev, [sentence]: 'idle' }));
-            throw e;
+
+            await playBlob(sentence, blob);
+        } catch (error) {
+            console.error('음성을 재생하는 데 실패했습니다:', error);
+            updateState(sentence, 'idle');
+            throw error;
         }
-    }, [audioStates, audioCache]);
+    }, [audioStates, playBlob, updateState]);
 
-    // 뉴스 관련 음성 캐시 삭제
-    const clearNewsAudioCache = useCallback(() => {
-        setAudioCache(prev => {
-            const newCache = { ...prev };
-            Object.keys(newCache).forEach(key => {
-                if (key.length > 50 || key.includes('news') || key.includes('article')) {
-                    delete newCache[key];
-                }
-            });
-            return newCache;
-        });
-        
-        setAudioStates(prev => {
-            const newStates = { ...prev };
-            Object.keys(newStates).forEach(key => {
-                if (key.length > 50 || key.includes('news') || key.includes('article')) {
-                    delete newStates[key];
-                }
-            });
-            return newStates;
-        });
-        
-        // 영구 캐시에서도 제거
-        const currentCache = loadAudioCache();
-        const newCache = { ...currentCache };
-        Object.keys(newCache).forEach(key => {
-            if (key.length > 50 || key.includes('news') || key.includes('article')) {
-                delete newCache[key];
-            }
-        });
-        saveAudioCache(newCache);
-    }, []);
-
-    // 오래된 음성 캐시 정리
-    const clearOldAudioCache = useCallback(() => {
-        const now = Date.now();
-        const expiryTime = CACHE_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
-        
-        setAudioCache(prev => {
-            const newCache = { ...prev };
-            const cacheData = JSON.parse(localStorage.getItem(TTS_CACHE_KEY) || '{}');
-            Object.keys(newCache).forEach(key => {
-                if (cacheData[key] && (now - cacheData[key].timestamp) > expiryTime) {
-                    delete newCache[key];
-                }
-            });
-            return newCache;
-        });
-        
-        const currentCache = loadAudioCache();
-        const newCache = {};
-        Object.keys(currentCache).forEach(key => {
-            if (currentCache[key].timestamp && (now - currentCache[key].timestamp) <= expiryTime) {
-                newCache[key] = currentCache[key];
-            }
-        });
-        saveAudioCache(newCache);
-    }, []);
-
-    // 모든 캐시 삭제
-    const clearAllAudioCache = useCallback(() => {
-        setAudioCache({});
+    const clearAllAudioCache = useCallback(async () => {
+        objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
+        objectUrls.current.clear();
+        audioElements.current.clear();
         setAudioStates({});
-        localStorage.removeItem(TTS_CACHE_KEY);
+        await clearAudioCache();
     }, []);
 
-    return { 
-        audioStates, 
-        playAudio, 
-        clearNewsAudioCache, 
-        clearOldAudioCache,
+    useEffect(() => {
+        // 이전 버전의 localStorage 오디오 캐시는 더 이상 사용하지 않으므로 정리합니다.
+        try { localStorage.removeItem('tts_audio_cache'); } catch (error) { /* ignore */ }
+
+        const urls = objectUrls.current;
+        return () => {
+            urls.forEach((url) => URL.revokeObjectURL(url));
+            urls.clear();
+        };
+    }, []);
+
+    return {
+        audioStates,
+        playAudio,
         clearAllAudioCache
     };
 };

@@ -202,7 +202,8 @@ const ActionButton = styled.button`
     height: 14px !important;
   }
 
-  &:hover {
+  &:hover,
+  &.on {
     color: var(--coral);
   }
 
@@ -589,6 +590,7 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
               <ActionButton
                 onClick={handleAudioClick}
                 disabled={audioStates[expression.sentence] === 'loading'}
+                className={audioStates[expression.sentence] === 'playing' ? 'on' : ''}
                 aria-label="음성 재생"
               >
                 {audioStates[expression.sentence] === 'loading' ? (
@@ -602,6 +604,7 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
               <ActionButton
                 onClick={handleTranslateClick}
                 disabled={isTranslating}
+                className={showTranslation ? 'on' : ''}
                 aria-label="번역 보기"
                 aria-expanded={showTranslation}
               >
@@ -615,6 +618,7 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
 
               <ActionButton
                 onClick={handleDetailsClick}
+                className={isActive ? 'on' : ''}
                 aria-label="상세 보기"
                 aria-expanded={isActive}
               >

@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Daily English — Icon Directions</title>
+  <style>
+    :root {
+      --paper: #f2ede2;
+      --paper-deep: #e7dfcf;
+      --ink: #17140f;
+      --coral: #ef532e;
+      --forest: #2f5d50;
+      --muted: #8b8276;
+      --line: rgba(23, 20, 15, 0.14);
+      --mono: "SF Mono", Menlo, Monaco, monospace;
+      --serif: Georgia, "Times New Roman", serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(70% 40% at 92% -8%, rgba(239, 83, 46, 0.13), transparent 60%),
+        radial-gradient(60% 35% at 0% 25%, rgba(47, 93, 80, 0.13), transparent 60%),
+        #0d0d10;
+      color: var(--paper);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Apple SD Gothic Neo", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 1400px; margin: 0 auto; padding: 42px 32px 48px; }
+    header { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; margin-bottom: 30px; }
+    .eyebrow { margin: 0 0 10px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--coral); }
+    h1 { margin: 0; font-size: clamp(30px, 3.4vw, 48px); line-height: 1.05; letter-spacing: -0.05em; font-weight: 720; }
+    h1 em { font-family: var(--serif); font-style: italic; font-weight: 400; color: #d8d1c4; letter-spacing: -0.04em; }
+    .lead { max-width: 420px; margin: 0; color: #918a7f; font-size: 12.5px; line-height: 1.75; }
+    .lead b { color: var(--paper); font-weight: 600; }
+
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; }
+    .direction {
+      padding: 20px;
+      border-radius: 24px;
+      background: var(--paper);
+      color: var(--ink);
+      box-shadow: 0 24px 50px rgba(0, 0, 0, 0.35);
+    }
+    .dir-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .dir-kicker { font-family: var(--mono); font-size: 8px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+    .dir-head h2 { margin: 5px 0 0; font-size: 19px; font-weight: 720; letter-spacing: -0.035em; }
+    .dir-desc { margin: 7px 0 0; color: #665e52; font-size: 11.5px; line-height: 1.65; }
+    .num {
+      display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 auto;
+      border: 1px solid var(--line); border-radius: 50%;
+      font-family: var(--mono); font-size: 9px; color: var(--muted);
+    }
+    .stage {
+      display: flex; align-items: center; justify-content: center;
+      margin: 20px 0 16px; padding: 18px;
+      border-radius: 18px;
+      background: #f7f2e7;
+      box-shadow: inset 0 0 0 1px rgba(23, 20, 15, 0.05);
+    }
+    .stage img { width: 190px; height: 190px; display: block; filter: drop-shadow(0 18px 26px rgba(23, 20, 15, 0.22)); }
+    .sizes { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; padding: 0 4px; }
+    .size { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .size img { display: block; border-radius: 22%; box-shadow: 0 3px 8px rgba(23, 20, 15, 0.14); }
+    .size span { font-family: var(--mono); font-size: 7.5px; color: var(--muted); letter-spacing: 0.04em; }
+    .home {
+      display: flex; align-items: center; gap: 12px;
+      margin-top: 18px; padding: 12px 14px;
+      border-radius: 16px; background: var(--ink); color: var(--paper);
+    }
+    .home img { width: 48px; height: 48px; border-radius: 12px; }
+    .home strong { display: block; font-size: 12px; font-weight: 650; letter-spacing: -0.01em; }
+    .home small { display: block; margin-top: 3px; color: rgba(242, 237, 226, 0.5); font-family: var(--mono); font-size: 8px; letter-spacing: 0.08em; }
+    .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
+    .tags span { padding: 4px 8px; border: 1px solid var(--line); border-radius: 999px; font-family: var(--mono); font-size: 7.5px; letter-spacing: 0.05em; color: var(--muted); }
+
+    .round-head {
+      display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;
+      margin: 38px 2px 14px;
+    }
+    .round-head h2 { margin: 5px 0 0; font-size: 22px; letter-spacing: -0.04em; }
+    .round-head p { margin: 0; max-width: 430px; color: #8f887d; font-size: 11.5px; line-height: 1.7; }
+    .grid.second { margin-top: 0; }
+
+    .ui-panel {
+      margin-top: 22px; padding: 26px 28px;
+      border: 1px solid rgba(242, 237, 226, 0.12);
+      border-radius: 24px;
+      background: rgba(242, 237, 226, 0.035);
+    }
+    .ui-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 22px; }
+    .ui-head h2 { margin: 4px 0 0; font-size: 20px; letter-spacing: -0.035em; }
+    .ui-head p { margin: 0; max-width: 340px; color: #8f887d; font-size: 11.5px; line-height: 1.7; }
+    .ui-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+    .ui-item {
+      display: flex; flex-direction: column; align-items: center; gap: 7px;
+      width: 78px; padding: 12px 6px;
+      border: 1px solid rgba(242, 237, 226, 0.1); border-radius: 14px;
+      background: rgba(242, 237, 226, 0.04);
+    }
+    .ui-item svg { width: 24px; height: 24px; color: var(--paper); }
+    .ui-item span { font-family: var(--mono); font-size: 7.5px; letter-spacing: 0.08em; color: #8f887d; text-transform: uppercase; }
+    .ui-item.active { background: var(--coral); border-color: var(--coral); }
+    .ui-item.active svg { color: #fff8ea; }
+    .ui-item.active span { color: rgba(255, 248, 234, 0.72); }
+
+    .demo {
+      display: flex; flex-wrap: wrap; gap: 22px; align-items: center;
+      margin-top: 24px; padding-top: 22px;
+      border-top: 1px solid rgba(242, 237, 226, 0.1);
+    }
+    .demo-card { flex: 1 1 420px; max-width: 560px; padding: 18px; border-radius: 18px; background: var(--paper); color: var(--ink); }
+    .demo-top { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+    .demo-card p { margin: 10px 0 14px; font-size: 18px; line-height: 1.5; font-weight: 600; letter-spacing: -0.025em; }
+    .demo-card p em { font-family: var(--serif); font-style: italic; border-bottom: 1.5px solid var(--coral); padding-bottom: 1px; }
+    .demo-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+    .demo-pv { font-size: 11px; color: var(--muted); }
+    .demo-pv b { color: var(--ink); font-size: 12px; margin-right: 4px; }
+    .demo-actions { display: flex; gap: 14px; }
+    .demo-action { display: flex; align-items: center; gap: 4px; border: 0; background: none; color: var(--muted); font-family: var(--mono); font-size: 8px; letter-spacing: 0.08em; text-transform: uppercase; padding: 0; }
+    .demo-action svg { width: 14px; height: 14px; }
+    .demo-action.on { color: var(--coral); }
+    .specs { flex: 1 1 280px; display: grid; gap: 10px; }
+    .spec { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding-bottom: 8px; border-bottom: 1px solid rgba(242, 237, 226, 0.08); }
+    .spec span { font-family: var(--mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; color: #7e776d; }
+    .spec b { font-size: 11px; font-weight: 600; color: #d6cfc2; }
+    footer { display: flex; justify-content: space-between; gap: 24px; margin-top: 24px; color: #5f594f; font-family: var(--mono); font-size: 8px; letter-spacing: 0.08em; text-transform: uppercase; }
+
+    @media (max-width: 1100px) {
+      .grid { grid-template-columns: 1fr; }
+      .stage img { width: 160px; height: 160px; }
+      header { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-volume" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11 5 6 9H3v6h3l5 4V5Z" /><path d="M15.5 8.5a5 5 0 0 1 0 7" />
+      </symbol>
+      <symbol id="i-translate" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 6h8M8 4v2c0 4-2 6-5 7" /><path d="M4 10c1.5 2 4 3.5 6.5 4.5" /><path d="m14 20 4-9 4 9" /><path d="M15.5 17h5" />
+      </symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m6 9 6 6 6-6" />
+      </symbol>
+      <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2 4h6a4 4 0 0 1 4 4v12a3 3 0 0 0-3-3H2z" /><path d="M22 4h-6a4 4 0 0 0-4 4v12a3 3 0 0 1 3-3h7z" />
+      </symbol>
+      <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+        <path d="M6 6 18 18M18 6 6 18" />
+      </symbol>
+      <symbol id="i-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 19V5M6 11l6-6 6 6" />
+      </symbol>
+    </defs>
+  </svg>
+
+  <div class="wrap">
+    <header>
+      <div>
+        <p class="eyebrow">Daily English · Icon system</p>
+        <h1>작은 표지,<br /><em>여섯 가지 방향</em></h1>
+      </div>
+      <p class="lead">
+        <b>종이 · 잉크 · 코랄</b>을 그대로 아이콘 언어로 옮긴 시안입니다. 홈 화면에서의 존재감, 16px에서의 판독성, 그리고 현재 UI 아이콘과의 결을 함께 봐주세요.
+      </p>
+    </header>
+
+    <main class="grid">
+      <section class="direction">
+        <div class="dir-head">
+          <div>
+            <p class="dir-kicker">Direction A</p>
+            <h2>Ink Monogram</h2>
+            <p class="dir-desc">잉크 타일 위 세리프 이탤릭 D. 코랄 마침표 하나로 브랜드 온도를 만듭니다.</p>
+          </div>
+          <span class="num">A</span>
+        </div>
+        <div class="stage"><img src="./icons/app-a.svg" alt="Ink Monogram 아이콘" /></div>
+        <div class="sizes">
+          <div class="size"><img src="./icons/app-a.svg" width="96" height="96" alt="" /><span>96</span></div>
+          <div class="size"><img src="./icons/app-a.svg" width="64" height="64" alt="" /><span>64</span></div>
+          <div class="size"><img src="./icons/app-a.svg" width="40" height="40" alt="" /><span>40</span></div>
+          <div class="size"><img src="./icons/app-a.svg" width="24" height="24" alt="" /><span>24</span></div>
+          <div class="size"><img src="./icons/app-a.svg" width="16" height="16" alt="" /><span>16</span></div>
+        </div>
+        <div class="home">
+          <img src="./icons/app-a.svg" alt="" />
+          <div><strong>Daily English</strong><small>매일 3개의 표현</small></div>
+        </div>
+        <div class="tags"><span>EDITORIAL</span><span>INK</span><span>PREMIUM</span></div>
+      </section>
+
+      <section class="direction">
+        <div class="dir-head">
+          <div>
+            <p class="dir-kicker">Direction B</p>
+            <h2>Paper No. 3</h2>
+            <p class="dir-desc">종이 타일 위 숫자 3. “매일 3개”라는 이 앱의 규칙을 가장 직접적으로 전달합니다.</p>
+          </div>
+          <span class="num">B</span>
+        </div>
+        <div class="stage"><img src="./icons/app-b.svg" alt="Paper No. 3 아이콘" /></div>
+        <div class="sizes">
+          <div class="size"><img src="./icons/app-b.svg" width="96" height="96" alt="" /><span>96</span></div>
+          <div class="size"><img src="./icons/app-b.svg" width="64" height="64" alt="" /><span>64</span></div>
+          <div class="size"><img src="./icons/app-b.svg" width="40" height="40" alt="" /><span>40</span></div>
+          <div class="size"><img src="./icons/app-b.svg" width="24" height="24" alt="" /><span>24</span></div>
+          <div class="size"><img src="./icons/app-b.svg" width="16" height="16" alt="" /><span>16</span></div>
+        </div>
+        <div class="home">
+          <img src="./icons/app-b.svg" alt="" />
+          <div><strong>Daily English</strong><small>매일 3개의 표현</small></div>
+        </div>
+        <div class="tags"><span>PAPER</span><span>NUMERAL</span><span>CALM</span></div>
+      </section>
+
+      <section class="direction">
+        <div class="dir-head">
+          <div>
+            <p class="dir-kicker">Direction C</p>
+            <h2>Coral Monogram</h2>
+            <p class="dir-desc">코랄 타일과 크림색 D. 홈 화면에서 가장 멀리서도 눈에 들어오는 안입니다.</p>
+          </div>
+          <span class="num">C</span>
+        </div>
+        <div class="stage"><img src="./icons/app-c.svg" alt="Coral Monogram 아이콘" /></div>
+        <div class="sizes">
+          <div class="size"><img src="./icons/app-c.svg" width="96" height="96" alt="" /><span>96</span></div>
+          <div class="size"><img src="./icons/app-c.svg" width="64" height="64" alt="" /><span>64</span></div>
+          <div class="size"><img src="./icons/app-c.svg" width="40" height="40" alt="" /><span>40</span></div>
+          <div class="size"><img src="./icons/app-c.svg" width="24" height="24" alt="" /><span>24</span></div>
+          <div class="size"><img src="./icons/app-c.svg" width="16" height="16" alt="" /><span>16</span></div>
+        </div>
+        <div class="home">
+          <img src="./icons/app-c.svg" alt="" />
+          <div><strong>Daily English</strong><small>매일 3개의 표현</small></div>
+        </div>
+        <div class="tags"><span>CORAL</span><span>BOLD</span><span>HOME SCREEN</span></div>
+      </section>
+    </main>
+
+
+    <div class="round-head">
+      <div>
+        <p class="eyebrow">Round 02 · New directions</p>
+        <h2>다른 결의 <em style="font-family: var(--serif); font-style: italic; font-weight: 400;">세 가지</em></h2>
+      </div>
+      <p>글자에서 벗어나 카드·페이지·빛으로 풀어본 안입니다. A/B/C와 함께 놓고 16px에서의 인상까지 비교해보세요.</p>
+    </div>
+
+    <main class="grid second">
+      <section class="direction">
+        <div class="dir-head">
+          <div>
+            <p class="dir-kicker">Direction D</p>
+            <h2>Paper Deck</h2>
+            <p class="dir-desc">세 장의 카드가 겹쳐진 형태. “매일 3개”를 글자 없이 실루엣으로 보여줍니다.</p>
+          </div>
+          <span class="num">D</span>
+        </div>
+        <div class="stage"><img src="./icons/app-d.svg" alt="Paper Deck 아이콘" /></div>
+        <div class="sizes">
+          <div class="size"><img src="./icons/app-d.svg" width="96" height="96" alt="" /><span>96</span></div>
+          <div class="size"><img src="./icons/app-d.svg" width="64" height="64" alt="" /><span>64</span></div>
+          <div class="size"><img src="./icons/app-d.svg" width="40" height="40" alt="" /><span>40</span></div>
+          <div class="size"><img src="./icons/app-d.svg" width="24" height="24" alt="" /><span>24</span></div>
+          <div class="size"><img src="./icons/app-d.svg" width="16" height="16" alt="" /><span>16</span></div>
+        </div>
+        <div class="home">
+          <img src="./icons/app-d.svg" alt="" />
+          <div><strong>Daily English</strong><small>매일 3개의 표현</small></div>
+        </div>
+        <div class="tags"><span>STACK</span><span>TACTILE</span><span>THREE</span></div>
+      </section>
+
+      <section class="direction">
+        <div class="dir-head">
+          <div>
+            <p class="dir-kicker">Direction E</p>
+            <h2>Margin Note</h2>
+            <p class="dir-desc">페이지와 코랄 북마크. 읽고 표시하는 학습의 행위를 아이콘으로 옮겼습니다.</p>
+          </div>
+          <span class="num">E</span>
+        </div>
+        <div class="stage"><img src="./icons/app-e.svg" alt="Margin Note 아이콘" /></div>
+        <div class="sizes">
+          <div class="size"><img src="./icons/app-e.svg" width="96" height="96" alt="" /><span>96</span></div>
+          <div class="size"><img src="./icons/app-e.svg" width="64" height="64" alt="" /><span>64</span></div>
+          <div class="size"><img src="./icons/app-e.svg" width="40" height="40" alt="" /><span>40</span></div>
+          <div class="size"><img src="./icons/app-e.svg" width="24" height="24" alt="" /><span>24</span></div>
+          <div class="size"><img src="./icons/app-e.svg" width="16" height="16" alt="" /><span>16</span></div>
+        </div>
+        <div class="home">
+          <img src="./icons/app-e.svg" alt="" />
+          <div><strong>Daily English</strong><small>매일 3개의 표현</small></div>
+        </div>
+        <div class="tags"><span>PAGE</span><span>BOOKMARK</span><span>READING</span></div>
+      </section>
+
+      <section class="direction">
+        <div class="dir-head">
+          <div>
+            <p class="dir-kicker">Direction F</p>
+            <h2>First Light</h2>
+            <p class="dir-desc">수평선 위로 떠오르는 해와 세 줄기 빛. 매일 아침의 루틴을 상징합니다.</p>
+          </div>
+          <span class="num">F</span>
+        </div>
+        <div class="stage"><img src="./icons/app-f.svg" alt="First Light 아이콘" /></div>
+        <div class="sizes">
+          <div class="size"><img src="./icons/app-f.svg" width="96" height="96" alt="" /><span>96</span></div>
+          <div class="size"><img src="./icons/app-f.svg" width="64" height="64" alt="" /><span>64</span></div>
+          <div class="size"><img src="./icons/app-f.svg" width="40" height="40" alt="" /><span>40</span></div>
+          <div class="size"><img src="./icons/app-f.svg" width="24" height="24" alt="" /><span>24</span></div>
+          <div class="size"><img src="./icons/app-f.svg" width="16" height="16" alt="" /><span>16</span></div>
+        </div>
+        <div class="home">
+          <img src="./icons/app-f.svg" alt="" />
+          <div><strong>Daily English</strong><small>매일 3개의 표현</small></div>
+        </div>
+        <div class="tags"><span>SUNRISE</span><span>DAILY</span><span>WARM</span></div>
+      </section>
+    </main>
+
+    <section class="ui-panel">
+      <div class="ui-head">
+        <div>
+          <p class="eyebrow">UI icon set</p>
+          <h2>Editorial Line</h2>
+        </div>
+        <p>24px 그리드 · 1.6px 스트로크 · 둥근 캡. 기본은 잉크, 활성 상태는 코랄 필로 통일합니다.</p>
+      </div>
+
+      <div class="ui-grid">
+        <div class="ui-item"><svg><use href="#i-volume" /></svg><span>듣기</span></div>
+        <div class="ui-item active"><svg><use href="#i-volume" /></svg><span>재생 중</span></div>
+        <div class="ui-item"><svg><use href="#i-translate" /></svg><span>번역</span></div>
+        <div class="ui-item active"><svg><use href="#i-translate" /></svg><span>번역됨</span></div>
+        <div class="ui-item"><svg><use href="#i-chevron" /></svg><span>더보기</span></div>
+        <div class="ui-item"><svg><use href="#i-book" /></svg><span>설명</span></div>
+        <div class="ui-item"><svg><use href="#i-close" /></svg><span>닫기</span></div>
+        <div class="ui-item"><svg><use href="#i-up" /></svg><span>위로</span></div>
+      </div>
+
+      <div class="demo">
+        <article class="demo-card">
+          <div class="demo-top"><span>01</span><span>Phrasal verb</span></div>
+          <p>Feel free to <em>drop by</em> my office if you have any questions about the project.</p>
+          <div class="demo-foot">
+            <div class="demo-pv"><b>drop by</b> 잠깐 들르다</div>
+            <div class="demo-actions">
+              <button class="demo-action"><svg><use href="#i-volume" /></svg>듣기</button>
+              <button class="demo-action on"><svg><use href="#i-translate" /></svg>번역</button>
+              <button class="demo-action"><svg><use href="#i-chevron" /></svg>더보기</button>
+            </div>
+          </div>
+        </article>
+        <div class="specs">
+          <div class="spec"><span>Stroke</span><b>1.6px / round cap</b></div>
+          <div class="spec"><span>Grid</span><b>24 × 24</b></div>
+          <div class="spec"><span>Default</span><b>Ink #17140F</b></div>
+          <div class="spec"><span>Active</span><b>Coral #EF532E</b></div>
+          <div class="spec"><span>Surface</span><b>Paper #FFFDF6</b></div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <span>Daily English · Icon exploration · 2026</span>
+      <span>선택 시 1024 / 512 / 192 / 180 / 32px · maskable · favicon 적용</span>
+    </footer>
+  </div>
+</body>
+</html>

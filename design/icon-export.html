@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#17140f}img{display:block;width:100%;height:100%}</style></head>
+<body><img id="icon" alt="" /><script>
+const p = new URLSearchParams(location.search);
+const name = p.get('icon') || 'app-a-full';
+document.getElementById('icon').src = './icons/' + name + '.svg';
+</script></body>
+</html>

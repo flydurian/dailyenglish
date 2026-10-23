@@ -1550,24 +1550,15 @@ html {
 }
 
 body {
+  /* 그레인을 고정(fixed) 레이어가 아닌 배경 레이어로 넣어 스크롤 페인트 비용을 줄입니다. */
   background:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)' opacity='.045'/%3E%3C/svg%3E"),
     radial-gradient(90% 50% at 85% -10%, rgba(239, 83, 46, 0.09), transparent 65%),
     radial-gradient(70% 40% at 0% 40%, rgba(47, 93, 80, 0.06), transparent 60%),
     var(--paper);
   color: var(--ink);
   font-family: var(--font-ui);
   min-height: 100dvh;
-}
-
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  opacity: 0.22;
-  mix-blend-mode: multiply;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)' opacity='.09'/%3E%3C/svg%3E");
 }
 
 #root {

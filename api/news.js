@@ -35,7 +35,8 @@ export default async function handler(req, res) {
         const response = await fetch(rssUrl, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
+            },
+            signal: AbortSignal.timeout(10_000)
         });
 
         if (!response.ok) {
@@ -94,7 +95,9 @@ export default async function handler(req, res) {
 
         // 랜덤하게 하나 선택
         const randomArticle = items[Math.floor(Math.random() * items.length)];
-        
+
+        // 같은 뉴스 요청은 CDN/브라우저에서 재사용해 함수 호출과 RSS 요청을 줄입니다.
+        res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=1800, stale-while-revalidate=86400');
         res.status(200).json({ article: randomArticle });
         
     } catch (error) {

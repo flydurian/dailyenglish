@@ -29,14 +29,16 @@ export const useTranslation = () => {
 
     // 번역 캐시를 로컬 스토리지에 저장
     const saveToCache = useCallback((key, data) => {
-        try {
-            const updated = { ...translations, [key]: data };
-            setTranslations(updated);
-            localStorage.setItem('translation_cache', JSON.stringify(updated));
-        } catch (error) {
-            console.error('번역 캐시 저장 실패:', error);
-        }
-    }, [translations]);
+        setTranslations((prev) => {
+            const updated = { ...prev, [key]: data };
+            try {
+                localStorage.setItem('translation_cache', JSON.stringify(updated));
+            } catch (error) {
+                console.error('번역 캐시 저장 실패:', error);
+            }
+            return updated;
+        });
+    }, []);
 
     // 긴 텍스트를 청크로 나누어 번역하는 함수
     const translateLongText = useCallback(async (text) => {
@@ -79,7 +81,7 @@ export const useTranslation = () => {
                     contents: [{ role: "user", parts: [{ text: prompt }] }],
                     generationConfig: {
                         responseMimeType: "text/plain",
-                        maxOutputTokens: 2000, // 청크 번역을 위한 토큰 제한
+                        maxOutputTokens: 1200, // 청크 번역 토큰 상한
                         temperature: 0.1
                     }
                 };
@@ -153,7 +155,7 @@ export const useTranslation = () => {
                 contents: [{ role: "user", parts: [{ text: prompt }] }],
                 generationConfig: {
                     responseMimeType: "text/plain",
-                    maxOutputTokens: 4000,
+                    maxOutputTokens: 2000,
                     temperature: 0.1
                 }
             };

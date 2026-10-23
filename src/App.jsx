@@ -368,12 +368,7 @@ export default function App() {
   const [showScrollToTop, setShowScrollToTop] = useState(false);
 
   // 커스텀 훅 사용
-  const {
-    audioStates,
-    playAudio,
-    clearNewsAudioCache,
-    clearOldAudioCache
-  } = useAudio();
+  const { audioStates, playAudio } = useAudio();
   const { translateText, summarizeText, generateExamples, explainArticle, translations } = useTranslation();
   const { loading, error, fetchExpressions, fetchNews, initializeData } = useDataFetching();
 
@@ -389,16 +384,12 @@ export default function App() {
   const loadData = useCallback(async () => {
     try {
       if (activeTab === 'expressions') {
-        // 표현 데이터를 새로 불러올 때 오래된 캐시 정리
-        clearOldAudioCache();
         const data = await fetchExpressions(currentDate, level);
         setExpressions(data);
         setActiveCardIndex(null);
       } else if (activeTab === 'news') {
         // 뉴스학습은 항상 오늘 날짜 사용
         const today = new Date();
-        // 뉴스가 새로 불러와질 때 기존 뉴스 음성 캐시 삭제
-        clearNewsAudioCache();
         const data = await fetchNews(today, level);
         setNews(data);
         setActiveNewsIndex(null);
@@ -406,7 +397,7 @@ export default function App() {
     } catch (err) {
       console.error('데이터 로딩 실패:', err);
     }
-  }, [activeTab, currentDate, level, fetchExpressions, fetchNews, clearNewsAudioCache, clearOldAudioCache]);
+  }, [activeTab, currentDate, level, fetchExpressions, fetchNews]);
 
   // 스크롤 이벤트 처리
   useEffect(() => {

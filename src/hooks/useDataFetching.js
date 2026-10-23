@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { callGeminiAPI, levelDescriptions } from '../utils/apiUtils';
 import {
     getCachedData,
@@ -11,6 +11,7 @@ import { getDailyPhrasalVerbs, getRandomPhrasalVerbs } from '../data/phrasalVerb
 export const useDataFetching = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const inFlight = useRef(new Map());
 
     // 최소한의 폴백 뉴스 데이터 (Gemini API 실패 시에만 사용)
     const getFallbackNews = useCallback((type, dayOfYear) => {
@@ -308,7 +309,7 @@ Return ONLY the English translation, nothing else. Make it suitable for ${target
 
 ORIGINAL ARTICLE:
 TITLE: ${articleTitle}
-CONTENT: ${newsItem.full_text}
+CONTENT: ${(newsItem.full_text || '').slice(0, 6000)}
 SOURCE: ${newsItem.source}
 DATE: ${newsItem.date}
 
@@ -453,7 +454,7 @@ The ongoing progress demonstrates the interconnected nature of modern developmen
         }
     }, []);
 
-    const fetchExpressions = useCallback(async (date, selectedLevel) => {
+    const fetchExpressionsInternal = useCallback(async (date, selectedLevel) => {
         setLoading(true);
         setError(null);
 
@@ -465,22 +466,14 @@ The ongoing progress demonstrates the interconnected nature of modern developmen
                 throw new Error('유효하지 않은 날짜입니다.');
             }
 
-            // 캐시된 표현이 있는지 확인 (하루에 한 번만)
+            // 캐시된 표현이 있으면 필드 유무와 관계없이 재사용합니다.
+            // (필드가 일부 없어도 상세 정보는 로컬 데이터로 보완되므로 재생성하지 않습니다.)
             if (isCacheValid('expressions', dateObj)) {
                 const cached = getCachedData('expressions', dateObj);
                 if (cached && cached.data[selectedLevel]) {
-                    // 캐시된 데이터가 새로운 필드(situation, examples)를 포함하고 있는지 확인
-                    const hasNewFields = Array.isArray(cached.data[selectedLevel]) &&
-                        cached.data[selectedLevel].some(item => item.situation && item.examples);
-
-                    if (hasNewFields) {
-                        // 캐시된 데이터를 사용할 때도 에러 상태 초기화
-                        setError(null);
-                        setLoading(false);
-                        return cached.data[selectedLevel];
-                    }
-                    // 새로운 필드가 없으면 캐시 무시하고 새로 요청
-                    console.log('오래된 캐시 데이터 감지됨(examples 누락). 새로운 형식으로 다시 가져옵니다.');
+                    setError(null);
+                    setLoading(false);
+                    return cached.data[selectedLevel];
                 }
             }
 
@@ -627,7 +620,7 @@ IMPORTANT:
         }
     }, []);
 
-    const fetchNews = useCallback(async (date, selectedLevel) => {
+    const fetchNewsInternal = useCallback(async (date, selectedLevel) => {
         setLoading(true);
         setError(null);
 
@@ -724,6 +717,29 @@ IMPORTANT:
     const initializeData = useCallback(() => {
         cleanupOldMonthlyData();
     }, []);
+
+    const withDedupe = useCallback((key, request) => {
+        if (inFlight.current.has(key)) {
+            return inFlight.current.get(key);
+        }
+        const promise = request().finally(() => {
+            inFlight.current.delete(key);
+        });
+        inFlight.current.set(key, promise);
+        return promise;
+    }, []);
+
+    const fetchExpressions = useCallback((date, selectedLevel) => {
+        const dateObj = date instanceof Date ? date : new Date(date);
+        const dateKey = isNaN(dateObj.getTime()) ? String(date) : dateObj.toISOString().split('T')[0];
+        return withDedupe(`expressions:${dateKey}:${selectedLevel}`, () => fetchExpressionsInternal(date, selectedLevel));
+    }, [fetchExpressionsInternal, withDedupe]);
+
+    const fetchNews = useCallback((date, selectedLevel) => {
+        const dateObj = date instanceof Date ? date : new Date(date);
+        const dateKey = isNaN(dateObj.getTime()) ? String(date) : dateObj.toISOString().split('T')[0];
+        return withDedupe(`news:${dateKey}:${selectedLevel}`, () => fetchNewsInternal(date, selectedLevel));
+    }, [fetchNewsInternal, withDedupe]);
 
     return {
         loading,
