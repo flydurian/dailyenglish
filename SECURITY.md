@@ -55,14 +55,16 @@ There is no PHP, Apache, MySQL, or WordPress runtime, so PHP-specific advisories
 
 - React / React DOM updated to 18.3.1; unused `web-vitals` removed.
 - `package-lock.json` is now tracked for reproducible installs.
-- `yaml@1.10.3` override fixes the Emotion build-chain advisory.
-- Runtime audit: `npm audit --omit=dev` → **0 vulnerabilities**.
+- The build moved from Create React App 5 to **Vite 8**; the old CRA
+  dev-server/toolchain tree (62 dev-only advisories) is gone.
+- `yaml@1.10.3` override remains for the Emotion build chain.
+- Audit: `npm audit --omit=dev` and `npm audit --include=dev` → **0 vulnerabilities**.
 
 ## Residual risks
 
 - The API is protected by origin checks, schema validation, and rate limits, but a static SPA cannot hold a true client secret. A determined attacker can spoof request headers. For stronger protection, put Vercel WAF / rate limiting in front of `/api/*`, or add authenticated user sessions.
 - Rate limiting is in-memory per serverless instance. It is not a global quota across regions/instances; rely on Google's 429 and Vercel WAF for hard global limits.
-- The CRA 5 build toolchain has known advisories in dev-only packages (`npm audit --include=dev` currently reports 62). They are not shipped in the production bundle, but the build environment still installs them. The long-term fix is migrating off CRA to Vite or Next.js.
+- React 19 major updates are intentionally blocked in Dependabot until the app is migrated as one coordinated change. Vite is compatible, but React 19 needs an app-wide review rather than a single-package bump.
 - TTS remains on the Gemini free tier. A Google Cloud project with a billing account attached can still incur charges; code cannot enforce billing state. Keep the project's billing account unlinked if zero spend is required.
 - CSP allows `'unsafe-inline'` for styles because Emotion injects styles at runtime. Scripts remain restricted to `'self'`.
 
@@ -70,6 +72,7 @@ There is no PHP, Apache, MySQL, or WordPress runtime, so PHP-specific advisories
 
 ```bash
 npm audit --omit=dev
+npm audit --include=dev
 npm run build
 npm run key:check
 ```

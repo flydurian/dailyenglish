@@ -40,4 +40,4 @@ process.on('SIGINT', () => shutdown(0));
 process.on('SIGTERM', () => shutdown(0));
 
 run('api', ['server/dev-api.mjs']);
-run('web', [path.join(rootDir, 'node_modules', 'react-scripts', 'scripts', 'start.js')]);
+run('web', [path.join(rootDir, 'node_modules', 'vite', 'bin', 'vite.js')]);

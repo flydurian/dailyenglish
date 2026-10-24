@@ -1,6 +1,10 @@
 {
-  "installCommand": "npm install --include=dev",
-  "regions": ["icn1"],
+  "installCommand": "npm ci --include=dev",
+  "buildCommand": "npm run build",
+  "outputDirectory": "build",
+  "regions": [
+    "icn1"
+  ],
   "headers": [
     {
       "source": "/(.*)",
