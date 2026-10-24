@@ -383,6 +383,16 @@ const PvDoneButton = styled.button`
   &:active { opacity: 0.85; }
 `;
 
+const parseVocabularyNote = (note) => {
+    const raw = String(note || '').trim();
+    const separator = raw.indexOf(':');
+    if (separator === -1) return { word: raw, meaning: '' };
+    return {
+        word: raw.slice(0, separator).trim(),
+        meaning: raw.slice(separator + 1).trim(),
+    };
+};
+
 const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudio, onWordClick, onTranslate, onSummarize, onExplain, translations, handleTranslationClick }) => {
     const { fontSize } = useFontSize();
     const [showTitleTranslation, setShowTitleTranslation] = useState(false);
@@ -489,6 +499,35 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
     }, [newsItem?.title, newsItem?.full_text]);
 
 
+
+    const findVocabularyExample = useCallback((word) => {
+        const text = (newsItem?.summary || newsItem?.full_text || newsItem?.title || '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        if (!text || !word) return '';
+
+        const sentences = text.match(/[^.!?]+[.!?]?/g) || [];
+        const matched = sentences.find((sentence) =>
+            sentence.toLowerCase().includes(word.toLowerCase())
+        );
+        return (matched || sentences[0] || text).trim();
+    }, [newsItem?.summary, newsItem?.full_text, newsItem?.title]);
+
+    const handleVocabularyClick = useCallback((event, note) => {
+        event.stopPropagation();
+
+        if (typeof onWordClick !== 'function') return;
+
+        const { word, meaning } = parseVocabularyNote(note);
+        if (!word) return;
+
+        onWordClick(
+            word,
+            meaning,
+            findVocabularyExample(word),
+            { type: 'vocabulary', frequency: 'high' }
+        );
+    }, [onWordClick, findVocabularyExample]);
 
     // 구동사 클릭 핸들러
     const handlePhrasalVerbClick = useCallback((phrasalVerb) => {
@@ -711,7 +750,23 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                                     <SectionTitle style={{ fontSize: '12px', marginBottom: '8px', textAlign: 'left' }}>주요 단어</SectionTitle>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                         {newsItem?.vocabulary_notes?.map((note, index) => (
-                                            <KeyPointCard key={index} style={{ padding: '8px', marginBottom: '4px' }}>
+                                            <KeyPointCard
+                                                as="button"
+                                                type="button"
+                                                key={index}
+                                                onClick={(event) => handleVocabularyClick(event, note)}
+                                                aria-label={`단어 상세: ${note}`}
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '8px',
+                                                    marginBottom: '4px',
+                                                    color: 'inherit',
+                                                    font: 'inherit',
+                                                    textAlign: 'left',
+                                                    cursor: 'pointer',
+                                                    appearance: 'none',
+                                                }}
+                                            >
                                                 <KeyPointText style={{ fontSize: '11px', lineHeight: '1.3' }}>{note}</KeyPointText>
                                             </KeyPointCard>
                                         ))}
