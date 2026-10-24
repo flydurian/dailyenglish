@@ -458,6 +458,7 @@ export default function App() {
           onPlayAudio={playAudio}
           audioStates={audioStates}
           onGenerateExamples={generateExamples}
+          onTranslate={translateText}
           onClose={() => setWordModal({ ...wordModal, isOpen: false })}
         />
 

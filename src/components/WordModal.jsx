@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from '@emotion/styled';
-import { Volume2Icon, LoaderIcon, CloseIcon } from './Icons';
+import { Volume2Icon, TranslateIcon, LoaderIcon, CloseIcon } from './Icons';
 
 const Overlay = styled.div`
   position: fixed;
@@ -206,27 +206,83 @@ const ExampleText = styled.p`
   line-height: 1.6;
 `;
 
-const ExampleAudio = styled.button`
+const ExampleActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+`;
+
+const ExampleAction = styled.button`
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-top: 8px;
   padding: 0;
   border: 0;
   background: none;
   color: var(--forest);
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 8.5px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   cursor: pointer;
+  transition: color 150ms ease;
 
-  svg { width: 12px; height: 12px; }
+  svg { width: 13px; height: 13px; }
+
+  &:hover,
+  &.on {
+    color: var(--coral);
+  }
 
   &:disabled {
     opacity: 0.4;
     cursor: not-allowed;
   }
+`;
+
+const MainExampleCard = styled.div`
+  margin-top: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #f8f3e8;
+`;
+
+const MainExampleText = styled.p`
+  margin: 0;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.55;
+  letter-spacing: -0.02em;
+  text-wrap: pretty;
+
+  em {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 500;
+    border-bottom: 1.5px solid var(--coral);
+    padding-bottom: 1px;
+  }
+`;
+
+const MainTranslation = styled.p`
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+  color: #5f574a;
+  font-size: 12.5px;
+  line-height: 1.7;
+`;
+
+const ExampleTranslation = styled.p`
+  margin: 8px 0 0;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+  color: #5f574a;
+  font-size: 12px;
+  line-height: 1.65;
 `;
 
 const LoadingRow = styled.div`
@@ -247,9 +303,14 @@ const EmptyText = styled.p`
   font-style: italic;
 `;
 
-const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPlayAudio, audioStates = {}, onGenerateExamples }) => {
+const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPlayAudio, audioStates = {}, onGenerateExamples, onTranslate }) => {
     const [examples, setExamples] = useState([]);
     const [isGeneratingExamples, setIsGeneratingExamples] = useState(false);
+    const [exampleTranslation, setExampleTranslation] = useState('');
+    const [showExampleTranslation, setShowExampleTranslation] = useState(false);
+    const [isTranslatingExample, setIsTranslatingExample] = useState(false);
+    const [generatedTranslations, setGeneratedTranslations] = useState({});
+    const [translatingText, setTranslatingText] = useState('');
 
     useEffect(() => {
         if (isOpen && word && meaning && typeof onGenerateExamples === 'function') {
@@ -273,6 +334,14 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
     }, [isOpen, word, meaning, onGenerateExamples]);
 
     useEffect(() => {
+        setExampleTranslation('');
+        setShowExampleTranslation(false);
+        setIsTranslatingExample(false);
+        setGeneratedTranslations({});
+        setTranslatingText('');
+    }, [isOpen, word, example]);
+
+    useEffect(() => {
         if (!isOpen) return undefined;
         const previous = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
@@ -289,6 +358,65 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
 
     const playAudio = (text) => {
         if (typeof onPlayAudio === 'function') onPlayAudio(text);
+    };
+
+    const primaryExample = (example || '').replace(/\*\*(.*?)\*\*/g, '$1').trim();
+
+    const highlightWord = (sentence) => {
+        if (!word) return sentence;
+        const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const parts = sentence.split(new RegExp(`(${escaped})`, 'ig'));
+        return parts.map((part, idx) => (
+            part.toLowerCase() === word.toLowerCase()
+                ? <em key={idx}>{part}</em>
+                : <React.Fragment key={idx}>{part}</React.Fragment>
+        ));
+    };
+
+    const handlePrimaryTranslate = async () => {
+        if (!primaryExample || typeof onTranslate !== 'function') return;
+
+        if (showExampleTranslation) {
+            setShowExampleTranslation(false);
+            return;
+        }
+
+        if (!exampleTranslation) {
+            setIsTranslatingExample(true);
+            try {
+                const result = await onTranslate(primaryExample);
+                setExampleTranslation(result);
+            } catch (error) {
+                console.error('예문 번역 실패:', error);
+            } finally {
+                setIsTranslatingExample(false);
+            }
+        }
+
+        setShowExampleTranslation(true);
+    };
+
+    const handleGeneratedTranslate = async (text) => {
+        if (!text || typeof onTranslate !== 'function') return;
+
+        if (generatedTranslations[text]) {
+            setGeneratedTranslations((prev) => {
+                const next = { ...prev };
+                delete next[text];
+                return next;
+            });
+            return;
+        }
+
+        setTranslatingText(text);
+        try {
+            const result = await onTranslate(text);
+            setGeneratedTranslations((prev) => ({ ...prev, [text]: result }));
+        } catch (error) {
+            console.error('예문 번역 실패:', error);
+        } finally {
+            setTranslatingText('');
+        }
     };
 
     const detailLabels = {
@@ -327,6 +455,46 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
                 </WordRow>
                 <Meaning>{meaning}</Meaning>
 
+                {primaryExample && (
+                    <>
+                        <SectionLabel>Example</SectionLabel>
+                        <MainExampleCard>
+                            <MainExampleText>{highlightWord(primaryExample)}</MainExampleText>
+                            <ExampleActions>
+                                <ExampleAction
+                                    onClick={() => playAudio(primaryExample)}
+                                    disabled={audioStates[primaryExample] === 'loading' || typeof onPlayAudio !== 'function'}
+                                >
+                                    {audioStates[primaryExample] === 'loading' ? (
+                                        <LoaderIcon size="h-3 w-3" />
+                                    ) : (
+                                        <Volume2Icon />
+                                    )}
+                                    듣기
+                                </ExampleAction>
+                                <ExampleAction
+                                    className={showExampleTranslation ? 'on' : ''}
+                                    onClick={handlePrimaryTranslate}
+                                    disabled={isTranslatingExample || typeof onTranslate !== 'function'}
+                                    aria-expanded={showExampleTranslation}
+                                >
+                                    {isTranslatingExample ? (
+                                        <LoaderIcon size="h-3 w-3" />
+                                    ) : (
+                                        <TranslateIcon />
+                                    )}
+                                    번역
+                                </ExampleAction>
+                            </ExampleActions>
+                            {showExampleTranslation && (
+                                <MainTranslation>
+                                    {exampleTranslation || '번역을 불러오는 중...'}
+                                </MainTranslation>
+                            )}
+                        </MainExampleCard>
+                    </>
+                )}
+
                 {detailedInfo && (
                     <InfoBox>
                         <InfoTitle>상세 정보</InfoTitle>
@@ -345,7 +513,7 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
                     </InfoBox>
                 )}
 
-                <SectionLabel>예문</SectionLabel>
+                <SectionLabel>More examples</SectionLabel>
                 {isGeneratingExamples ? (
                     <LoadingRow>
                         <LoaderIcon size="h-4 w-4" />
@@ -355,17 +523,35 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
                     examples.map((item, index) => (
                         <ExampleCard key={index}>
                             <ExampleText>“{item}”</ExampleText>
-                            <ExampleAudio
-                                onClick={() => playAudio(item)}
-                                disabled={audioStates[item] === 'loading' || typeof onPlayAudio !== 'function'}
-                            >
-                                {audioStates[item] === 'loading' ? (
-                                    <LoaderIcon size="h-3 w-3" />
-                                ) : (
-                                    <Volume2Icon />
-                                )}
-                                듣기
-                            </ExampleAudio>
+                            <ExampleActions>
+                                <ExampleAction
+                                    onClick={() => playAudio(item)}
+                                    disabled={audioStates[item] === 'loading' || typeof onPlayAudio !== 'function'}
+                                >
+                                    {audioStates[item] === 'loading' ? (
+                                        <LoaderIcon size="h-3 w-3" />
+                                    ) : (
+                                        <Volume2Icon />
+                                    )}
+                                    듣기
+                                </ExampleAction>
+                                <ExampleAction
+                                    className={generatedTranslations[item] ? 'on' : ''}
+                                    onClick={() => handleGeneratedTranslate(item)}
+                                    disabled={translatingText === item || typeof onTranslate !== 'function'}
+                                    aria-expanded={Boolean(generatedTranslations[item])}
+                                >
+                                    {translatingText === item ? (
+                                        <LoaderIcon size="h-3 w-3" />
+                                    ) : (
+                                        <TranslateIcon />
+                                    )}
+                                    번역
+                                </ExampleAction>
+                            </ExampleActions>
+                            {generatedTranslations[item] && (
+                                <ExampleTranslation>{generatedTranslations[item]}</ExampleTranslation>
+                            )}
                         </ExampleCard>
                     ))
                 ) : (
