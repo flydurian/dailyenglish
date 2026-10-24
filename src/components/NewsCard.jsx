@@ -12,11 +12,12 @@ const CardContainer = styled.div`
   max-width: none;
   margin: 0 auto;
   padding: 20px;
-  background: var(--ink);
-  border: 1px solid var(--ink);
+  background: var(--card-paper);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--ink);
   border-radius: 20px;
-  color: #f2ede2;
-  box-shadow: 0 18px 34px rgba(23, 20, 15, 0.18);
+  color: var(--ink);
+  box-shadow: 0 12px 28px rgba(23, 20, 15, 0.07);
   transition: box-shadow 200ms ease;
 
   @media (max-width: 480px) {
@@ -37,7 +38,7 @@ const TitleContainer = styled.div`
 const NewsTitle = styled.h3`
   flex: 1 1 100%;
   margin: 0;
-  color: #f2ede2;
+  color: var(--ink);
   font-size: clamp(20px, 4.8vw, 24px);
   font-weight: 650;
   line-height: 1.36;
@@ -67,9 +68,10 @@ const NewsSource = styled.div`
 
 const SourceBadge = styled.span`
   padding: 4px 8px;
-  border: 1px solid rgba(242, 237, 226, 0.26);
+  border: 1px solid var(--ink);
   border-radius: 999px;
-  color: #f2ede2;
+  background: var(--ink);
+  color: var(--paper);
   font-family: var(--font-mono);
   font-size: 8px;
   font-weight: 600;
@@ -78,7 +80,7 @@ const SourceBadge = styled.span`
 `;
 
 const NewsDate = styled.span`
-  color: rgba(242, 237, 226, 0.52);
+  color: var(--muted);
   font-family: var(--font-mono);
   font-size: 8.5px;
   letter-spacing: 0.03em;
@@ -100,10 +102,10 @@ const ActionButton = styled.button`
   min-width: 36px;
   min-height: 36px;
   padding: 6px;
-  border: 1px solid rgba(242, 237, 226, 0.22);
+  border: 1px solid var(--line);
   border-radius: 50%;
   background: transparent;
-  color: #f2ede2;
+  color: var(--muted);
   cursor: pointer;
   transition: 150ms ease;
   touch-action: manipulation;
@@ -135,22 +137,22 @@ const ExpandedSection = styled.div`
   overflow: hidden;
   margin-top: ${props => props.isActive ? '16px' : '0'};
   padding-top: ${props => props.isActive ? '14px' : '0'};
-  border-top: ${props => props.isActive ? '1px solid rgba(242, 237, 226, 0.14)' : '0 solid transparent'};
+  border-top: ${props => props.isActive ? '1px solid var(--line)' : '0 solid transparent'};
   transition: opacity 300ms ease;
 `;
 
 const SummarySection = styled.div`
   padding: 15px;
-  border: 1px solid rgba(242, 237, 226, 0.1);
+  border: 1px solid var(--line);
   border-radius: 14px;
-  background: rgba(242, 237, 226, 0.06);
+  background: #f8f3e8;
   box-shadow: none;
   margin-bottom: 0;
 `;
 
 const SectionTitle = styled.h4`
   margin: 0 0 10px;
-  color: #ff8b6d;
+  color: var(--coral);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.01em;
@@ -159,7 +161,7 @@ const SectionTitle = styled.h4`
 
 const SummaryText = styled.p`
   margin: 0 0 14px;
-  color: rgba(242, 237, 226, 0.82);
+  color: #4f4a40;
   font-size: clamp(14px, 3.6vw, 16px);
   line-height: 1.7;
   text-align: left;
@@ -168,9 +170,9 @@ const SummaryText = styled.p`
 const KeyPointCard = styled.div`
   margin-bottom: 4px;
   padding: 10px;
-  border: 1px solid rgba(242, 237, 226, 0.1);
+  border: 1px solid var(--line);
   border-radius: 10px;
-  background: rgba(242, 237, 226, 0.05);
+  background: var(--card-paper);
   transition: border-color 150ms ease;
 
   &:hover {
@@ -181,7 +183,7 @@ const KeyPointCard = styled.div`
 const KeyPointText = styled.span`
   flex: 1;
   padding-right: 8px;
-  color: rgba(242, 237, 226, 0.78);
+  color: #5f574a;
   font-size: 11px;
   line-height: 1.45;
 `;
@@ -191,7 +193,7 @@ const TranslationText = styled.div`
   margin-top: 8px;
   padding-left: 10px;
   border-left: 2px solid var(--coral);
-  color: #ffab93;
+  color: var(--coral);
   font-size: 12.5px;
   line-height: 1.65;
 `;
@@ -203,11 +205,11 @@ const ArticleTranslationBox = styled.div`
   padding: 12px 14px;
   border-left: 2px solid var(--coral);
   border-radius: 0 10px 10px 0;
-  background: rgba(242, 237, 226, 0.06);
+  background: #f8f3e8;
 
   h4 {
     margin: 0 0 6px;
-    color: #ff8b6d;
+    color: var(--coral);
     font-family: var(--font-mono);
     font-size: 8px;
     font-weight: 600;
@@ -217,7 +219,7 @@ const ArticleTranslationBox = styled.div`
 
   p {
     margin: 0;
-    color: rgba(242, 237, 226, 0.8);
+    color: #4f4a40;
     font-size: 12.5px;
     line-height: 1.7;
   }
@@ -697,7 +699,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
 
                     <SummaryText style={{ fontSize: `calc(${fontSize} * 14.5px)`, lineHeight: '1.7', marginBottom: '14px' }}>
                         {newsItem?.summary || (
-                            <span style={{ color: 'rgba(242, 237, 226, 0.6)', fontStyle: 'italic' }}>
+                            <span style={{ color: 'var(--muted)', fontStyle: 'italic' }}>
                                 {newsItem?.category === 'korean' ? '한국 뉴스 요약을 생성하고 있습니다...' : '세계 뉴스 요약을 생성하고 있습니다...'}
                             </span>
                         )}
