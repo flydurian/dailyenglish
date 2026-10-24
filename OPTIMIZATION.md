@@ -40,12 +40,26 @@ Cache-Control: public, max-age=300, s-maxage=1800, stale-while-revalidate=86400
 - `useDataFetching`에 in-flight Map을 두고 `날짜 + 레벨 + 탭` 단위로 요청을 공유
 - 레벨을 빠르게 바꾸거나 StrictMode에서 effect가 재실행되어도 동일 요청은 1회만 발생
 
-### TTS 오디오 캐시를 IndexedDB로 이전
+### TTS 모델 분리 + 오디오 캐시를 IndexedDB로 이전
 - 기존 localStorage 캐시는 동기 I/O + 5MB 제한 + 실제 복원이 되지 않는 구조였음
+- 텍스트는 `gemini-3.5-flash-lite`, TTS는 최신 `gemini-3.8-flash-tts`로 분리
+- 3.8 TTS의 WAV 응답을 그대로 저장 (구형 PCM 응답은 WAV로 변환)
 - IndexedDB에 WAV Blob을 저장하고, 재생 시 메모리 → IndexedDB → Gemini TTS 순서로 확인
 - 최대 25개, 7일 TTL, 초과분 자동 정리
 - 탭/레벨 전환 때 오디오 캐시를 지우던 동작 제거
 - 기존 `tts_audio_cache` localStorage 키는 1회 정리
+
+
+### 무료 티어 전용 TTS 폴백과 과금 방지
+- 1차 TTS: `gemini-3.8-flash-tts`
+- 1차가 **429(무료 한도)** 일 때만 2차 `gemini-3.8-flash-lite-tts`로 서버에서 1회 폴백
+- 5xx/400 등 다른 오류에는 폴백하지 않음 (원인 은폐 방지)
+- 클라이언트 TTS 자동 재시도 없음 (중복 호출 방지), 폴백은 서버에서만 수행
+- 허용 모델 목록을 무료 티어 모델로 제한하고, 유료 모델 폴백 경로를 두지 않음
+- 둘 다 429면 `Retry-After: 20`과 함께 429 반환 (추가 호출 없음)
+- TTS는 IndexedDB 캐시를 사용하므로 같은 문장 재생은 API를 호출하지 않음
+- **과금 방지의 최종 보장은 Google Cloud 프로젝트에 결제 계정이 연결되지 않은 상태**입니다. 코드는 유료 모델을 호출하지 않지만, 결제 계정이 연결된 프로젝트에서는 Google 정책상 과금될 수 있으므로 배포 전 결제 상태를 확인해야 합니다.
+- 무료 티어 공개 기준: TTS 3 RPM / 10K input TPM, 텍스트 3.5 Flash-Lite 10 RPM / 250K TPM / 500 RPD (정확한 값은 AI Studio Rate limit에서 프로젝트별 확인)
 
 ### 번역 캐시 안정화
 - `saveToCache`가 이전 state를 참조해 동시 번역 시 캐시가 덮어써지던 문제를 함수형 업데이트로 수정

@@ -3,7 +3,8 @@ import { callGeminiAPI } from '../utils/apiUtils';
 import { base64ToArrayBuffer, pcmToWav } from '../utils/audioUtils';
 import { getCachedAudio, setCachedAudio, clearAudioCache } from '../utils/audioCache';
 
-const TTS_MODEL = 'gemini-2.5-flash-preview-tts';
+// 텍스트 생성(3.5 Flash Lite)과 달리 TTS는 오디오 품질을 위해 별도 모델을 사용합니다.
+const TTS_MODEL = 'gemini-3.8-flash-tts';
 
 export const useAudio = () => {
     const [audioStates, setAudioStates] = useState({});
@@ -65,7 +66,8 @@ export const useAudio = () => {
                     model: TTS_MODEL
                 };
 
-                const result = await callGeminiAPI(payload, TTS_MODEL, 2);
+                // TTS는 중복 과금/요청을 막기 위해 클라이언트 자동 재시도를 하지 않습니다.
+            const result = await callGeminiAPI(payload, TTS_MODEL, 1);
                 const part = result?.candidates?.[0]?.content?.parts?.[0];
                 const audioData = part?.inlineData?.data;
                 const mimeType = part?.inlineData?.mimeType;
@@ -74,17 +76,25 @@ export const useAudio = () => {
                     throw new Error('유효한 오디오 데이터를 받지 못했습니다.');
                 }
 
-                const sampleRate = parseInt(mimeType.match(/rate=(\d+)/)?.[1] || '24000', 10);
-                const pcmData = base64ToArrayBuffer(audioData);
-                const pcm16 = new Int16Array(pcmData);
+                const audioBytes = base64ToArrayBuffer(audioData);
 
-                if (pcm16.length === 0) {
-                    throw new Error('유효하지 않은 PCM 데이터');
+                if (/audio\/(wav|wave|x-wav)/i.test(mimeType)) {
+                    // 3.8 TTS는 완성된 WAV를 반환합니다.
+                    blob = new Blob([audioBytes], { type: 'audio/wav' });
+                } else {
+                    // 이전 모델은 raw PCM(L16)을 반환하므로 WAV로 감쌉니다.
+                    const sampleRate = parseInt(mimeType.match(/rate=(\d+)/)?.[1] || '24000', 10);
+                    const pcm16 = new Int16Array(audioBytes);
+
+                    if (pcm16.length === 0) {
+                        throw new Error('유효하지 않은 PCM 데이터');
+                    }
+
+                    blob = pcmToWav(pcm16, sampleRate);
                 }
 
-                blob = pcmToWav(pcm16, sampleRate);
                 if (!blob || blob.size === 0) {
-                    throw new Error('유효하지 않은 WAV 데이터');
+                    throw new Error('유효하지 않은 오디오 데이터');
                 }
 
                 await setCachedAudio(sentence, blob);
@@ -107,8 +117,9 @@ export const useAudio = () => {
     }, []);
 
     useEffect(() => {
-        // 이전 버전의 localStorage 오디오 캐시는 더 이상 사용하지 않으므로 정리합니다.
+        // 이전 버전의 localStorage 오디오 캐시와 구 모델 IndexedDB 캐시를 정리합니다.
         try { localStorage.removeItem('tts_audio_cache'); } catch (error) { /* ignore */ }
+        try { indexedDB.deleteDatabase('dailyenglish-audio'); } catch (error) { /* ignore */ }
 
         const urls = objectUrls.current;
         return () => {

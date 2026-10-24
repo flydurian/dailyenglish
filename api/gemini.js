@@ -1,4 +1,5 @@
 // Vercel Serverless Function for Gemini API
+// 무료 티어 전용: 허용 모델은 무료 티어 모델뿐이며, 유료 모델로 폴백하지 않습니다.
 import { createHash } from 'node:crypto';
 // API 키는 서버 환경변수(GEMINI_API_KEY)에만 존재하며 클라이언트로 전달되지 않습니다.
 
@@ -15,11 +16,22 @@ const MODEL_ALIASES = {
     'gemini-pro': DEFAULT_TEXT_MODEL,
 };
 
+// 무료 티어 전용 TTS 모델만 허용합니다. 유료 모델로의 폴백은 없습니다.
+const TTS_MODELS = new Set([
+    'gemini-3.8-flash-tts',
+    'gemini-3.8-flash-lite-tts',
+]);
+
+// 1차 TTS가 429(무료 한도)일 때만 2차 무료 TTS로 전환합니다.
+const TTS_FALLBACKS = new Map([
+    ['gemini-3.8-flash-tts', 'gemini-3.8-flash-lite-tts'],
+]);
+
 // 이 엔드포인트로 호출할 수 있는 모델 목록 (임의 모델/URL 주입 방지)
 const ALLOWED_MODELS = new Set([
     DEFAULT_TEXT_MODEL,
     'gemini-3.1-flash-lite', // 이전 버전 호환
-    'gemini-2.5-flash-preview-tts',
+    ...TTS_MODELS,
 ]);
 
 const GEMINI_TIMEOUT_MS = 60_000;
@@ -55,6 +67,27 @@ const writeTextCache = (key, data) => {
     }
 };
 
+const requestGemini = async (targetModel, targetPayload, apiKey) => {
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent`;
+    const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+        },
+        body: JSON.stringify(targetPayload),
+        signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Gemini API Error (${response.status}) [${targetModel}]:`, errorText);
+        return { ok: false, status: response.status };
+    }
+
+    return { ok: true, data: await response.json() };
+};
+
 export default async function handler(req, res) {
     // CORS 헤더 설정
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -87,8 +120,7 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'API key not configured' });
     }
 
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-    const canCache = model !== 'gemini-2.5-flash-preview-tts';
+    const canCache = !TTS_MODELS.has(model);
     const cacheKey = canCache ? getRequestCacheKey(model, payload) : null;
 
     if (cacheKey) {
@@ -101,24 +133,30 @@ export default async function handler(req, res) {
     }
 
     try {
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-goog-api-key': apiKey,
-            },
-            body: JSON.stringify(payload),
-            signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
-        });
+        let actualModel = model;
+        let fallbackUsed = false;
+        let result = await requestGemini(model, payload, apiKey);
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`Gemini API Error (${response.status}):`, errorText);
+        // 429(무료 한도)일 때만 Lite TTS로 한 번 폴백합니다. 유료 모델은 사용하지 않습니다.
+        if (!result.ok && result.status === 429 && TTS_FALLBACKS.has(model)) {
+            const fallbackModel = TTS_FALLBACKS.get(model);
+            console.warn(`TTS quota hit for ${model}; falling back to ${fallbackModel}`);
+            actualModel = fallbackModel;
+            fallbackUsed = true;
+            result = await requestGemini(
+                fallbackModel,
+                { ...payload, model: fallbackModel },
+                apiKey
+            );
+        }
 
-            if (response.status === 429) {
+        if (!result.ok) {
+            if (result.status === 429) {
+                res.setHeader('Retry-After', TTS_MODELS.has(model) ? '20' : '10');
                 return res.status(429).json({
                     error: 'Too Many Requests',
-                    details: 'API Quota Exceeded. Please try again later.'
+                    details: 'API Quota Exceeded. Please try again later.',
+                    fallback: fallbackUsed ? 'exhausted' : 'not-used'
                 });
             }
 
@@ -126,11 +164,12 @@ export default async function handler(req, res) {
             return res.status(502).json({ error: 'Gemini API request failed' });
         }
 
-        const data = await response.json();
-        if (cacheKey) writeTextCache(cacheKey, data);
+        if (cacheKey) writeTextCache(cacheKey, result.data);
         res.setHeader('Cache-Control', 'no-store');
         res.setHeader('X-Gemini-Cache', cacheKey ? 'MISS' : 'BYPASS');
-        res.status(200).json(data);
+        res.setHeader('X-Gemini-Model', actualModel);
+        if (fallbackUsed) res.setHeader('X-Gemini-Fallback', '1');
+        res.status(200).json(result.data);
     } catch (error) {
         console.error('Gemini API Server Error:', error);
         const status = error.name === 'TimeoutError' ? 504 : 500;

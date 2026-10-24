@@ -1,6 +1,6 @@
 // TTS 오디오를 IndexedDB에 저장합니다.
 // localStorage는 동기 I/O + 5MB 제한이 있어 오디오 캐시에 적합하지 않습니다.
-const DB_NAME = 'dailyenglish-audio';
+const DB_NAME = 'dailyenglish-audio-v2';
 const STORE_NAME = 'tts';
 const DB_VERSION = 1;
 const TTL_MS = 7 * 24 * 60 * 60 * 1000;
