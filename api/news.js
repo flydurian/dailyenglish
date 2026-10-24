@@ -1,13 +1,13 @@
 // Vercel Serverless Function for RSS News Feed
+import { setApiSecurityHeaders } from '../lib/security.js';
+const MAX_RSS_BYTES = 1_500_000;
+const MAX_ITEMS = 50;
+
 export default async function handler(req, res) {
-    // CORS 헤더 설정
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    setApiSecurityHeaders(res);
 
     if (req.method === 'OPTIONS') {
-        res.status(200).end();
-        return;
+        return res.status(204).end();
     }
 
     if (req.method !== 'GET') {
@@ -43,7 +43,20 @@ export default async function handler(req, res) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
+        const contentType = response.headers.get('content-type') || '';
+        if (!/xml|rss/i.test(contentType)) {
+            throw new Error('Unexpected RSS content type');
+        }
+
+        const contentLength = Number(response.headers.get('content-length') || 0);
+        if (Number.isFinite(contentLength) && contentLength > MAX_RSS_BYTES) {
+            throw new Error('RSS response too large');
+        }
+
         const xmlText = await response.text();
+        if (xmlText.length > MAX_RSS_BYTES) {
+            throw new Error('RSS response too large');
+        }
         
         // XML 파싱 (간단한 정규식 기반 파싱)
         const items = [];
@@ -51,6 +64,7 @@ export default async function handler(req, res) {
         let match;
         
         while ((match = itemRegex.exec(xmlText)) !== null) {
+            if (items.length >= MAX_ITEMS) break;
             const itemXml = match[1];
             
             const titleMatch = itemXml.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>|<title>(.*?)<\/title>/s);
@@ -77,13 +91,14 @@ export default async function handler(req, res) {
                     .replace(/&#39;/g, "'")
                     .trim();
                 
+                const safeLink = /^https?:\/\//i.test(link) ? link : '';
                 items.push({
-                    title: title.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&'),
-                    description: cleanDescription,
-                    url: link,
+                    title: title.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').slice(0, 300),
+                    description: cleanDescription.slice(0, 2000),
+                    url: safeLink,
                     publishedAt: pubDate,
                     source: {
-                        name: sourceName
+                        name: sourceName.slice(0, 120)
                     }
                 });
             }
@@ -102,7 +117,7 @@ export default async function handler(req, res) {
         
     } catch (error) {
         console.error('RSS News error:', error);
-        res.status(500).json({ error: 'Internal server error', message: error.message });
+        res.status(500).json({ error: 'Internal server error' });
     }
 }
 
