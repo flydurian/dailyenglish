@@ -14,10 +14,11 @@ DeepSeek는 ds.py가 붙이는 공통 지시에 따라 조사·계획·구현·�
    `ds.py go --title "<제목>" --brief-file <파일>` (브리프는 같은 명령 안에서 heredoc으로 파일에 쓴다).
    코드를 읽어 명세를 만들지 않는다. 필요한 정보가 있으면 그것도 DeepSeek에게 조사시킨다.
 2. **대기**: "You have N orchestration message" 알림이 오면 도구 없이 한 줄로 턴을 끝낸다 (heartbeat는 ds.py가 처리).
-3. **호출 2 — 판정**: 백그라운드 완료 알림이 오면 출력의 worker_done 요약을 읽고
-   `ds.py review --auto-merge --delivery <id>` 한 번. 검사 PASS·경고 없음이면 main에 자동 merge된다.
-   - exit 2(검사 실패·경고) → 이유를 브리프로 정리해 같은 브랜치에서 고치라고 `go` 한 번 더 (브리프에 "브랜치 <이름>에서" 명시).
-   - 경고가 의도된 변경(예: 보안 설정)이라면 worker 요약을 보고 판단 후 `ds.py merge --delivery <id>`.
+3. **호출 2 — 판정**: 백그라운드 완료 알림이 오면 worker_done 요약을 읽고 `ds.py review --auto-merge --delivery <id>`.
+   - 코드 변경이 없고 검사 PASS·경고 없음 → main에 자동 merge.
+   - 코드 변경이 있으면 auto-merge가 거부된다(`reviewNeeded`). `ds.py review --diff`로 테스트·문서를 뺀 핵심 diff만 읽고,
+     문제 없으면 `ds.py merge --delivery <id>` (호출 +1). 처음부터 코드 작업인 줄 알면 바로 `review --diff`를 쓴다.
+   - 문제·검사 실패 → 이유를 모아 "브랜치 <이름>에서 고쳐라" 브리프로 `go` 한 번 더.
    - question → `orca orchestration reply --id <msg> --body "<답>" --json` 후 `ds.py wait` 다시.
 4. **호출 3 — 보고**: 사용자에게 결과를 짧게 보고하고, 작업이 끝났으면 `/clear`를 권한다.
 
@@ -28,6 +29,7 @@ DeepSeek는 ds.py가 붙이는 공통 지시에 따라 조사·계획·구현·�
 배경/이유: 한두 줄
 범위: 바꿔도 되는 것 / 건드리면 안 되는 것
 완료 기준: 사용자 관점 결과 + 필요한 테스트·확인 (예: 테스트 추가, 프리뷰 배포 후 화면 확인)
+경계 사례: 반드시 테스트로 만들 상황 1~3개 (예: 다시 시작해도 같은 날 재채점 금지)
 ```
 
 - 관련된 일은 한 브리프에 묶는다 (구현·테스트·프리뷰 배포·확인). 프로덕션 배포·보안 설정 변경만 리뷰 후 따로.
