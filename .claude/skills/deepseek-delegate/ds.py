@@ -4,7 +4,9 @@
   ds.py run --objective "<목표>"          새 Orca Run 생성·바인딩
   ds.py worker                           새 dsh-tui 탭 생성 (사용자가 탭을 한 번 열어야 함)
   ds.py dispatch --title "<제목>" --spec <명세 파일> [--deps '["task_x"]'] [--terminal <handle>]
-  ds.py go --title "<제목>" (--brief "<브리프>" | --brief-file F) [--terminal <handle>] [--timeout-min 60]
+                                         [--effort off|low|high|max]
+  ds.py go --title "<제목>" (--brief "<브리프>" | --brief-file F) [--terminal <handle>]
+                                         [--timeout-min 60] [--effort off|low|high|max]
                                          Run 생성(필요 시)·디스패치·대기까지 한 번에
   ds.py wait [--timeout-min 60]          worker_done/question/escalation이 올 때까지 대기 (heartbeat는 자동 확인 처리)
   ds.py review [--delivery <id>] [--auto-merge | --diff [--max-lines 300]]
@@ -24,9 +26,12 @@ import shutil
 import subprocess
 import sys
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 WAKE_TYPES = 'worker_done,escalation,question'
+EFFORT_LEVELS = ('off', 'low', 'high', 'max')
+KST = timezone(timedelta(hours=9))
 WORKER_NOTES = """
 
 ## 총괄 공통 지시 (ds.py가 자동으로 붙임 — preamble보다 우선)
@@ -38,6 +43,8 @@ WORKER_NOTES = """
 5. 자체 리뷰: `git diff main...HEAD`를 다시 읽고 확인한다 — 브리프 요구 모두 충족, 범위 밖 변경 없음, console.log 디버그 출력 없음, 비밀 값·.env 노출 없음, 새 의존성 없음(브리프가 허용한 경우 제외). 문제가 있으면 고치고 4를 다시 한다.
 6. 작업노트.md에 이번 작업을 짧게 기록하고, 변경을 설명하는 메시지로 브랜치에 커밋한다 (git add는 네가 바꾼 파일만).
 7. worker_done 요약(3문장): 무엇을 바꿨는지, 검증 결과, 남은 위험. --files-modified에 실제 파일. 총괄이 diff를 읽지 않고 판단할 수 있게 쓴다.
+- 웹 검색·fetch 는 브리프가 요구할 때만 쓴다.
+- 보고·로그 출력은 필요한 부분만 짧게.
 금지: merge, push, `vercel deploy --prod`, vercel env 변경 — 브리프가 "사용자 확인됨"이라고 명시한 경우만 예외. 프리뷰 배포(`vercel deploy`)는 브리프가 요청하면 한다.
 ask는 정말 막혔을 때만 쓴다. 사소한 결정은 스스로 하고 요약에 적는다. heartbeat는 작업이 15분을 넘을 때만 15분마다.
 """
@@ -129,6 +136,40 @@ def ensure_orca():
         fail('Orca 앱 밖에서는 orca 명령을 쓰지 않습니다 (작업 규칙). Orca 터미널에서 실행하세요.')
 
 
+def is_peak_kst(now=None):
+    """한국시간 평일 10–13시·15–19시면 피크. 주말은 항상 비피크."""
+    now = now or datetime.now(KST)
+    if now.weekday() >= 5:
+        return False
+    return 10 <= now.hour < 13 or 15 <= now.hour < 19
+
+
+def print_peak_notice():
+    if is_peak_kst():
+        print('피크 시간 — 급하지 않은 큰 작업은 비피크에')
+
+
+def switch_effort(handle, level):
+    """대상 탭의 세션 effort 를 /effort 로 바꾸고 화면에서 확인한다."""
+    current = compact_screen(handle, 30).lower()
+    if 'skiptheguide' in current or 'step1of4' in current:
+        press_esc(handle)
+        time.sleep(1.5)
+
+    orca('terminal', 'send', '--terminal', handle, '--enter', '--text', f'/effort {level}')
+    pattern = re.compile(rf'→\s*{re.escape(level)}\b', re.IGNORECASE)
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        time.sleep(0.4)
+        current = compact_screen(handle, 30)
+        if re.search(r'unknown\s*reasoning\s*effort|this\s*model\s*offers', current, re.IGNORECASE):
+            fail(f'effort {level} 전환 거부됨 (terminal {handle})')
+        if pattern.search(current):
+            print(f'effort → {level} (terminal {handle})')
+            return
+    fail(f'effort {level} 전환을 확인하지 못했습니다 (terminal {handle})')
+
+
 def cmd_run(args):
     run = orca('orchestration', 'run-create', '--objective', args.objective)['run']
     print(json.dumps({'run': run['id']}, ensure_ascii=False))
@@ -144,7 +185,7 @@ def cmd_worker(_args):
           f'그 다음 dispatch --terminal {handle}')
 
 
-def dispatch_task(root, title, spec, terminal=None, deps=None):
+def dispatch_task(root, title, spec, terminal=None, deps=None, effort=None):
     if not orca('orchestration', 'run-current').get('run'):
         fail('바인딩된 Run이 없습니다. 먼저 `ds.py run --objective ...`를 실행하세요.')
 
@@ -154,6 +195,9 @@ def dispatch_task(root, title, spec, terminal=None, deps=None):
         handle, ctx = find_dsh_terminal(root)
     if not handle:
         fail('DeepSeek 탭이 없습니다. `ds.py worker`로 만들고, 사용자가 탭을 연 뒤 다시 dispatch하세요.')
+
+    if effort:
+        switch_effort(handle, effort)
 
     create = ['orchestration', 'task-create', '--spec', spec, '--task-title', title,
               '--display-name', f'deepseek · {title}']
@@ -200,18 +244,21 @@ def print_dispatch(result):
 
 def cmd_dispatch(args):
     root = repo_root()
+    print_peak_notice()
     spec = Path(args.spec).read_text(encoding='utf-8')
-    print_dispatch(dispatch_task(root, args.title, spec, args.terminal, args.deps))
+    print_dispatch(dispatch_task(root, args.title, spec, terminal=args.terminal,
+                                 deps=args.deps, effort=args.effort))
 
 
 def cmd_go(args):
     root = repo_root()
+    print_peak_notice()
     if not orca('orchestration', 'run-current').get('run'):
         orca('orchestration', 'run-create', '--objective', args.title)
     spec = args.brief if args.brief is not None else Path(args.brief_file).read_text(encoding='utf-8')
     if not spec.strip():
         fail('브리프가 비어 있습니다.')
-    print_dispatch(dispatch_task(root, args.title, spec, args.terminal))
+    print_dispatch(dispatch_task(root, args.title, spec, terminal=args.terminal, effort=args.effort))
     cmd_wait(argparse.Namespace(timeout_min=args.timeout_min))
 
 
@@ -501,6 +548,8 @@ def main():
     p.add_argument('--spec', required=True, help='Target/Change/Constraints/Ownership/Observable acceptance 명세 파일')
     p.add_argument('--deps', help='JSON 배열, 예: \'["task_abc"]\'')
     p.add_argument('--terminal', help='보낼 DeepSeek 터미널 handle (생략하면 컨텍스트가 가장 작은 탭)')
+    p.add_argument('--effort', type=str.lower, choices=EFFORT_LEVELS,
+                   help='워커 세션 추론 강도 (생략하면 변경하지 않음)')
     p.set_defaults(func=cmd_dispatch)
 
     p = sub.add_parser('go')
@@ -509,6 +558,8 @@ def main():
     brief.add_argument('--brief', help='브리프 본문')
     brief.add_argument('--brief-file', help='브리프 파일 경로')
     p.add_argument('--terminal', help='보낼 DeepSeek 터미널 handle (생략하면 컨텍스트가 가장 작은 탭)')
+    p.add_argument('--effort', type=str.lower, choices=EFFORT_LEVELS,
+                   help='워커 세션 추론 강도 (생략하면 변경하지 않음)')
     p.add_argument('--timeout-min', type=int, default=60)
     p.set_defaults(func=cmd_go)
 
