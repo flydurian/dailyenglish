@@ -60,7 +60,7 @@ src/
 ## 🚀 시작하기
 
 ### 필수 요구사항
-- Node.js 16.0.0 이상
+- Node.js 22.12.0 이상
 - npm 또는 yarn
 
 ### 설치 및 실행
@@ -123,10 +123,12 @@ npm run key:set
 
 ## 🛠️ 기술 스택
 
-- **Frontend**: React 18.2.0
-- **Styling**: Tailwind CSS 3.3.0
-- **API**: Gemini API (Google AI)
-- **Build Tool**: Vite
+- **Frontend**: React 18.3.1
+- **Styling**: Emotion (`@emotion/react`, `@emotion/styled`) 기반 CSS-in-JS + 전역 CSS
+- **API**: Gemini API (Google AI) — Vercel Serverless Function(`/api/gemini`) 경유
+- **Build Tool**: Vite 8.3.5
+- **Runtime**: Node.js 22.12.0 이상
+- **Deployment**: Vercel (정적 프론트엔드 + `/api` 서버리스 함수)
 - **Package Manager**: npm
 
 ## 📱 주요 컴포넌트
@@ -202,7 +204,7 @@ npm run build
 ## 🙏 감사의 말
 
 - Google Gemini API 팀
-- React 및 Tailwind CSS 커뮤니티
+- React 및 Emotion 커뮤니티
 - 모든 기여자들
 
 ---
