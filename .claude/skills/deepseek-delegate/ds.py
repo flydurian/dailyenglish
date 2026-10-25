@@ -4,7 +4,12 @@
   ds.py run --objective "<목표>"          새 Orca Run 생성·바인딩
   ds.py worker                           새 dsh-tui 탭 생성 (사용자가 탭을 한 번 열어야 함)
   ds.py dispatch --title "<제목>" --spec <명세 파일> [--deps '["task_x"]'] [--terminal <handle>]
+  ds.py go --title "<제목>" (--brief "<브리프>" | --brief-file F) [--terminal <handle>] [--timeout-min 60]
+                                         Run 생성(필요 시)·디스패치·대기까지 한 번에
   ds.py wait [--timeout-min 60]          worker_done/question/escalation이 올 때까지 대기 (heartbeat는 자동 확인 처리)
+  ds.py review [--delivery <id>] [--auto-merge]
+                                         브랜치·diff·검사·경고 요약 JSON (auto-merge 가능)
+  ds.py merge [--delivery <id>]          검사 없이 ff-only merge·ack·정리
   ds.py ack <delivery_id>                처리한 보고 확인 처리
   ds.py status                           Run 작업 상태·DeepSeek 화면·변경 파일 요약
 
@@ -14,6 +19,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -23,11 +29,16 @@ WAKE_TYPES = 'worker_done,escalation,question'
 WORKER_NOTES = """
 
 ## 총괄 공통 지시 (ds.py가 자동으로 붙임 — preamble보다 우선)
-- heartbeat: 작업이 15분을 넘길 때만 15분마다 한 번 보낸다. preamble의 5분 주기 대신 이 지시를 따른다 (총괄은 heartbeat마다 깨어나 비용이 든다).
-- ask는 정말 막혔을 때만 쓴다. 사소한 선택은 명세의 의도에 맞게 스스로 정하고 worker_done 요약에 적는다.
-- git commit / checkout / push 금지. 명세의 Ownership 밖 파일은 수정하지 않는다. 새 npm 의존성 금지.
-- 끝내기 전에 명세의 Observable acceptance 명령을 모두 실행하고, 결과를 worker_done 요약에 넣는다.
-- worker_done은 실제 값으로 정확히 한 번 보낸다.
+총괄(Claude)은 짧은 브리프만 준다. 나머지는 네가 끝까지 책임진다.
+1. 브리프의 목표·범위·완료 기준을 읽고, 필요한 코드를 직접 조사해 계획을 세운다. 총괄에게 코드 설명을 요구하지 않는다.
+2. 브리프에 브랜치가 없으면 main에서 `ds/<task id 뒤 8자>` 브랜치를 만들어 작업한다. main에 직접 커밋하지 않는다. 파일 변경이 없는 작업(배포·조사)은 브랜치·커밋 없이 보고만 한다.
+3. 구현한다. 순수 로직은 node로 테스트 가능한 파일(src/utils/*.js 등)에 두고 scripts/test-*.mjs 테스트를 추가·갱신한다.
+4. scripts/test-*.mjs 전부와 `npx vite build`를 실행해 통과시킨다 (`npm run build`는 public/hash.json을 바꾸므로 쓰지 않는다).
+5. 자체 리뷰: `git diff main...HEAD`를 다시 읽고 확인한다 — 브리프 요구 모두 충족, 범위 밖 변경 없음, console.log 디버그 출력 없음, 비밀 값·.env 노출 없음, 새 의존성 없음(브리프가 허용한 경우 제외). 문제가 있으면 고치고 4를 다시 한다.
+6. 작업노트.md에 이번 작업을 짧게 기록하고, 변경을 설명하는 메시지로 브랜치에 커밋한다 (git add는 네가 바꾼 파일만).
+7. worker_done 요약(3문장): 무엇을 바꿨는지, 검증 결과, 남은 위험. --files-modified에 실제 파일. 총괄이 diff를 읽지 않고 판단할 수 있게 쓴다.
+금지: merge, push, `vercel deploy --prod`, vercel env 변경 — 브리프가 "사용자 확인됨"이라고 명시한 경우만 예외. 프리뷰 배포(`vercel deploy`)는 브리프가 요청하면 한다.
+ask는 정말 막혔을 때만 쓴다. 사소한 결정은 스스로 하고 요약에 적는다. heartbeat는 작업이 15분을 넘을 때만 15분마다.
 """
 
 
@@ -41,6 +52,15 @@ def repo_root():
     if out.returncode != 0:
         fail('git 저장소 안에서 실행해야 합니다.')
     return Path(out.stdout.strip())
+
+
+def git(root, *args, timeout=None):
+    return subprocess.run(['git', *args], cwd=root, capture_output=True, text=True, timeout=timeout)
+
+
+def current_branch(root):
+    out = git(root, 'rev-parse', '--abbrev-ref', 'HEAD')
+    return out.stdout.strip() if out.returncode == 0 else None
 
 
 def orca(*args, timeout=None):
@@ -123,23 +143,21 @@ def cmd_worker(_args):
           f'그 다음 dispatch --terminal {handle}')
 
 
-def cmd_dispatch(args):
-    root = repo_root()
-    spec = Path(args.spec).read_text(encoding='utf-8')
+def dispatch_task(root, title, spec, terminal=None, deps=None):
     if not orca('orchestration', 'run-current').get('run'):
         fail('바인딩된 Run이 없습니다. 먼저 `ds.py run --objective ...`를 실행하세요.')
 
-    if args.terminal:
-        handle, ctx = args.terminal, None
+    if terminal:
+        handle, ctx = terminal, None
     else:
         handle, ctx = find_dsh_terminal(root)
     if not handle:
         fail('DeepSeek 탭이 없습니다. `ds.py worker`로 만들고, 사용자가 탭을 연 뒤 다시 dispatch하세요.')
 
-    create = ['orchestration', 'task-create', '--spec', spec, '--task-title', args.title,
-              '--display-name', f'deepseek · {args.title}']
-    if args.deps:
-        create += ['--deps', args.deps]
+    create = ['orchestration', 'task-create', '--spec', spec, '--task-title', title,
+              '--display-name', f'deepseek · {title}']
+    if deps:
+        create += ['--deps', deps]
     task_id = orca(*create)['task']['id']
 
     result = orca('orchestration', 'dispatch', '--task', task_id, '--to', handle, '--return-preamble')
@@ -164,14 +182,36 @@ def cmd_dispatch(args):
         '그 안의 명세·총괄 공통 지시·보고 명령(ask, worker_done)을 정확히 따르세요. '
         '끝나면 worker_done을 실제 값으로 한 번만 실행하세요.')
 
-    print(json.dumps({'task': task_id, 'dispatch': (result.get('dispatch') or {}).get('id'),
-                      'terminal': handle, 'deepseekCtxPercent': ctx, 'prompt': str(rel),
-                      'started': started}, ensure_ascii=False))
-    if not started:
-        print(f'참고: 화면으로 작업 시작을 확인하지 못했습니다 (백그라운드 탭이면 정상일 수 있음). '
-              f'ds.py wait로 보고를 기다리고, 오래 조용하면 Orca에서 terminal {handle} 탭을 열어 확인하세요.')
+    return {'task': task_id, 'dispatch': (result.get('dispatch') or {}).get('id'),
+            'terminal': handle, 'deepseekCtxPercent': ctx, 'prompt': str(rel),
+            'started': started}
+
+
+def print_dispatch(result):
+    print(json.dumps(result, ensure_ascii=False))
+    if not result['started']:
+        print(f"참고: 화면으로 작업 시작을 확인하지 못했습니다 (백그라운드 탭이면 정상일 수 있음). "
+              f"ds.py wait로 보고를 기다리고, 오래 조용하면 Orca에서 terminal {result['terminal']} 탭을 열어 확인하세요.")
+    ctx = result.get('deepseekCtxPercent')
     if ctx and ctx >= 50:
         print('참고: DeepSeek 세션 컨텍스트가 50% 이상입니다. 다음에는 ds.py worker로 새 세션을 여는 것을 고려하세요.')
+
+
+def cmd_dispatch(args):
+    root = repo_root()
+    spec = Path(args.spec).read_text(encoding='utf-8')
+    print_dispatch(dispatch_task(root, args.title, spec, args.terminal, args.deps))
+
+
+def cmd_go(args):
+    root = repo_root()
+    if not orca('orchestration', 'run-current').get('run'):
+        orca('orchestration', 'run-create', '--objective', args.title)
+    spec = args.brief if args.brief is not None else Path(args.brief_file).read_text(encoding='utf-8')
+    if not spec.strip():
+        fail('브리프가 비어 있습니다.')
+    print_dispatch(dispatch_task(root, args.title, spec, args.terminal))
+    cmd_wait(argparse.Namespace(timeout_min=args.timeout_min))
 
 
 def summarize(message):
@@ -240,6 +280,126 @@ def cmd_status(_args):
     }, ensure_ascii=False, indent=1))
 
 
+def run_checks(root):
+    checks = {}
+    for script in sorted((root / 'scripts').glob('test-*.mjs')):
+        rel = str(script.relative_to(root))
+        try:
+            proc = subprocess.run(['node', rel], cwd=root, capture_output=True, text=True, timeout=180)
+        except subprocess.TimeoutExpired:
+            checks[rel] = {'status': 'FAIL', 'tail': ['timeout']}
+            continue
+        if proc.returncode == 0:
+            checks[rel] = 'PASS'
+        else:
+            tail = [line for line in (proc.stdout + proc.stderr).splitlines() if line.strip()][-5:]
+            checks[rel] = {'status': 'FAIL', 'tail': tail}
+
+    try:
+        build = subprocess.run(['npx', 'vite', 'build'], cwd=root, capture_output=True, text=True, timeout=300)
+    except subprocess.TimeoutExpired:
+        checks['vite build'] = {'status': 'FAIL', 'tail': ['timeout']}
+        return checks
+    if build.returncode == 0:
+        checks['vite build'] = 'PASS'
+    else:
+        tail = [line for line in (build.stdout + build.stderr).splitlines() if line.strip()][-5:]
+        checks['vite build'] = {'status': 'FAIL', 'tail': tail}
+    return checks
+
+
+def collect_warnings(root):
+    warnings = []
+    diff = git(root, 'diff', 'main...HEAD', '--no-color')
+    added = [line for line in diff.stdout.splitlines()
+             if line.startswith('+') and not line.startswith('+++')]
+    console_logs = sum(1 for line in added if re.search(r'console\.log\(', line))
+    if console_logs:
+        warnings.append(f'console.log 추가 {console_logs}줄')
+
+    changed = git(root, 'diff', '--name-only', 'main...HEAD').stdout.splitlines()
+    for name in changed:
+        if name in ('package.json', 'vercel.json', 'lib/security.js') or name.startswith('.env'):
+            warnings.append(f'{name} 변경')
+    return warnings
+
+
+def merge_branch(root, branch, delivery=None):
+    checkout = git(root, 'checkout', 'main')
+    if checkout.returncode != 0:
+        return {'merged': False, 'reason': f'checkout main 실패: {checkout.stderr.strip()[:300]}'}
+    merged = git(root, 'merge', '--ff-only', branch)
+    if merged.returncode != 0:
+        return {'merged': False, 'reason': f'ff-only merge 실패: {merged.stderr.strip()[:300]}'}
+    deleted = git(root, 'branch', '-d', branch)
+    acked = None
+    if delivery:
+        acked = orca('orchestration', 'check', '--ack', delivery).get('acknowledged')
+    shutil.rmtree(root / '.orca-tasks', ignore_errors=True)
+    return {'merged': True, 'branch': branch, 'deleted': deleted.returncode == 0, 'acked': acked}
+
+
+def cmd_review(args):
+    root = repo_root()
+    branch = current_branch(root)
+    has_work_branch = branch not in (None, 'main')
+
+    log = git(root, 'log', '--oneline', 'main..HEAD').stdout.strip().splitlines() if has_work_branch else []
+    stat = git(root, 'diff', '--stat', 'main...HEAD').stdout.strip().splitlines() if has_work_branch else []
+    files = git(root, 'diff', '--name-only', 'main...HEAD').stdout.strip().splitlines() if has_work_branch else []
+    uncommitted = [line for line in git(root, 'status', '--porcelain').stdout.splitlines()
+                   if not line.startswith('??')]
+    checks = run_checks(root)
+    warnings = collect_warnings(root) if has_work_branch else []
+
+    result = {
+        'branch': branch if has_work_branch else '작업 브랜치 없음',
+        'log': log,
+        'diffStat': stat[-1] if stat else None,
+        'files': files,
+        'uncommitted': uncommitted,
+        'checks': checks,
+        'warnings': warnings,
+    }
+
+    if not args.auto_merge:
+        print(json.dumps(result, ensure_ascii=False, indent=1))
+        return
+
+    failed = [name for name, status in checks.items() if status != 'PASS']
+    reasons = []
+    if not has_work_branch:
+        reasons.append('작업 브랜치 없음')
+    if failed:
+        reasons.append('검사 실패: ' + ', '.join(failed))
+    if uncommitted:
+        reasons.append(f'미커밋 변경 {len(uncommitted)}건')
+    if warnings:
+        reasons.append('경고: ' + '; '.join(warnings))
+
+    if reasons:
+        result['autoMerge'] = {'merged': False, 'reason': ' / '.join(reasons)}
+        print(json.dumps(result, ensure_ascii=False, indent=1))
+        sys.exit(2)
+
+    result['autoMerge'] = merge_branch(root, branch, args.delivery)
+    print(json.dumps(result, ensure_ascii=False, indent=1))
+    if not result['autoMerge'].get('merged'):
+        sys.exit(2)
+
+
+def cmd_merge(args):
+    root = repo_root()
+    branch = current_branch(root)
+    if branch in (None, 'main'):
+        print(json.dumps({'merged': False, 'reason': '작업 브랜치 없음'}, ensure_ascii=False))
+        sys.exit(2)
+    merged = merge_branch(root, branch, args.delivery)
+    print(json.dumps(merged, ensure_ascii=False, indent=1))
+    if not merged.get('merged'):
+        sys.exit(2)
+
+
 def main():
     ensure_orca()
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -259,9 +419,27 @@ def main():
     p.add_argument('--terminal', help='보낼 DeepSeek 터미널 handle (생략하면 컨텍스트가 가장 작은 탭)')
     p.set_defaults(func=cmd_dispatch)
 
+    p = sub.add_parser('go')
+    p.add_argument('--title', required=True)
+    brief = p.add_mutually_exclusive_group(required=True)
+    brief.add_argument('--brief', help='브리프 본문')
+    brief.add_argument('--brief-file', help='브리프 파일 경로')
+    p.add_argument('--terminal', help='보낼 DeepSeek 터미널 handle (생략하면 컨텍스트가 가장 작은 탭)')
+    p.add_argument('--timeout-min', type=int, default=60)
+    p.set_defaults(func=cmd_go)
+
     p = sub.add_parser('wait')
     p.add_argument('--timeout-min', type=int, default=60)
     p.set_defaults(func=cmd_wait)
+
+    p = sub.add_parser('review')
+    p.add_argument('--delivery', help='성공 시 ack 할 delivery id')
+    p.add_argument('--auto-merge', action='store_true', help='검사·경고 통과 시 main에 ff-only merge')
+    p.set_defaults(func=cmd_review)
+
+    p = sub.add_parser('merge')
+    p.add_argument('--delivery', help='merge 후 ack 할 delivery id')
+    p.set_defaults(func=cmd_merge)
 
     p = sub.add_parser('ack')
     p.add_argument('delivery')
