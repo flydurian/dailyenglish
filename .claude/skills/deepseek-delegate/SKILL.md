@@ -12,7 +12,7 @@ DeepSeek는 ds.py가 붙이는 공통 지시에 따라 조사·계획·구현·�
 
 1. **호출 1 — 브리프 + 실행**: Bash `run_in_background: true`, timeout 3600000 으로
    `ds.py go --title "<제목>" --brief-file <파일>` (브리프는 같은 명령 안에서 heredoc으로 파일에 쓴다).
-   - `--effort off|low|high|max`: 세션 추론 강도 (기본: 변경 안 함). 단순 작업 `off`/`low`, 일반 구현 `high`, 복잡한 로직 `max`.
+   effort는 기본 `high`(문서·설정·배포·일반 구현), 복잡한 로직·디버깅·보안만 `--effort max`. 설정은 `~/.dsh-tui/effort.json`에 전역 저장되어 사용자가 여는 dsh-tui 시작값도 바뀐다 (사용자 동의함).
    코드를 읽어 명세를 만들지 않는다. 필요한 정보가 있으면 그것도 DeepSeek에게 조사시킨다.
 2. **대기**: "You have N orchestration message" 알림이 오면 도구 없이 한 줄로 턴을 끝낸다 (heartbeat는 ds.py가 처리).
 3. **호출 2 — 판정**: 백그라운드 완료 알림이 오면 worker_done 요약을 읽고 `ds.py review --auto-merge --delivery <id>`.

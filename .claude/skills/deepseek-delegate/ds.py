@@ -4,9 +4,9 @@
   ds.py run --objective "<목표>"          새 Orca Run 생성·바인딩
   ds.py worker                           새 dsh-tui 탭 생성 (사용자가 탭을 한 번 열어야 함)
   ds.py dispatch --title "<제목>" --spec <명세 파일> [--deps '["task_x"]'] [--terminal <handle>]
-                                         [--effort off|low|high|max]
+                                         [--effort high|max]
   ds.py go --title "<제목>" (--brief "<브리프>" | --brief-file F) [--terminal <handle>]
-                                         [--timeout-min 60] [--effort off|low|high|max]
+                                         [--timeout-min 60] [--effort high|max]
                                          Run 생성(필요 시)·디스패치·대기까지 한 번에
   ds.py wait [--timeout-min 60]          worker_done/question/escalation이 올 때까지 대기 (heartbeat는 자동 확인 처리)
   ds.py review [--delivery <id>] [--auto-merge | --diff [--max-lines 300]]
@@ -548,8 +548,8 @@ def main():
     p.add_argument('--spec', required=True, help='Target/Change/Constraints/Ownership/Observable acceptance 명세 파일')
     p.add_argument('--deps', help='JSON 배열, 예: \'["task_abc"]\'')
     p.add_argument('--terminal', help='보낼 DeepSeek 터미널 handle (생략하면 컨텍스트가 가장 작은 탭)')
-    p.add_argument('--effort', type=str.lower, choices=EFFORT_LEVELS,
-                   help='워커 세션 추론 강도 (생략하면 변경하지 않음)')
+    p.add_argument('--effort', type=str.lower, choices=('high', 'max'), default='high',
+                   help='워커 세션 추론 강도 (기본 high, 복잡한 로직·디버깅·보안만 max)')
     p.set_defaults(func=cmd_dispatch)
 
     p = sub.add_parser('go')
@@ -558,8 +558,8 @@ def main():
     brief.add_argument('--brief', help='브리프 본문')
     brief.add_argument('--brief-file', help='브리프 파일 경로')
     p.add_argument('--terminal', help='보낼 DeepSeek 터미널 handle (생략하면 컨텍스트가 가장 작은 탭)')
-    p.add_argument('--effort', type=str.lower, choices=EFFORT_LEVELS,
-                   help='워커 세션 추론 강도 (생략하면 변경하지 않음)')
+    p.add_argument('--effort', type=str.lower, choices=('high', 'max'), default='high',
+                   help='워커 세션 추론 강도 (기본 high, 복잡한 로직·디버깅·보안만 max)')
     p.add_argument('--timeout-min', type=int, default=60)
     p.set_defaults(func=cmd_go)
 
