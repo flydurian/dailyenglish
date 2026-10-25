@@ -3,6 +3,7 @@ import styled from '@emotion/styled';
 import { ArrowUpIcon } from './components/Icons';
 import WordModal from './components/WordModal';
 import WordbookView from './components/WordbookView';
+import ReviewView from './components/ReviewView';
 import ExpressionCard from './components/ExpressionCard';
 import NewsCard from './components/NewsCard';
 import FontSizeControl from './components/FontSizeControl';
@@ -13,6 +14,8 @@ import { FontSizeProvider } from './contexts/FontSizeContext';
 import { useWordbook } from './contexts/WordbookContext';
 import { levelDescriptions } from './utils/apiUtils';
 import { detectHotReload } from './utils/versionUtils';
+import { getDueItems } from './utils/srs';
+import { toLocalDateKey } from './utils/dateUtils';
 
 // Editorial Paper 디자인 시스템
 const AppContainer = styled.div`
@@ -114,14 +117,22 @@ const TabNavigation = styled.div`
   width: 100%;
   margin-top: 18px;
   border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 
   @media (max-width: 480px) {
-    gap: 22px;
+    gap: 16px;
   }
 `;
 
 const TabButton = styled.button`
   position: relative;
+  flex: 0 0 auto;
   margin-bottom: -1px;
   padding: 2px 0 10px;
   border: 0;
@@ -131,6 +142,7 @@ const TabButton = styled.button`
   font-size: 12.5px;
   font-weight: 650;
   letter-spacing: 0.01em;
+  white-space: nowrap;
   cursor: pointer;
   transition: color 160ms ease, border-color 160ms ease;
   touch-action: manipulation;
@@ -360,6 +372,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('expressions');
   const { items: wordbookItems } = useWordbook();
   const wordbookCount = wordbookItems.length;
+  const reviewDueCount = getDueItems(wordbookItems, toLocalDateKey()).length;
   const [expressions, setExpressions] = useState([]);
   const [news, setNews] = useState([]);
   const [activeCardIndex, setActiveCardIndex] = useState(null);
@@ -522,13 +535,21 @@ export default function App() {
                 >
                   {`단어장${wordbookCount > 0 ? ` ${wordbookCount}` : ''}`}
                 </TabButton>
+                <TabButton
+                  isActive={activeTab === 'review'}
+                  role="tab"
+                  aria-selected={activeTab === 'review'}
+                  onClick={() => setActiveTab('review')}
+                >
+                  {`복습${reviewDueCount > 0 ? ` ${reviewDueCount}` : ''}`}
+                </TabButton>
               </TabNavigation>
             </HeaderContent>
           </Header>
 
 
           {/* 레벨 선택 */}
-          {activeTab !== 'wordbook' && (
+          {activeTab !== 'wordbook' && activeTab !== 'review' && (
             <LevelSelection>
               <LevelGrid role="group" aria-label="난이도">
                 {levels.map(l => (
@@ -548,24 +569,34 @@ export default function App() {
           <SectionHead>
             <div>
               <Eyebrow>
-                {activeTab === 'expressions' ? "Today's selection" : activeTab === 'news' ? 'News briefing' : 'My wordbook'}
+                {activeTab === 'expressions'
+                  ? "Today's selection"
+                  : activeTab === 'news'
+                    ? 'News briefing'
+                    : activeTab === 'wordbook' ? 'My wordbook' : 'Spaced review'}
               </Eyebrow>
               <SectionTitle>
                 {activeTab === 'expressions'
                   ? <>오늘의 표현 <span>· 3</span></>
-                  : activeTab === 'news' ? '뉴스로 배우기' : '내 단어장'}
+                  : activeTab === 'news'
+                    ? '뉴스로 배우기'
+                    : activeTab === 'wordbook' ? '내 단어장' : '오늘의 복습'}
               </SectionTitle>
             </div>
             <SectionMeta>
               {activeTab === 'expressions'
                 ? '3 MIN READ'
-                : activeTab === 'news' ? 'AI SUMMARY' : `${wordbookCount} SAVED`}
+                : activeTab === 'news'
+                  ? 'AI SUMMARY'
+                  : activeTab === 'wordbook' ? `${wordbookCount} SAVED` : `${reviewDueCount} DUE`}
             </SectionMeta>
           </SectionHead>
 
           {/* 메인 컨텐츠 */}
           <MainContent>
-            {activeTab === 'wordbook' ? (
+            {activeTab === 'review' ? (
+              <ReviewView onPlayAudio={playAudio} audioStates={audioStates} />
+            ) : activeTab === 'wordbook' ? (
               <WordbookView onPlayAudio={playAudio} audioStates={audioStates} />
             ) : loading ? (
               <LoadingContainer>
