@@ -73,11 +73,15 @@ for (const file of buildFiles) {
 }
 checks.push(`빌드 결과물 ${buildFiles.length}개 파일의 키 포함 여부`);
 
-// 4. .env 가 gitignore 대상인지
-if (!readFile(path.join(rootDir, '.gitignore')).split('\n').map(line => line.trim()).includes('.env')) {
-  problems.push('.gitignore 에 .env 가 없습니다.');
+// 4. .env 가 gitignore 대상인지 (Vercel CLI 업로드에는 .gitignore 가 포함되지 않으므로 Vercel 빌드에서는 건너뛴다)
+if (process.env.VERCEL) {
+  checks.push('.gitignore 의 .env 제외 (Vercel 빌드에서는 건너뜀)');
+} else {
+  if (!readFile(path.join(rootDir, '.gitignore')).split('\n').map(line => line.trim()).includes('.env')) {
+    problems.push('.gitignore 에 .env 가 없습니다.');
+  }
+  checks.push('.gitignore 의 .env 제외');
 }
-checks.push('.gitignore 의 .env 제외');
 
 for (const check of checks) console.log(`  · 확인: ${check}`);
 
