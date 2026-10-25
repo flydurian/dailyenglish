@@ -19,6 +19,7 @@
 출력은 코디네이터 컨텍스트를 아끼기 위해 필요한 값만 짧게 낸다.
 """
 import argparse
+import fnmatch
 import json
 import os
 import re
@@ -32,27 +33,113 @@ from pathlib import Path
 WAKE_TYPES = 'worker_done,escalation,question'
 EFFORT_LEVELS = ('off', 'low', 'high', 'max')
 KST = timezone(timedelta(hours=9))
-WORKER_NOTES = """
-
-## 총괄 공통 지시 (ds.py가 자동으로 붙임 — preamble보다 우선)
-총괄(Claude)은 짧은 브리프만 준다. 나머지는 네가 끝까지 책임진다.
-1. 브리프의 목표·범위·완료 기준을 읽고, 필요한 코드를 직접 조사해 계획을 세운다. 총괄에게 코드 설명을 요구하지 않는다.
-2. 브리프에 브랜치가 없으면 main에서 `ds/<task id 뒤 8자>` 브랜치를 만들어 작업한다. main에 직접 커밋하지 않는다. 파일 변경이 없는 작업(배포·조사)은 브랜치·커밋 없이 보고만 한다.
-3. 구현한다. 순수 로직은 node로 테스트 가능한 파일(src/utils/*.js 등)에 두고 scripts/test-*.mjs 테스트를 추가·갱신한다.
-4. scripts/test-*.mjs 전부와 `npx vite build`를 실행해 통과시킨다 (`npm run build`는 public/hash.json을 바꾸므로 쓰지 않는다).
-5. 자체 리뷰: `git diff main...HEAD`를 다시 읽고 확인한다 — 브리프 요구 모두 충족, 범위 밖 변경 없음, console.log 디버그 출력 없음, 비밀 값·.env 노출 없음, 새 의존성 없음(브리프가 허용한 경우 제외). 문제가 있으면 고치고 4를 다시 한다.
-6. 작업노트.md에 이번 작업을 짧게 기록하고, 변경을 설명하는 메시지로 브랜치에 커밋한다 (git add는 네가 바꾼 파일만).
-7. worker_done 요약(3문장): 무엇을 바꿨는지, 검증 결과, 남은 위험. --files-modified에 실제 파일. 총괄이 diff를 읽지 않고 판단할 수 있게 쓴다.
-- 웹 검색·fetch 는 브리프가 요구할 때만 쓴다.
-- 보고·로그 출력은 필요한 부분만 짧게.
-금지: merge, push, `vercel deploy --prod`, vercel env 변경 — 브리프가 "사용자 확인됨"이라고 명시한 경우만 예외. 프리뷰 배포(`vercel deploy`)는 브리프가 요청하면 한다.
-ask는 정말 막혔을 때만 쓴다. 사소한 결정은 스스로 하고 요약에 적는다. heartbeat는 작업이 15분을 넘을 때만 15분마다.
-"""
 
 
 def fail(message):
     print(f'ds.py: {message}', file=sys.stderr)
     sys.exit(1)
+
+
+def default_config():
+    return {
+        'mainBranch': 'main',
+        'checks': {},
+        'protected': ['.env*'],
+        'codeExtensions': ['.js', '.jsx', '.mjs', '.ts', '.tsx', '.py'],
+        'testPatterns': ['scripts/test-*.mjs'],
+        'notesFile': None,
+        'workerNotes': [],
+    }
+
+
+def _string_list(value, path, key):
+    if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
+        fail(f'{path}: {key} 는 비어 있지 않은 문자열 배열이어야 합니다.')
+    return list(value)
+
+
+def load_config(root):
+    path = root / '.claude' / 'ds.json'
+    config = default_config()
+    if not path.exists():
+        return config
+    try:
+        data = json.loads(path.read_text(encoding='utf-8'))
+    except json.JSONDecodeError as exc:
+        fail(f'{path} JSON 오류: {exc.msg} (line {exc.lineno}, column {exc.colno})')
+    except OSError as exc:
+        fail(f'{path} 읽기 실패: {exc}')
+    if not isinstance(data, dict):
+        fail(f'{path}: 최상위 값이 JSON 객체여야 합니다.')
+
+    if 'mainBranch' in data:
+        main = data['mainBranch']
+        if not isinstance(main, str) or not main.strip():
+            fail(f'{path}: mainBranch 는 비어 있지 않은 문자열이어야 합니다.')
+        config['mainBranch'] = main.strip()
+
+    if 'checks' in data:
+        checks = data['checks']
+        if not isinstance(checks, dict) or not all(
+            isinstance(name, str) and name and isinstance(command, str) and command
+            for name, command in checks.items()
+        ):
+            fail(f'{path}: checks 는 {{"이름": "셸 명령"}} 객체여야 합니다.')
+        config['checks'] = dict(checks)
+
+    if 'protected' in data:
+        config['protected'] = _string_list(data['protected'], path, 'protected')
+    if 'codeExtensions' in data:
+        exts = _string_list(data['codeExtensions'], path, 'codeExtensions')
+        config['codeExtensions'] = [ext if ext.startswith('.') else f'.{ext}' for ext in exts]
+    if 'testPatterns' in data:
+        config['testPatterns'] = _string_list(data['testPatterns'], path, 'testPatterns')
+    if 'notesFile' in data:
+        notes = data['notesFile']
+        if notes is not None and not isinstance(notes, str):
+            fail(f'{path}: notesFile 은 문자열 또는 null 이어야 합니다.')
+        config['notesFile'] = notes or None
+    if 'workerNotes' in data:
+        config['workerNotes'] = _string_list(data['workerNotes'], path, 'workerNotes')
+
+    return config
+
+
+def build_worker_notes(config):
+    main = config['mainBranch']
+    checks = config['checks']
+    check_step = (
+        '4. 다음 검사를 실행해 모두 통과시킨다: ' + '; '.join(checks.values()) + '.'
+        if checks else '4. 이 프로젝트에는 설정된 검사가 없다.'
+    )
+    patterns = ', '.join(config['testPatterns'])
+    test_step = (
+        f'3. 구현한다. 순수 로직은 테스트 가능한 파일로 분리하고, 테스트 파일({patterns})을 추가·갱신한다.'
+        if patterns else '3. 구현한다. 순수 로직은 테스트 가능한 파일로 분리하고 테스트를 추가·갱신한다.'
+    )
+    notes_file = config['notesFile']
+    commit_step = (
+        f'6. {notes_file}에 이번 작업을 짧게 기록하고, 변경을 설명하는 메시지로 브랜치에 커밋한다 (git add는 네가 바꾼 파일만).'
+        if notes_file else '6. 변경을 설명하는 메시지로 브랜치에 커밋한다 (git add는 네가 바꾼 파일만).'
+    )
+    extra = '\n'.join(f'- {note}' for note in config['workerNotes'])
+    extra_block = f'\n{extra}' if extra else ''
+    return f"""
+
+## 총괄 공통 지시 (ds.py가 자동으로 붙임 — preamble보다 우선)
+총괄(Claude)은 짧은 브리프만 준다. 나머지는 네가 끝까지 책임진다.
+1. 브리프의 목표·범위·완료 기준을 읽고, 필요한 코드를 직접 조사해 계획을 세운다. 총괄에게 코드 설명을 요구하지 않는다.
+2. 브리프에 브랜치가 없으면 {main}에서 `ds/<task id 뒤 8자>` 브랜치를 만들어 작업한다. {main}에 직접 커밋하지 않는다. 파일 변경이 없는 작업(배포·조사)은 브랜치·커밋 없이 보고만 한다.
+{test_step}
+{check_step}
+5. 자체 리뷰: `git diff {main}...HEAD`를 다시 읽고 확인한다 — 브리프 요구 모두 충족, 범위 밖 변경 없음, console.log 디버그 출력 없음, 비밀 값·.env 노출 없음, 새 의존성 없음(브리프가 허용한 경우 제외). 문제가 있으면 고치고 4를 다시 한다.
+{commit_step}
+7. worker_done 요약(3문장): 무엇을 바꿨는지, 검증 결과, 남은 위험. --files-modified에 실제 파일. 총괄이 diff를 읽지 않고 판단할 수 있게 쓴다.
+- 웹 검색·fetch 는 브리프가 요구할 때만 쓴다.
+- 보고·로그 출력은 필요한 부분만 짧게.{extra_block}
+금지: merge, push, `vercel deploy --prod`, vercel env 변경 — 브리프가 "사용자 확인됨"이라고 명시한 경우만 예외. 프리뷰 배포(`vercel deploy`)는 브리프가 요청하면 한다.
+ask는 정말 막혔을 때만 쓴다. 사소한 결정은 스스로 하고 요약에 적는다. heartbeat는 작업이 15분을 넘을 때만 15분마다.
+"""
 
 
 def repo_root():
@@ -185,7 +272,8 @@ def cmd_worker(_args):
           f'그 다음 dispatch --terminal {handle}')
 
 
-def dispatch_task(root, title, spec, terminal=None, deps=None, effort=None):
+def dispatch_task(root, title, spec, terminal=None, deps=None, effort=None, config=None):
+    config = config or load_config(root)
     if not orca('orchestration', 'run-current').get('run'):
         fail('바인딩된 Run이 없습니다. 먼저 `ds.py run --objective ...`를 실행하세요.')
 
@@ -217,7 +305,7 @@ def dispatch_task(root, title, spec, terminal=None, deps=None, effort=None):
         with exclude.open('a', encoding='utf-8') as fh:
             fh.write('.orca-tasks/\n')
     prompt_path = task_dir / f'{task_id}.md'
-    prompt_path.write_text(preamble + WORKER_NOTES, encoding='utf-8')
+    prompt_path.write_text(preamble + build_worker_notes(config), encoding='utf-8')
 
     # 여러 줄 프롬프트를 TUI에 직접 넣으면 중간에 제출될 수 있어 한 줄 지시만 보낸다
     rel = prompt_path.relative_to(root)
@@ -244,21 +332,24 @@ def print_dispatch(result):
 
 def cmd_dispatch(args):
     root = repo_root()
+    config = load_config(root)
     print_peak_notice()
     spec = Path(args.spec).read_text(encoding='utf-8')
     print_dispatch(dispatch_task(root, args.title, spec, terminal=args.terminal,
-                                 deps=args.deps, effort=args.effort))
+                                 deps=args.deps, effort=args.effort, config=config))
 
 
 def cmd_go(args):
     root = repo_root()
+    config = load_config(root)
     print_peak_notice()
     if not orca('orchestration', 'run-current').get('run'):
         orca('orchestration', 'run-create', '--objective', args.title)
     spec = args.brief if args.brief is not None else Path(args.brief_file).read_text(encoding='utf-8')
     if not spec.strip():
         fail('브리프가 비어 있습니다.')
-    print_dispatch(dispatch_task(root, args.title, spec, terminal=args.terminal, effort=args.effort))
+    print_dispatch(dispatch_task(root, args.title, spec, terminal=args.terminal,
+                                 effort=args.effort, config=config))
     cmd_wait(argparse.Namespace(timeout_min=args.timeout_min))
 
 
@@ -328,82 +419,72 @@ def cmd_status(_args):
     }, ensure_ascii=False, indent=1))
 
 
-def run_checks(root):
+def run_checks(root, configured_checks):
     checks = {}
-    for script in sorted((root / 'scripts').glob('test-*.mjs')):
-        rel = str(script.relative_to(root))
+    for name, command in configured_checks.items():
         try:
-            proc = subprocess.run(['node', rel], cwd=root, capture_output=True, text=True, timeout=180)
+            proc = subprocess.run(['bash', '-c', command], cwd=root, capture_output=True, text=True, timeout=300)
         except subprocess.TimeoutExpired:
-            checks[rel] = {'status': 'FAIL', 'tail': ['timeout']}
+            checks[name] = {'status': 'FAIL', 'tail': ['timeout']}
             continue
         if proc.returncode == 0:
-            checks[rel] = 'PASS'
+            checks[name] = 'PASS'
         else:
             tail = [line for line in (proc.stdout + proc.stderr).splitlines() if line.strip()][-5:]
-            checks[rel] = {'status': 'FAIL', 'tail': tail}
-
-    try:
-        build = subprocess.run(['npx', 'vite', 'build'], cwd=root, capture_output=True, text=True, timeout=300)
-    except subprocess.TimeoutExpired:
-        checks['vite build'] = {'status': 'FAIL', 'tail': ['timeout']}
-        return checks
-    if build.returncode == 0:
-        checks['vite build'] = 'PASS'
-    else:
-        tail = [line for line in (build.stdout + build.stderr).splitlines() if line.strip()][-5:]
-        checks['vite build'] = {'status': 'FAIL', 'tail': tail}
+            checks[name] = {'status': 'FAIL', 'tail': tail}
     return checks
 
 
-def collect_warnings(root):
+def collect_warnings(root, files, config):
     warnings = []
-    diff = git(root, 'diff', 'main...HEAD', '--no-color')
+    main = config['mainBranch']
+    diff = git(root, 'diff', f'{main}...HEAD', '--no-color')
     added = [line for line in diff.stdout.splitlines()
              if line.startswith('+') and not line.startswith('+++')]
     console_logs = sum(1 for line in added if re.search(r'console\.log\(', line))
     if console_logs:
         warnings.append(f'console.log 추가 {console_logs}줄')
 
-    changed = git(root, 'diff', '--name-only', 'main...HEAD').stdout.splitlines()
-    for name in changed:
-        if name in ('package.json', 'vercel.json', 'lib/security.js') or name.startswith('.env'):
+    for name in files:
+        if any(fnmatch.fnmatch(name, pattern) for pattern in config['protected']):
             warnings.append(f'{name} 변경')
     return warnings
 
 
-CODE_EXTENSIONS = {'.js', '.jsx', '.mjs', '.ts', '.tsx', '.py'}
 DIFF_EXCLUDED_PREFIXES = ('public/', 'build/')
 
 
-def is_test_script(name):
-    return re.fullmatch(r'scripts/test-[^/]*\.mjs', name) is not None
+def is_test_script(name, config):
+    return any(fnmatch.fnmatch(name, pattern) for pattern in config['testPatterns'])
 
 
-def review_needed(files):
+def review_needed(files, config):
+    extensions = set(config['codeExtensions'])
     return any(
-        Path(name).suffix in CODE_EXTENSIONS and not is_test_script(name)
+        Path(name).suffix in extensions and not is_test_script(name, config)
         for name in files
     )
 
 
-def diff_targets(files):
+def diff_targets(files, config):
+    extensions = set(config['codeExtensions'])
     targets = []
     for name in files:
         if name == 'package-lock.json' or name.endswith('.md'):
             continue
-        if name.startswith(DIFF_EXCLUDED_PREFIXES) or is_test_script(name):
+        if name.startswith(DIFF_EXCLUDED_PREFIXES) or is_test_script(name, config):
             continue
-        if Path(name).suffix in CODE_EXTENSIONS:
+        if Path(name).suffix in extensions:
             targets.append(name)
     return targets
 
 
-def render_review_diff(root, files, max_lines):
-    targets = diff_targets(files)
+def render_review_diff(root, files, max_lines, config):
+    targets = diff_targets(files, config)
+    main = config['mainBranch']
     diffs = {}
     for name in targets:
-        out = git(root, 'diff', '-U3', '--no-color', 'main...HEAD', '--', name)
+        out = git(root, 'diff', '-U3', '--no-color', f'{main}...HEAD', '--', name)
         lines = out.stdout.rstrip('\n').splitlines()
         if lines:
             diffs[name] = lines
@@ -445,10 +526,10 @@ def render_review_diff(root, files, max_lines):
     return '\n'.join(chunks)
 
 
-def merge_branch(root, branch, delivery=None):
-    checkout = git(root, 'checkout', 'main')
+def merge_branch(root, branch, delivery=None, main_branch='main'):
+    checkout = git(root, 'checkout', main_branch)
     if checkout.returncode != 0:
-        return {'merged': False, 'reason': f'checkout main 실패: {checkout.stderr.strip()[:300]}'}
+        return {'merged': False, 'reason': f'checkout {main_branch} 실패: {checkout.stderr.strip()[:300]}'}
     merged = git(root, 'merge', '--ff-only', branch)
     if merged.returncode != 0:
         return {'merged': False, 'reason': f'ff-only merge 실패: {merged.stderr.strip()[:300]}'}
@@ -462,17 +543,19 @@ def merge_branch(root, branch, delivery=None):
 
 def cmd_review(args):
     root = repo_root()
+    config = load_config(root)
+    main = config['mainBranch']
     branch = current_branch(root)
-    has_work_branch = branch not in (None, 'main')
+    has_work_branch = branch not in (None, main)
 
-    log = git(root, 'log', '--oneline', 'main..HEAD').stdout.strip().splitlines() if has_work_branch else []
-    stat = git(root, 'diff', '--stat', 'main...HEAD').stdout.strip().splitlines() if has_work_branch else []
-    files = git(root, 'diff', '--name-only', 'main...HEAD').stdout.strip().splitlines() if has_work_branch else []
+    log = git(root, 'log', '--oneline', f'{main}..HEAD').stdout.strip().splitlines() if has_work_branch else []
+    stat = git(root, 'diff', '--stat', f'{main}...HEAD').stdout.strip().splitlines() if has_work_branch else []
+    files = git(root, 'diff', '--name-only', f'{main}...HEAD').stdout.strip().splitlines() if has_work_branch else []
     uncommitted = [line for line in git(root, 'status', '--porcelain').stdout.splitlines()
                    if not line.startswith('??')]
-    checks = run_checks(root)
-    warnings = collect_warnings(root) if has_work_branch else []
-    code_changed = review_needed(files)
+    checks = run_checks(root, config['checks'])
+    warnings = collect_warnings(root, files, config) if has_work_branch else []
+    code_changed = review_needed(files, config)
 
     result = {
         'branch': branch if has_work_branch else '작업 브랜치 없음',
@@ -481,13 +564,15 @@ def cmd_review(args):
         'diffStat': stat[-1] if stat else None,
         'files': files,
         'uncommitted': uncommitted,
-        'checks': checks,
+        'checks': checks if checks else '검사 없음',
         'warnings': warnings,
     }
 
     if args.auto_merge:
         failed = [name for name, status in checks.items() if status != 'PASS']
         reasons = []
+        if not checks:
+            reasons.append('검사 없음 — auto-merge 거부')
         if code_changed:
             reasons.append('코드 변경 — review --diff 후 merge')
         if not has_work_branch:
@@ -504,7 +589,7 @@ def cmd_review(args):
             print(json.dumps(result, ensure_ascii=False, indent=1))
             sys.exit(2)
 
-        result['autoMerge'] = merge_branch(root, branch, args.delivery)
+        result['autoMerge'] = merge_branch(root, branch, args.delivery, main)
         print(json.dumps(result, ensure_ascii=False, indent=1))
         if not result['autoMerge'].get('merged'):
             sys.exit(2)
@@ -516,16 +601,18 @@ def cmd_review(args):
         if args.max_lines < 1:
             fail('--max-lines 는 1 이상이어야 합니다.')
         print('--- REVIEW DIFF ---')
-        print(render_review_diff(root, files, args.max_lines))
+        print(render_review_diff(root, files, args.max_lines, config))
 
 
 def cmd_merge(args):
     root = repo_root()
+    config = load_config(root)
+    main = config['mainBranch']
     branch = current_branch(root)
-    if branch in (None, 'main'):
+    if branch in (None, main):
         print(json.dumps({'merged': False, 'reason': '작업 브랜치 없음'}, ensure_ascii=False))
         sys.exit(2)
-    merged = merge_branch(root, branch, args.delivery)
+    merged = merge_branch(root, branch, args.delivery, main)
     print(json.dumps(merged, ensure_ascii=False, indent=1))
     if not merged.get('merged'):
         sys.exit(2)

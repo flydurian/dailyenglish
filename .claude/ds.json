@@ -1,0 +1,16 @@
+{
+  "mainBranch": "main",
+  "checks": {
+    "scripts/test-news-language.mjs": "node scripts/test-news-language.mjs",
+    "scripts/test-progress.mjs": "node scripts/test-progress.mjs",
+    "scripts/test-security.mjs": "node scripts/test-security.mjs",
+    "scripts/test-srs.mjs": "node scripts/test-srs.mjs",
+    "scripts/test-wordbook.mjs": "node scripts/test-wordbook.mjs",
+    "vite build": "npx vite build"
+  },
+  "protected": ["package.json", ".env*", "vercel.json", "lib/security.js"],
+  "codeExtensions": [".js", ".jsx", ".mjs", ".ts", ".tsx", ".py"],
+  "testPatterns": ["scripts/test-*.mjs"],
+  "notesFile": "작업노트.md",
+  "workerNotes": ["`npm run build`는 public/hash.json을 바꾸므로 쓰지 않는다"]
+}
