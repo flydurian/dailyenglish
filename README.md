@@ -10,6 +10,9 @@
 - **음성 재생**: TTS를 통한 정확한 발음 학습
 - **한국어 번역**: 실시간 번역 기능으로 이해도 향상
 - **캐시 시스템**: 효율적인 데이터 관리로 빠른 로딩
+- **단어장**: 저장한 표현과 단어를 모아 복습
+- **간격 반복 복습(플래시카드)**: SRS 기반 플래시카드로 효율적인 복습
+- **학습 기록(연속 학습일)**: 연속 학습일과 최근 7일 활동 확인
 - **반응형 디자인**: 모바일과 데스크톱에서 최적화된 경험
 
 ## 🏗️ 최적화된 아키텍처
@@ -23,7 +26,13 @@ src/
 │   ├── WordModal.jsx   # 단어 상세 정보 모달
 │   ├── ExpressionCard.jsx # 표현 카드 컴포넌트
 │   ├── NewsCard.jsx    # 뉴스 카드 컴포넌트
+│   ├── WordbookView.jsx # 저장한 표현 단어장
+│   ├── ReviewView.jsx  # 간격 반복 복습 플래시카드
+│   ├── ProgressStrip.jsx # 연속 학습일·최근 7일 기록
 │   └── ErrorBoundary.jsx # 에러 처리 컴포넌트
+├── contexts/           # 전역 상태 컨텍스트
+│   ├── WordbookContext.jsx # 단어장 상태 및 저장
+│   └── ProgressContext.jsx # 학습 기록 상태 및 저장
 ├── hooks/              # 커스텀 React 훅
 │   ├── useAudio.js     # 오디오 재생 로직
 │   ├── useTranslation.js # 번역 및 요약 로직
@@ -31,7 +40,11 @@ src/
 ├── utils/              # 유틸리티 함수
 │   ├── audioUtils.js   # 오디오 처리 함수
 │   ├── cacheUtils.js   # 캐시 관리 함수
-│   └── apiUtils.js     # API 호출 함수
+│   ├── apiUtils.js     # API 호출 함수
+│   ├── dateUtils.js    # 로컬 날짜 키 유틸
+│   ├── wordbookUtils.js # 단어장 순수 로직
+│   ├── srs.js          # 간격 반복 계산
+│   └── progress.js     # 학습 기록 계산
 └── App.jsx             # 메인 애플리케이션 컴포넌트
 ```
 
@@ -113,7 +126,7 @@ npm run key:set
 - **Frontend**: React 18.2.0
 - **Styling**: Tailwind CSS 3.3.0
 - **API**: Gemini API (Google AI)
-- **Build Tool**: Create React App
+- **Build Tool**: Vite
 - **Package Manager**: npm
 
 ## 📱 주요 컴포넌트
@@ -159,7 +172,7 @@ npm run key:set
 
 ### 테스트
 ```bash
-npm test
+node scripts/test-wordbook.mjs && node scripts/test-srs.mjs && node scripts/test-progress.mjs
 ```
 
 ### 빌드 최적화

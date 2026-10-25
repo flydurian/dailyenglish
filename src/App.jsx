@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import styled from '@emotion/styled';
 import { ArrowUpIcon } from './components/Icons';
 import WordModal from './components/WordModal';
@@ -7,11 +7,13 @@ import ReviewView from './components/ReviewView';
 import ExpressionCard from './components/ExpressionCard';
 import NewsCard from './components/NewsCard';
 import FontSizeControl from './components/FontSizeControl';
+import ProgressStrip from './components/ProgressStrip';
 import { useAudio } from './hooks/useAudio';
 import { useTranslation } from './hooks/useTranslation';
 import { useDataFetching } from './hooks/useDataFetching';
 import { FontSizeProvider } from './contexts/FontSizeContext';
 import { useWordbook } from './contexts/WordbookContext';
+import { useProgress } from './contexts/ProgressContext';
 import { levelDescriptions } from './utils/apiUtils';
 import { detectHotReload } from './utils/versionUtils';
 import { getDueItems } from './utils/srs';
@@ -373,6 +375,8 @@ export default function App() {
   const { items: wordbookItems } = useWordbook();
   const wordbookCount = wordbookItems.length;
   const reviewDueCount = getDueItems(wordbookItems, toLocalDateKey()).length;
+  const { record } = useProgress();
+  const viewedTodayRef = useRef(new Set());
   const [expressions, setExpressions] = useState([]);
   const [news, setNews] = useState([]);
   const [activeCardIndex, setActiveCardIndex] = useState(null);
@@ -510,6 +514,8 @@ export default function App() {
                 </FontControlWrapper>
               </TitleRow>
 
+              <ProgressStrip />
+
               <TabNavigation role="tablist" aria-label="학습 모드">
                 <TabButton
                   isActive={activeTab === 'expressions'}
@@ -628,7 +634,20 @@ export default function App() {
                       index={index}
                       isActive={activeCardIndex === index}
                       onToggle={(index) => {
-                        setActiveCardIndex(activeCardIndex === index ? null : index);
+                        const isOpening = activeCardIndex !== index;
+
+                        if (isOpening) {
+                          const expression = expressions[index];
+                          const dateKey = toLocalDateKey();
+                          const key = `${dateKey}:${expression?.phrasal_verb || index}`;
+
+                          if (!viewedTodayRef.current.has(key)) {
+                            viewedTodayRef.current.add(key);
+                            record('viewed');
+                          }
+                        }
+
+                        setActiveCardIndex(isOpening ? index : null);
                       }}
                       audioStates={audioStates}
                       onPlayAudio={playAudio}

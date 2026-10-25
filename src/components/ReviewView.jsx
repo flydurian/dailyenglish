@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import styled from '@emotion/styled';
 import { Volume2Icon, LoaderIcon } from './Icons';
 import { useWordbook } from '../contexts/WordbookContext';
+import { useProgress } from '../contexts/ProgressContext';
 import { toLocalDateKey } from '../utils/dateUtils';
 import { getDueItems, getNextDueDate, gradeItem } from '../utils/srs';
 
@@ -383,6 +384,7 @@ const EndBadge = styled.div`
 
 const ReviewView = ({ onPlayAudio, audioStates = {} }) => {
   const { items, updateItem } = useWordbook();
+  const { record } = useProgress();
   const [todayKey] = useState(() => toLocalDateKey());
   const [mode, setMode] = useState('review');
   const [sessionIds, setSessionIds] = useState(() => getDueItemIds(items, todayKey));
@@ -407,6 +409,8 @@ const ReviewView = ({ onPlayAudio, audioStates = {} }) => {
   const handleGrade = useCallback((known) => {
     if (!currentItem || !revealed || finished) return;
 
+    record('reviewed');
+
     if (mode === 'review' && currentItem.srs?.lastReviewed !== todayKey) {
       updateItem(currentItem.id, { srs: gradeItem(currentItem, known, todayKey) });
     }
@@ -420,7 +424,7 @@ const ReviewView = ({ onPlayAudio, audioStates = {} }) => {
     } else {
       setIndex((current) => current + 1);
     }
-  }, [currentItem, finished, index, mode, revealed, todayKey, total, updateItem]);
+  }, [currentItem, finished, index, mode, record, revealed, todayKey, total, updateItem]);
 
   const handleReveal = useCallback(() => {
     if (!currentItem || finished) return;

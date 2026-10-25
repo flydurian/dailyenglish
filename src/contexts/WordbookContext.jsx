@@ -5,6 +5,7 @@ import {
   createItem,
   sanitizeWordbookItems,
 } from '../utils/wordbookUtils';
+import { useProgress } from './ProgressContext';
 
 export { makeWordbookId } from '../utils/wordbookUtils';
 
@@ -34,6 +35,7 @@ export const useWordbook = () => {
 
 export const WordbookProvider = ({ children }) => {
   const [items, setItems] = useState(loadItems);
+  const { record } = useProgress();
 
   useEffect(() => {
     try {
@@ -48,12 +50,15 @@ export const WordbookProvider = ({ children }) => {
   const addItem = useCallback(({ type, term, meaning, example }) => {
     if (typeof term !== 'string' || !term.trim()) return;
 
+    const id = makeWordbookId(normalizeType(type), term);
+    if (items.some((item) => item.id === id)) return;
+
     setItems((prev) => {
-      const id = makeWordbookId(normalizeType(type), term);
       if (prev.some((item) => item.id === id)) return prev;
       return [createItem({ type, term, meaning, example }), ...prev];
     });
-  }, []);
+    record('saved');
+  }, [items, record]);
 
   const removeItem = useCallback((id) => {
     setItems((prev) => prev.filter((item) => item.id !== id));
@@ -62,14 +67,18 @@ export const WordbookProvider = ({ children }) => {
   const toggleItem = useCallback(({ type, term, meaning, example }) => {
     if (typeof term !== 'string' || !term.trim()) return;
 
+    const id = makeWordbookId(normalizeType(type), term);
+    const alreadySaved = items.some((item) => item.id === id);
+
     setItems((prev) => {
-      const id = makeWordbookId(normalizeType(type), term);
       if (prev.some((item) => item.id === id)) {
         return prev.filter((item) => item.id !== id);
       }
       return [createItem({ type, term, meaning, example }), ...prev];
     });
-  }, []);
+
+    if (!alreadySaved) record('saved');
+  }, [items, record]);
 
   const updateItem = useCallback((id, patch) => {
     setItems((prev) => prev.map((item) => (
