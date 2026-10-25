@@ -7,8 +7,9 @@
   ds.py go --title "<제목>" (--brief "<브리프>" | --brief-file F) [--terminal <handle>] [--timeout-min 60]
                                          Run 생성(필요 시)·디스패치·대기까지 한 번에
   ds.py wait [--timeout-min 60]          worker_done/question/escalation이 올 때까지 대기 (heartbeat는 자동 확인 처리)
-  ds.py review [--delivery <id>] [--auto-merge]
-                                         브랜치·diff·검사·경고 요약 JSON (auto-merge 가능)
+  ds.py review [--delivery <id>] [--auto-merge | --diff [--max-lines 300]]
+                                         브랜치·diff·검사·경고 JSON
+                                         (코드 변경 시 auto-merge 거부, --diff 는 핵심 diff 출력)
   ds.py merge [--delivery <id>]          검사 없이 ff-only merge·ack·정리
   ds.py ack <delivery_id>                처리한 보고 확인 처리
   ds.py status                           Run 작업 상태·DeepSeek 화면·변경 파일 요약
@@ -324,6 +325,79 @@ def collect_warnings(root):
     return warnings
 
 
+CODE_EXTENSIONS = {'.js', '.jsx', '.mjs', '.ts', '.tsx', '.py'}
+DIFF_EXCLUDED_PREFIXES = ('public/', 'build/')
+
+
+def is_test_script(name):
+    return re.fullmatch(r'scripts/test-[^/]*\.mjs', name) is not None
+
+
+def review_needed(files):
+    return any(
+        Path(name).suffix in CODE_EXTENSIONS and not is_test_script(name)
+        for name in files
+    )
+
+
+def diff_targets(files):
+    targets = []
+    for name in files:
+        if name == 'package-lock.json' or name.endswith('.md'):
+            continue
+        if name.startswith(DIFF_EXCLUDED_PREFIXES) or is_test_script(name):
+            continue
+        if Path(name).suffix in CODE_EXTENSIONS:
+            targets.append(name)
+    return targets
+
+
+def render_review_diff(root, files, max_lines):
+    targets = diff_targets(files)
+    diffs = {}
+    for name in targets:
+        out = git(root, 'diff', '-U3', '--no-color', 'main...HEAD', '--', name)
+        lines = out.stdout.rstrip('\n').splitlines()
+        if lines:
+            diffs[name] = lines
+    if not diffs:
+        return ''
+
+    total = sum(len(lines) for lines in diffs.values())
+    if total <= max_lines:
+        return '\n'.join(line for lines in diffs.values() for line in lines)
+
+    counts = {name: len(lines) for name, lines in diffs.items()}
+    keep = {name: max(1, int(max_lines * count / total)) for name, count in counts.items()}
+    keep = {name: min(keep[name], counts[name]) for name in counts}
+
+    while sum(keep.values()) > max_lines:
+        candidates = [name for name in keep if keep[name] > 1]
+        if not candidates:
+            break
+        name = max(candidates, key=lambda item: keep[item])
+        keep[name] -= 1
+
+    while sum(keep.values()) < max_lines:
+        changed = False
+        for name in counts:
+            if keep[name] < counts[name]:
+                keep[name] += 1
+                changed = True
+                if sum(keep.values()) >= max_lines:
+                    break
+        if not changed:
+            break
+
+    chunks = []
+    for name, lines in diffs.items():
+        chunks.extend(lines[:keep[name]])
+        omitted = len(lines) - keep[name]
+        if omitted > 0:
+            chunks.append(f'... ({omitted}줄 생략)')
+    return '\n'.join(chunks)
+
+
 def merge_branch(root, branch, delivery=None):
     checkout = git(root, 'checkout', 'main')
     if checkout.returncode != 0:
@@ -351,9 +425,11 @@ def cmd_review(args):
                    if not line.startswith('??')]
     checks = run_checks(root)
     warnings = collect_warnings(root) if has_work_branch else []
+    code_changed = review_needed(files)
 
     result = {
         'branch': branch if has_work_branch else '작업 브랜치 없음',
+        'reviewNeeded': code_changed,
         'log': log,
         'diffStat': stat[-1] if stat else None,
         'files': files,
@@ -362,30 +438,38 @@ def cmd_review(args):
         'warnings': warnings,
     }
 
-    if not args.auto_merge:
+    if args.auto_merge:
+        failed = [name for name, status in checks.items() if status != 'PASS']
+        reasons = []
+        if code_changed:
+            reasons.append('코드 변경 — review --diff 후 merge')
+        if not has_work_branch:
+            reasons.append('작업 브랜치 없음')
+        if failed:
+            reasons.append('검사 실패: ' + ', '.join(failed))
+        if uncommitted:
+            reasons.append(f'미커밋 변경 {len(uncommitted)}건')
+        if warnings:
+            reasons.append('경고: ' + '; '.join(warnings))
+
+        if reasons:
+            result['autoMerge'] = {'merged': False, 'reason': ' / '.join(reasons)}
+            print(json.dumps(result, ensure_ascii=False, indent=1))
+            sys.exit(2)
+
+        result['autoMerge'] = merge_branch(root, branch, args.delivery)
         print(json.dumps(result, ensure_ascii=False, indent=1))
+        if not result['autoMerge'].get('merged'):
+            sys.exit(2)
         return
 
-    failed = [name for name, status in checks.items() if status != 'PASS']
-    reasons = []
-    if not has_work_branch:
-        reasons.append('작업 브랜치 없음')
-    if failed:
-        reasons.append('검사 실패: ' + ', '.join(failed))
-    if uncommitted:
-        reasons.append(f'미커밋 변경 {len(uncommitted)}건')
-    if warnings:
-        reasons.append('경고: ' + '; '.join(warnings))
-
-    if reasons:
-        result['autoMerge'] = {'merged': False, 'reason': ' / '.join(reasons)}
-        print(json.dumps(result, ensure_ascii=False, indent=1))
-        sys.exit(2)
-
-    result['autoMerge'] = merge_branch(root, branch, args.delivery)
     print(json.dumps(result, ensure_ascii=False, indent=1))
-    if not result['autoMerge'].get('merged'):
-        sys.exit(2)
+
+    if args.diff:
+        if args.max_lines < 1:
+            fail('--max-lines 는 1 이상이어야 합니다.')
+        print('--- REVIEW DIFF ---')
+        print(render_review_diff(root, files, args.max_lines))
 
 
 def cmd_merge(args):
@@ -434,7 +518,12 @@ def main():
 
     p = sub.add_parser('review')
     p.add_argument('--delivery', help='성공 시 ack 할 delivery id')
-    p.add_argument('--auto-merge', action='store_true', help='검사·경고 통과 시 main에 ff-only merge')
+    mode = p.add_mutually_exclusive_group()
+    mode.add_argument('--auto-merge', action='store_true',
+                      help='검사·경고 통과 시 main에 ff-only merge (코드 변경 시 거부)')
+    mode.add_argument('--diff', action='store_true',
+                      help='JSON 요약 뒤에 코드 파일 unified diff 출력')
+    p.add_argument('--max-lines', type=int, default=300, help='--diff 총 줄 수 제한 (기본 300)')
     p.set_defaults(func=cmd_review)
 
     p = sub.add_parser('merge')
