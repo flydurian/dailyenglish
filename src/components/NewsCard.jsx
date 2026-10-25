@@ -411,7 +411,14 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
 
     // 정리된 텍스트들
     const cleanTitle = newsItem?.title?.replace(/\*\*(.*?)\*\*/g, '$1') || '';
-    const textToRead = newsItem?.summary || newsItem?.full_text?.replace(/\*\*(.*?)\*\*/g, '$1') || '';
+    // 한국 뉴스는 summary 가 없을 때 한글 원문(full_text)으로 대체하지 않습니다.
+    const isKoreanNews = newsItem?.category === 'korean';
+    const textToReadSource = isKoreanNews
+        ? (newsItem?.summary || newsItem?.title || '')
+        : (newsItem?.summary || newsItem?.full_text || '');
+    const textToRead = typeof textToReadSource === 'string'
+        ? textToReadSource.replace(/\*\*(.*?)\*\*/g, '$1')
+        : '';
 
     useEffect(() => {
         if (!selectedPhrasalVerb) return undefined;
@@ -503,7 +510,11 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
 
 
     const findVocabularyExample = useCallback((word) => {
-        const text = (newsItem?.summary || newsItem?.full_text || newsItem?.title || '')
+        // 한국 뉴스는 한글 원문으로 대체하지 않고 영어 summary/title 안에서만 예문을 찾습니다.
+        const source = isKoreanNews
+            ? (newsItem?.summary || newsItem?.title || '')
+            : (newsItem?.summary || newsItem?.full_text || newsItem?.title || '');
+        const text = (typeof source === 'string' ? source : '')
             .replace(/\s+/g, ' ')
             .trim();
         if (!text || !word) return '';
@@ -513,7 +524,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
             sentence.toLowerCase().includes(word.toLowerCase())
         );
         return (matched || sentences[0] || text).trim();
-    }, [newsItem?.summary, newsItem?.full_text, newsItem?.title]);
+    }, [isKoreanNews, newsItem?.summary, newsItem?.full_text, newsItem?.title]);
 
     const handleVocabularyClick = useCallback((event, note) => {
         event.stopPropagation();

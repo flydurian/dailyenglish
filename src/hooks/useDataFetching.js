@@ -7,6 +7,72 @@ import {
     cleanupOldMonthlyData
 } from '../utils/cacheUtils';
 import { getDailyPhrasalVerbs, getRandomPhrasalVerbs } from '../data/phrasalVerbsData';
+import {
+    containsHangul,
+    needsEnglishRewrite,
+    buildNewsRewritePrompt
+} from '../utils/newsLanguage';
+
+const buildFallbackSummary = (isKorean) => `${isKorean ? 'South Korea' : 'International communities'} continue to make significant progress in various fields. Recent developments show promising trends in technology, economy, and social innovation.
+
+Key sectors are experiencing growth and transformation. Innovation and cooperation play crucial roles in addressing current challenges. Stakeholders are working together to create sustainable solutions for the future.
+
+These developments have important implications for society and the global economy. The changes reflect broader trends that will shape our world in the coming years. Understanding these trends helps us prepare for future opportunities and challenges.
+
+The ongoing progress demonstrates the interconnected nature of modern developments. Local achievements can have global impact, and international cooperation remains essential for continued success.`;
+
+const FALLBACK_KEY_POINTS = [
+    "come up with: 생각해내다",
+    "look into: 조사하다",
+    "put up with: 참다",
+    "set up: 설립하다",
+    "take over: 인수하다",
+    "break through: 돌파하다"
+];
+
+const FALLBACK_VOCABULARY_NOTES = [
+    "comprehensive: 포괄적인",
+    "development: 발전",
+    "significant: 중요한",
+    "innovation: 혁신",
+    "sustainable: 지속가능한",
+    "implications: 함의, 영향"
+];
+
+// 한국 뉴스 제목을 영어로 번역합니다. 한글이 남으면 빈 문자열을 돌려줍니다.
+const translateKoreanHeadlineToEnglish = async (headline, targetLevel) => {
+    if (typeof headline !== 'string' || !containsHangul(headline)) return '';
+
+    try {
+        const translatePrompt = `Translate this Korean news headline to English appropriate for ${targetLevel} level English learners. Keep it concise and natural.
+
+Korean headline: ${headline}
+
+Return ONLY the English translation, nothing else. Make it suitable for ${targetLevel} level learners.`;
+
+        const payload = {
+            contents: [{ role: "user", parts: [{ text: translatePrompt }] }],
+            generationConfig: {
+                responseMimeType: "text/plain",
+                maxOutputTokens: 100,
+                temperature: 0.3
+            }
+        };
+
+        const result = await callGeminiAPI(payload, 'gemini-flash-latest');
+        const translatedTitle = result?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+        if (!translatedTitle || containsHangul(translatedTitle)) return '';
+
+        return translatedTitle
+            .split('\n')[0]
+            .replace(/^["']|["']$/g, '')
+            .trim();
+    } catch (translateError) {
+        console.warn('제목 번역 실패, 영어 폴백 사용:', translateError);
+        return '';
+    }
+};
 
 export const useDataFetching = () => {
     const [loading, setLoading] = useState(false);
@@ -179,41 +245,9 @@ export const useDataFetching = () => {
                 fullText = `${article.title}\n\n${fullText}`;
             }
 
-            // 한국 뉴스의 제목이 한글이면 영어로 번역
-            let finalTitle = article.title || 'No title';
-            if (type === 'korean') {
-                // 한글이 포함되어 있는지 확인
-                const hasKorean = /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(finalTitle);
-                if (hasKorean) {
-                    try {
-                        // Gemini API를 사용해서 제목을 선택한 레벨에 맞는 영어로 번역
-                        const translatePrompt = `Translate this Korean news headline to English appropriate for ${targetLevel} level English learners. Keep it concise and natural.
-
-Korean headline: ${finalTitle}
-
-Return ONLY the English translation, nothing else. Make it suitable for ${targetLevel} level learners.`;
-
-                        const payload = {
-                            contents: [{ role: "user", parts: [{ text: translatePrompt }] }],
-                            generationConfig: {
-                                responseMimeType: "text/plain",
-                                maxOutputTokens: 100,
-                                temperature: 0.3
-                            }
-                        };
-
-                        const result = await callGeminiAPI(payload, 'gemini-flash-latest');
-                        const translatedTitle = result?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-                        if (translatedTitle) {
-                            finalTitle = translatedTitle;
-                        }
-                    } catch (translateError) {
-                        console.warn('제목 번역 실패, 원본 제목 사용:', translateError);
-                        // 번역 실패 시 원본 제목 사용
-                    }
-                }
-            }
+            // 제목 번역은 summarizeNewsForLevel 의 한국어 재작성 프롬프트에서 한 번에 처리합니다.
+            // (원문 제목이 필요하므로 fetchRealNews 에서는 원문을 그대로 둡니다.)
+            const finalTitle = article.title || 'No title';
 
             return {
                 title: finalTitle,
@@ -260,196 +294,110 @@ Return ONLY the English translation, nothing else. Make it suitable for ${target
         if (!newsItem || !newsItem.title) {
             console.error('뉴스 데이터가 유효하지 않습니다:', newsItem);
             return {
-                title: "뉴스 제목을 불러올 수 없습니다",
-                summary: "뉴스 요약을 생성할 수 없습니다.",
+                title: "News title unavailable",
+                summary: "News summary unavailable.",
                 key_points: [],
                 vocabulary_notes: []
             };
         }
 
+        const isKorean = newsItem.category === 'korean';
+
         try {
-            // 한국 뉴스의 경우 제목이 한글이면 영어로 번역
-            let articleTitle = newsItem.title;
-            if (newsItem.category === 'korean') {
-                const hasKorean = /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(articleTitle);
-                if (hasKorean) {
-                    try {
-                        const translatePrompt = `Translate this Korean news headline to English appropriate for ${targetLevel} level English learners. Keep it concise and natural.
-
-Korean headline: ${articleTitle}
-
-Return ONLY the English translation, nothing else. Make it suitable for ${targetLevel} level learners.`;
-
-                        const translatePayload = {
-                            contents: [{ role: "user", parts: [{ text: translatePrompt }] }],
-                            generationConfig: {
-                                responseMimeType: "text/plain",
-                                maxOutputTokens: 100,
-                                temperature: 0.3
-                            }
-                        };
-
-                        const translateResult = await callGeminiAPI(translatePayload, 'gemini-flash-latest');
-                        const translatedTitle = translateResult?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-                        if (translatedTitle) {
-                            articleTitle = translatedTitle;
-                        }
-                    } catch (translateError) {
-                        console.warn('제목 번역 실패, 원본 제목 사용:', translateError);
-                    }
-                }
-            }
-
             // 구동사 무작위 추출 (약 6-8개)
             const randomPhrasalVerbs = await getRandomPhrasalVerbs(8);
             const verbsList = randomPhrasalVerbs.map(v => `${v.verb} (${v.meaning})`).join(', ');
 
-            const summaryPrompt = `Rewrite this news article in ${targetLevel} level English for language learners. Write it as an actual news article, not as a summary or explanation.
+            // 한국 뉴스는 한 번의 재작성 호출로 영어 title + summary 를 받습니다.
+            const summaryPrompt = buildNewsRewritePrompt({
+                title: newsItem.title,
+                text: (newsItem.full_text || '').slice(0, 6000),
+                level: targetLevel,
+                verbsList,
+                sourceLanguage: isKorean ? 'ko' : 'en',
+                source: newsItem.source,
+                date: newsItem.date
+            });
 
-ORIGINAL ARTICLE:
-TITLE: ${articleTitle}
-CONTENT: ${(newsItem.full_text || '').slice(0, 6000)}
-SOURCE: ${newsItem.source}
-DATE: ${newsItem.date}
+            const requestSummary = async (prompt) => {
+                const payload = {
+                    contents: [{ role: "user", parts: [{ text: prompt }] }],
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        maxOutputTokens: 2500,
+                        temperature: 0.3
+                    }
+                };
 
-SUGGESTED PHRASAL VERBS:
-The following phrasal verbs are suggested for use in this article: ${verbsList}
+                const result = await callGeminiAPI(payload, 'gemini-flash-latest');
+                const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
 
-REQUIREMENTS:
-- Write a complete news article (4-5 paragraphs, 300-400 words) in ${targetLevel} level English
-- Write it as if you are a journalist reporting the news directly, not describing what the article says
-- Use direct reporting style (e.g., "South Korea announced..." not "The article says that South Korea announced...")
-- Include specific details, statistics, and examples from the original article
-- Make it engaging and educational for English learners
-- Use natural journalistic language appropriate for ${targetLevel} level
-- **Please prioritize using the SUGGESTED PHRASAL VERBS provided above ONLY IF they fit the context naturally and can replace a standard verb with a similar meaning. Do not force their use if they don't make sense.**
-- Extract 6 phrasal verbs from the rewritten article with Korean meanings. Try to include the suggested verbs you successfully prioritized.
-- Extract 4-6 important vocabulary words from the rewritten article with Korean meanings
-
-WRITING STYLE EXAMPLES:
-❌ WRONG: "This article discusses..." or "The report examines..." or "The article presents..."
-✅ CORRECT: "South Korea announced..." or "A new study shows..." or "Scientists discovered..."
-
-Return ONLY this JSON structure:
-{
-  "summary": "Write the complete news article here in ${targetLevel} level English. Write it as an actual news article with direct reporting, not as a summary or explanation of the article.",
-  "key_points": [
-    "phrasal_verb_1: Korean meaning",
-    "phrasal_verb_2: Korean meaning",
-    "phrasal_verb_3: Korean meaning",
-    "phrasal_verb_4: Korean meaning",
-    "phrasal_verb_5: Korean meaning",
-    "phrasal_verb_6: Korean meaning"
-  ],
-  "vocabulary_notes": [
-    "word1: Korean meaning",
-    "word2: Korean meaning",
-    "word3: Korean meaning",
-    "word4: Korean meaning",
-    "word5: Korean meaning",
-    "word6: Korean meaning"
-  ]
-}
-
-IMPORTANT: 
-- Return ONLY the JSON object, no other text
-- Write the summary as an actual news article, not as a description of the article
-- Use direct reporting style throughout
-- Use the suggested phrasal verbs where appropriate and natural`;
-
-            const payload = {
-                contents: [{ role: "user", parts: [{ text: summaryPrompt }] }],
-                generationConfig: {
-                    responseMimeType: "application/json",
-                    maxOutputTokens: 2500,
-                    temperature: 0.3
+                if (!text) {
+                    throw new Error("뉴스 요약 생성에 실패했습니다.");
                 }
+
+                return JSON.parse(text);
             };
 
-            const result = await callGeminiAPI(payload, 'gemini-flash-latest');
-            const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+            let summaryData = await requestSummary(summaryPrompt);
 
-            if (text) {
+            // 한글이 남아 있으면 "영어로만 다시 써라" 지시를 붙여 1회만 재시도합니다.
+            if (isKorean && needsEnglishRewrite({
+                title: summaryData?.title,
+                summary: summaryData?.summary
+            })) {
+                const retryPrompt = `${summaryPrompt}
+
+IMPORTANT: Your previous answer still contained Korean (Hangul) in "title" or "summary". Rewrite both in English only. Do not use a single Hangul character.`;
+
                 try {
-                    const summaryData = JSON.parse(text);
-                    return {
-                        title: articleTitle, // 번역된 제목 사용
-                        summary: summaryData.summary,
-                        key_points: summaryData.key_points,
-                        vocabulary_notes: summaryData.vocabulary_notes
-                    };
-                } catch (parseError) {
-                    console.error('JSON 파싱 실패:', parseError);
-                    console.log('원본 텍스트:', text);
-                    throw new Error("뉴스 요약 JSON 파싱에 실패했습니다.");
+                    summaryData = await requestSummary(retryPrompt);
+                } catch (retryError) {
+                    console.warn('한국 뉴스 영어 재작성 재시도 실패:', retryError);
                 }
-            } else {
-                throw new Error("뉴스 요약 생성에 실패했습니다.");
             }
+
+            const summarized = {
+                title: isKorean
+                    ? (typeof summaryData?.title === 'string' ? summaryData.title.trim() : '')
+                    : newsItem.title,
+                summary: typeof summaryData?.summary === 'string' ? summaryData.summary : '',
+                key_points: Array.isArray(summaryData?.key_points) ? summaryData.key_points : [],
+                vocabulary_notes: Array.isArray(summaryData?.vocabulary_notes) ? summaryData.vocabulary_notes : []
+            };
+
+            // 재시도 후에도 한글이 남으면 영어 폴백으로 확정합니다.
+            if (isKorean && needsEnglishRewrite(summarized)) {
+                const translatedTitle = await translateKoreanHeadlineToEnglish(newsItem.title, targetLevel);
+                return {
+                    title: translatedTitle || 'Today in Korea',
+                    summary: buildFallbackSummary(true),
+                    key_points: summarized.key_points.length > 0 ? summarized.key_points : FALLBACK_KEY_POINTS,
+                    vocabulary_notes: summarized.vocabulary_notes.length > 0 ? summarized.vocabulary_notes : FALLBACK_VOCABULARY_NOTES
+                };
+            }
+
+            return summarized;
 
         } catch (error) {
             console.error('뉴스 요약 생성 실패:', error);
-            // 폴백 요약 반환
-            // 한국 뉴스의 경우 제목이 한글이면 영어로 번역 시도
-            let fallbackTitle = newsItem.title;
-            if (newsItem.category === 'korean') {
-                const hasKorean = /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(fallbackTitle);
-                if (hasKorean) {
-                    // 간단한 번역 시도 (실패해도 원본 사용)
-                    try {
-                        const translatePrompt = `Translate this Korean news headline to English appropriate for ${targetLevel} level English learners. Keep it concise and natural.
 
-Korean headline: ${fallbackTitle}
-
-Return ONLY the English translation, nothing else.`;
-
-                        const translatePayload = {
-                            contents: [{ role: "user", parts: [{ text: translatePrompt }] }],
-                            generationConfig: {
-                                responseMimeType: "text/plain",
-                                maxOutputTokens: 100,
-                                temperature: 0.3
-                            }
-                        };
-
-                        const translateResult = await callGeminiAPI(translatePayload, 'gemini-flash-latest');
-                        const translatedTitle = translateResult?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-                        if (translatedTitle) {
-                            fallbackTitle = translatedTitle;
-                        }
-                    } catch (translateError) {
-                        console.warn('폴백 제목 번역 실패:', translateError);
-                    }
-                }
+            if (!isKorean) {
+                return {
+                    title: newsItem.title,
+                    summary: buildFallbackSummary(false),
+                    key_points: FALLBACK_KEY_POINTS,
+                    vocabulary_notes: FALLBACK_VOCABULARY_NOTES
+                };
             }
 
+            // summary 호출이 실패해도 한국 뉴스의 최종 title 은 반드시 영어여야 합니다.
+            const translatedTitle = await translateKoreanHeadlineToEnglish(newsItem.title, targetLevel);
             return {
-                title: fallbackTitle,
-                summary: `${newsItem.category === 'korean' ? 'South Korea' : 'International communities'} continue to make significant progress in various fields. Recent developments show promising trends in technology, economy, and social innovation.
-
-Key sectors are experiencing growth and transformation. Innovation and cooperation play crucial roles in addressing current challenges. Stakeholders are working together to create sustainable solutions for the future.
-
-These developments have important implications for society and the global economy. The changes reflect broader trends that will shape our world in the coming years. Understanding these trends helps us prepare for future opportunities and challenges.
-
-The ongoing progress demonstrates the interconnected nature of modern developments. Local achievements can have global impact, and international cooperation remains essential for continued success.`,
-                key_points: [
-                    "come up with: 생각해내다",
-                    "look into: 조사하다",
-                    "put up with: 참다",
-                    "set up: 설립하다",
-                    "take over: 인수하다",
-                    "break through: 돌파하다"
-                ],
-                vocabulary_notes: [
-                    "comprehensive: 포괄적인",
-                    "development: 발전",
-                    "significant: 중요한",
-                    "innovation: 혁신",
-                    "sustainable: 지속가능한",
-                    "implications: 함의, 영향"
-                ]
+                title: translatedTitle || (containsHangul(newsItem.title) ? 'Today in Korea' : newsItem.title),
+                summary: buildFallbackSummary(true),
+                key_points: FALLBACK_KEY_POINTS,
+                vocabulary_notes: FALLBACK_VOCABULARY_NOTES
             };
         }
     }, []);
@@ -636,13 +584,19 @@ IMPORTANT:
             const dateKey = dateObj.toISOString().split('T')[0];
 
             // 오늘 날짜의 캐시 확인
+            // 예전 캐시에 한글이 남아 있는 한국 뉴스가 있으면 캐시 미스로 보고 새로 가져옵니다.
             const cached = getCachedData('news', dateObj);
-            if (cached && cached.data && cached.data[selectedLevel]) {
+            const cachedNews = cached?.data?.[selectedLevel];
+            const cachedNeedsRefresh = Array.isArray(cachedNews) && cachedNews.some(
+                (item) => item?.category === 'korean' && needsEnglishRewrite(item)
+            );
+
+            if (cachedNews && !cachedNeedsRefresh) {
                 console.log('캐시된 뉴스 데이터 사용:', dateKey);
                 // 캐시된 데이터를 사용할 때도 에러 상태 초기화
                 setError(null);
                 setLoading(false);
-                return cached.data[selectedLevel];
+                return cachedNews;
             }
 
             console.log('새로운 뉴스 데이터 생성 중...');
