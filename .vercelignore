@@ -3,3 +3,5 @@
 .env.*
 build
 .DS_Store
+.claude
+.orca-tasks

@@ -1,0 +1,278 @@
+#!/usr/bin/env python3
+"""DeepSeek(dsh-tui) 워커 위임 헬퍼. Orca 터미널 안에서만 사용한다.
+
+  ds.py run --objective "<목표>"          새 Orca Run 생성·바인딩
+  ds.py worker                           새 dsh-tui 탭 생성 (사용자가 탭을 한 번 열어야 함)
+  ds.py dispatch --title "<제목>" --spec <명세 파일> [--deps '["task_x"]'] [--terminal <handle>]
+  ds.py wait [--timeout-min 60]          worker_done/question/escalation이 올 때까지 대기 (heartbeat는 자동 확인 처리)
+  ds.py ack <delivery_id>                처리한 보고 확인 처리
+  ds.py status                           Run 작업 상태·DeepSeek 화면·변경 파일 요약
+
+출력은 코디네이터 컨텍스트를 아끼기 위해 필요한 값만 짧게 낸다.
+"""
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+WAKE_TYPES = 'worker_done,escalation,question'
+WORKER_NOTES = """
+
+## 총괄 공통 지시 (ds.py가 자동으로 붙임 — preamble보다 우선)
+- heartbeat: 작업이 15분을 넘길 때만 15분마다 한 번 보낸다. preamble의 5분 주기 대신 이 지시를 따른다 (총괄은 heartbeat마다 깨어나 비용이 든다).
+- ask는 정말 막혔을 때만 쓴다. 사소한 선택은 명세의 의도에 맞게 스스로 정하고 worker_done 요약에 적는다.
+- git commit / checkout / push 금지. 명세의 Ownership 밖 파일은 수정하지 않는다. 새 npm 의존성 금지.
+- 끝내기 전에 명세의 Observable acceptance 명령을 모두 실행하고, 결과를 worker_done 요약에 넣는다.
+- worker_done은 실제 값으로 정확히 한 번 보낸다.
+"""
+
+
+def fail(message):
+    print(f'ds.py: {message}', file=sys.stderr)
+    sys.exit(1)
+
+
+def repo_root():
+    out = subprocess.run(['git', 'rev-parse', '--show-toplevel'], capture_output=True, text=True)
+    if out.returncode != 0:
+        fail('git 저장소 안에서 실행해야 합니다.')
+    return Path(out.stdout.strip())
+
+
+def orca(*args, timeout=None):
+    proc = subprocess.run(['orca', *args, '--json'], capture_output=True, text=True, timeout=timeout)
+    # check --wait는 keepalive 줄을 먼저 내보내므로 마지막 JSON 문서만 파싱한다
+    lines = [line for line in proc.stdout.splitlines() if not line.startswith('{"_keepalive"')]
+    text = '\n'.join(lines).strip()
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        fail(f"orca {' '.join(args[:2])} 실패: {(proc.stderr or proc.stdout).strip()[:400]}")
+    if not data.get('ok', False):
+        err = data.get('error') or {}
+        steps = (err.get('data') or {}).get('nextSteps') or []
+        fail(f"orca {' '.join(args[:2])} 거부: {err.get('code')} {err.get('message', '')[:300]} {steps}")
+    return data.get('result') or {}
+
+
+def screen(handle, last=12):
+    result = orca('terminal', 'read', '--terminal', handle)
+    return (result.get('terminal') or {}).get('tail', [])[-last:]
+
+
+def find_dsh_terminal(root):
+    # DeepSeek 세션이 여러 개면 컨텍스트가 가장 작은 것을 쓴다
+    candidates = []
+    for term in orca('terminal', 'list').get('terminals', []):
+        if term.get('agentIdentity') == 'dsh' and term.get('connected') and term.get('worktreePath') == str(root):
+            match = re.search(r'ctx (\d+(?:\.\d+)?)%', term.get('preview') or '')
+            candidates.append((float(match.group(1)) if match else 0.0, term['handle']))
+    if not candidates:
+        return None, None
+    ctx, handle = min(candidates)
+    return handle, ctx
+
+
+def compact_screen(handle, last=60):
+    # 백그라운드 탭은 Orca 화면 모델의 폭이 좁아 문구가 줄마다 잘리므로 공백·줄바꿈을 지우고 비교한다
+    return re.sub(r'\s+', '', ''.join(screen(handle, last)))
+
+
+def press_esc(handle):
+    orca('terminal', 'send', '--terminal', handle, '--text', '\x1b')
+
+
+def send_instruction(handle, text):
+    """지시를 보내고 DeepSeek가 실제로 작업을 시작했는지 확인한다. 첫 실행 안내가 지시를 삼켰을 때만 한 번 다시 보낸다."""
+    orca('terminal', 'send', '--terminal', handle, '--enter', '--text', text)
+    resent = False
+    for _ in range(20):
+        time.sleep(2)
+        current = compact_screen(handle)
+        if 'esctointerrupt' in current or 'Thinking' in current:
+            return True
+        if 'skiptheguide' in current and not resent:
+            press_esc(handle)
+            time.sleep(2)
+            orca('terminal', 'send', '--terminal', handle, '--enter', '--text', text)
+            resent = True
+    return False
+
+
+def ensure_orca():
+    if os.environ.get('TERM_PROGRAM') != 'Orca':
+        fail('Orca 앱 밖에서는 orca 명령을 쓰지 않습니다 (작업 규칙). Orca 터미널에서 실행하세요.')
+
+
+def cmd_run(args):
+    run = orca('orchestration', 'run-create', '--objective', args.objective)['run']
+    print(json.dumps({'run': run['id']}, ensure_ascii=False))
+
+
+def cmd_worker(_args):
+    # 탭이 화면에 한 번도 열리지 않은 터미널은 Orca 화면 모델이 몇 칸 폭이라 dsh-tui 상태를 읽거나 확인할 수 없다.
+    # 그래서 새 세션은 만들기만 하고, 사용자가 탭을 열어 첫 실행 안내를 닫은 뒤 dispatch한다.
+    handle = orca('terminal', 'create', '--worktree', 'current', '--title', 'deepseek-worker',
+                  '--command', 'dsh-tui')['terminal']['handle']
+    print(json.dumps({'terminal': handle}, ensure_ascii=False))
+    print("사용자에게 요청: Orca에서 'deepseek-worker' 탭을 한 번 열고, 첫 실행 안내가 보이면 Esc를 눌러 주세요. "
+          f'그 다음 dispatch --terminal {handle}')
+
+
+def cmd_dispatch(args):
+    root = repo_root()
+    spec = Path(args.spec).read_text(encoding='utf-8')
+    if not orca('orchestration', 'run-current').get('run'):
+        fail('바인딩된 Run이 없습니다. 먼저 `ds.py run --objective ...`를 실행하세요.')
+
+    if args.terminal:
+        handle, ctx = args.terminal, None
+    else:
+        handle, ctx = find_dsh_terminal(root)
+    if not handle:
+        fail('DeepSeek 탭이 없습니다. `ds.py worker`로 만들고, 사용자가 탭을 연 뒤 다시 dispatch하세요.')
+
+    create = ['orchestration', 'task-create', '--spec', spec, '--task-title', args.title,
+              '--display-name', f'deepseek · {args.title}']
+    if args.deps:
+        create += ['--deps', args.deps]
+    task_id = orca(*create)['task']['id']
+
+    result = orca('orchestration', 'dispatch', '--task', task_id, '--to', handle, '--return-preamble')
+    preamble = result.get('preamble') or ''
+    if not preamble:
+        fail(f'dispatch가 preamble을 돌려주지 않았습니다 (task {task_id}).')
+
+    task_dir = root / '.orca-tasks'
+    task_dir.mkdir(exist_ok=True)
+    exclude = root / '.git' / 'info' / 'exclude'
+    if '.orca-tasks/' not in exclude.read_text(encoding='utf-8').splitlines():
+        with exclude.open('a', encoding='utf-8') as fh:
+            fh.write('.orca-tasks/\n')
+    prompt_path = task_dir / f'{task_id}.md'
+    prompt_path.write_text(preamble + WORKER_NOTES, encoding='utf-8')
+
+    # 여러 줄 프롬프트를 TUI에 직접 넣으면 중간에 제출될 수 있어 한 줄 지시만 보낸다
+    rel = prompt_path.relative_to(root)
+    started = send_instruction(
+        handle,
+        f'Orca에서 디스패치된 새 작업입니다. 이전 task/dispatch ID는 쓰지 말고, {rel} 파일 전체를 끝까지 읽은 뒤 '
+        '그 안의 명세·총괄 공통 지시·보고 명령(ask, worker_done)을 정확히 따르세요. '
+        '끝나면 worker_done을 실제 값으로 한 번만 실행하세요.')
+
+    print(json.dumps({'task': task_id, 'dispatch': (result.get('dispatch') or {}).get('id'),
+                      'terminal': handle, 'deepseekCtxPercent': ctx, 'prompt': str(rel),
+                      'started': started}, ensure_ascii=False))
+    if not started:
+        print(f'참고: 화면으로 작업 시작을 확인하지 못했습니다 (백그라운드 탭이면 정상일 수 있음). '
+              f'ds.py wait로 보고를 기다리고, 오래 조용하면 Orca에서 terminal {handle} 탭을 열어 확인하세요.')
+    if ctx and ctx >= 50:
+        print('참고: DeepSeek 세션 컨텍스트가 50% 이상입니다. 다음에는 ds.py worker로 새 세션을 여는 것을 고려하세요.')
+
+
+def summarize(message):
+    try:
+        payload = json.loads(message.get('payload') or '{}')
+    except json.JSONDecodeError:
+        payload = {}
+    return {k: v for k, v in {
+        'id': message.get('id'),
+        'type': message.get('type'),
+        'subject': message.get('subject'),
+        'body': message.get('body'),
+        'task': payload.get('taskId'),
+        'dispatch': payload.get('dispatchId'),
+        'outcome': payload.get('outcome'),
+        'files': payload.get('filesModified'),
+    }.items() if v}
+
+
+def cmd_wait(args):
+    deadline = time.time() + args.timeout_min * 60
+    acked_heartbeats = 0
+    while True:
+        remaining_ms = int((deadline - time.time()) * 1000)
+        if remaining_ms <= 0:
+            root = repo_root()
+            handle, ctx = find_dsh_terminal(root)
+            print(json.dumps({'timedOut': True, 'heartbeatsAcked': acked_heartbeats,
+                              'deepseekScreen': screen(handle, 8) if handle else None}, ensure_ascii=False, indent=1))
+            sys.exit(3)
+        result = orca('orchestration', 'check', '--wait', '--types', WAKE_TYPES,
+                      '--timeout-ms', str(min(remaining_ms, 600000)))
+        messages = result.get('messages') or []
+        if result.get('timedOut') or not messages:
+            continue
+        actionable = [m for m in messages if m.get('type') != 'heartbeat']
+        if not actionable:
+            orca('orchestration', 'check', '--ack', result['deliveryId'])
+            acked_heartbeats += len(messages)
+            continue
+        print(json.dumps({'delivery': result['deliveryId'], 'heartbeatsAcked': acked_heartbeats,
+                          'messages': [summarize(m) for m in actionable]}, ensure_ascii=False, indent=1))
+        print(f"처리 후: ds.py ack {result['deliveryId']}")
+        return
+
+
+def cmd_ack(args):
+    result = orca('orchestration', 'check', '--ack', args.delivery)
+    print(json.dumps({'acked': result.get('acknowledged')}, ensure_ascii=False))
+
+
+def cmd_status(_args):
+    root = repo_root()
+    run = orca('orchestration', 'run-current').get('run') or {}
+    tasks = orca('orchestration', 'task-list', '--brief').get('tasks', [])
+    handle, ctx = find_dsh_terminal(root)
+    diff = subprocess.run(['git', 'diff', '--stat'], capture_output=True, text=True, cwd=root).stdout.strip()
+    untracked = subprocess.run(['git', 'ls-files', '--others', '--exclude-standard'],
+                               capture_output=True, text=True, cwd=root).stdout.split()
+    print(json.dumps({
+        'run': run.get('id'),
+        'tasks': [f"{t['id']} {t.get('status')} {t.get('task_title')}" for t in tasks if t.get('status') != 'failed'],
+        'deepseek': {'terminal': handle, 'ctxPercent': ctx, 'screen': screen(handle, 6) if handle else None},
+        'diffStat': diff.splitlines()[-1] if diff else None,
+        'untracked': untracked,
+    }, ensure_ascii=False, indent=1))
+
+
+def main():
+    ensure_orca()
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = parser.add_subparsers(dest='command', required=True)
+
+    p = sub.add_parser('run')
+    p.add_argument('--objective', required=True)
+    p.set_defaults(func=cmd_run)
+
+    p = sub.add_parser('worker')
+    p.set_defaults(func=cmd_worker)
+
+    p = sub.add_parser('dispatch')
+    p.add_argument('--title', required=True)
+    p.add_argument('--spec', required=True, help='Target/Change/Constraints/Ownership/Observable acceptance 명세 파일')
+    p.add_argument('--deps', help='JSON 배열, 예: \'["task_abc"]\'')
+    p.add_argument('--terminal', help='보낼 DeepSeek 터미널 handle (생략하면 컨텍스트가 가장 작은 탭)')
+    p.set_defaults(func=cmd_dispatch)
+
+    p = sub.add_parser('wait')
+    p.add_argument('--timeout-min', type=int, default=60)
+    p.set_defaults(func=cmd_wait)
+
+    p = sub.add_parser('ack')
+    p.add_argument('delivery')
+    p.set_defaults(func=cmd_ack)
+
+    p = sub.add_parser('status')
+    p.set_defaults(func=cmd_status)
+
+    args = parser.parse_args()
+    args.func(args)
+
+
+if __name__ == '__main__':
+    main()
