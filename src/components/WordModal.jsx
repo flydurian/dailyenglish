@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from '@emotion/styled';
-import { Volume2Icon, TranslateIcon, LoaderIcon, CloseIcon } from './Icons';
+import { Volume2Icon, TranslateIcon, LoaderIcon, CloseIcon, BookmarkIcon } from './Icons';
+import { useWordbook, makeWordbookId } from '../contexts/WordbookContext';
 
 const Overlay = styled.div`
   position: fixed;
@@ -68,6 +69,13 @@ const Header = styled.div`
   border-bottom: 1px solid var(--line);
 `;
 
+const HeaderActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+`;
+
 const Title = styled.h3`
   margin: 0;
   color: var(--ink);
@@ -95,6 +103,45 @@ const CloseButton = styled.button`
   &:hover {
     border-color: var(--ink);
     color: var(--ink);
+  }
+`;
+
+const SaveButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: 150ms ease;
+  touch-action: manipulation;
+
+  svg { width: 14px; height: 14px; }
+
+  &:hover,
+  &.on {
+    border-color: var(--coral);
+    color: var(--coral);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  @media (max-width: 360px) {
+    width: 36px;
+    padding: 0;
+
+    span { display: none; }
   }
 `;
 
@@ -304,6 +351,7 @@ const EmptyText = styled.p`
 `;
 
 const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPlayAudio, audioStates = {}, onGenerateExamples, onTranslate }) => {
+    const { isSaved, toggleItem } = useWordbook();
     const [examples, setExamples] = useState([]);
     const [isGeneratingExamples, setIsGeneratingExamples] = useState(false);
     const [exampleTranslation, setExampleTranslation] = useState('');
@@ -349,6 +397,21 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
     }, [isOpen]);
 
     if (!isOpen) return null;
+
+    const wordbookType = word && word.trim().includes(' ') ? 'phrasal' : 'word';
+    const saved = word ? isSaved(makeWordbookId(wordbookType, word)) : false;
+
+    const handleSaveClick = (e) => {
+        e.stopPropagation();
+        if (!word || !word.trim()) return;
+
+        toggleItem({
+            type: wordbookType,
+            term: word,
+            meaning: meaning || '',
+            example: example || '',
+        });
+    };
 
     const handleBackdropClick = (e) => {
         if (e.target === e.currentTarget) {
@@ -434,9 +497,21 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
             <Sheet role="dialog" aria-modal="true" aria-label="단어 상세 정보">
                 <Header>
                     <Title>단어 상세 정보</Title>
-                    <CloseButton onClick={onClose} aria-label="닫기">
-                        <CloseIcon />
-                    </CloseButton>
+                    <HeaderActions>
+                        <SaveButton
+                            type="button"
+                            className={saved ? 'on' : ''}
+                            onClick={handleSaveClick}
+                            aria-pressed={saved}
+                            aria-label={saved ? '저장됨' : '저장'}
+                        >
+                            <BookmarkIcon filled={saved} />
+                            <span>{saved ? '저장됨' : '저장'}</span>
+                        </SaveButton>
+                        <CloseButton onClick={onClose} aria-label="닫기">
+                            <CloseIcon />
+                        </CloseButton>
+                    </HeaderActions>
                 </Header>
 
                 <WordRow>

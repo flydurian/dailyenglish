@@ -88,3 +88,14 @@ export const ChevronDownIcon = () => (
         <path d="m6 9 6 6 6-6" />
     </svg>
 );
+
+export const BookmarkIcon = ({ filled = false }) => (
+    <svg
+        {...iconProps}
+        strokeWidth="1.6"
+        fill={filled ? 'currentColor' : 'none'}
+        className="h-5 w-5 sm:h-6 sm:w-6"
+    >
+        <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z" />
+    </svg>
+);

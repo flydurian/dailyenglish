@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import styled from '@emotion/styled';
-import { Volume2Icon, TranslateIcon, LoaderIcon, ChevronDownIcon } from './Icons';
+import { Volume2Icon, TranslateIcon, LoaderIcon, ChevronDownIcon, BookmarkIcon } from './Icons';
 import { markPhrasalVerbUsage } from '../data/phrasalVerbsData';
 import { useFontSize } from '../contexts/FontSizeContext';
+import { useWordbook, makeWordbookId } from '../contexts/WordbookContext';
 import { phrasalVerbDetails } from '../data/phrasalVerbDetails';
 import { css } from '@emotion/react';
 
@@ -415,6 +416,7 @@ const renderSentence = (sentence) => {
 
 const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, onPlayAudio, onWordClick, onTranslate, level, translations, handleTranslationClick }) => {
   const { fontSize } = useFontSize();
+  const { isSaved, toggleItem } = useWordbook();
   const [showTranslation, setShowTranslation] = useState(false);
   const [translation, setTranslation] = useState('');
   const [isTranslating, setIsTranslating] = useState(false);
@@ -552,6 +554,17 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
   const details = getPhrasalVerbDetails();
   const phrasalVerbName = expression.phrasal_verb.split(':')[0].trim();
   const phrasalVerbMeaning = expression.meaning || expression.phrasal_verb.split(':').slice(1).join(':').trim();
+  const saved = isSaved(makeWordbookId('phrasal', phrasalVerbName));
+
+  const handleSaveClick = useCallback((e) => {
+    e.stopPropagation();
+    toggleItem({
+      type: 'phrasal',
+      term: phrasalVerbName,
+      meaning: phrasalVerbMeaning,
+      example: expression.sentence.replace(/\*\*(.*?)\*\*/g, '$1'),
+    });
+  }, [toggleItem, phrasalVerbName, phrasalVerbMeaning, expression.sentence]);
 
   return (
     <CardContainer style={{ '--i': index }}>
@@ -614,6 +627,16 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
                   <TranslateIcon />
                 )}
                 <span>번역</span>
+              </ActionButton>
+
+              <ActionButton
+                onClick={handleSaveClick}
+                className={saved ? 'on' : ''}
+                aria-pressed={saved}
+                aria-label={saved ? '저장됨' : '저장'}
+              >
+                <BookmarkIcon filled={saved} />
+                <span>{saved ? '저장됨' : '저장'}</span>
               </ActionButton>
 
               <ActionButton
