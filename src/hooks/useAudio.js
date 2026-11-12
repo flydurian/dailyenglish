@@ -1,10 +1,27 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { callGeminiAPI } from '../utils/apiUtils';
-import { base64ToArrayBuffer, pcmToWav } from '../utils/audioUtils';
+import { requestTtsAudio } from '../utils/apiUtils';
+import { pcmToWav } from '../utils/audioUtils';
 import { getCachedAudio, setCachedAudio, clearAudioCache } from '../utils/audioCache';
 
 // 텍스트 생성(3.5 Flash Lite)과 달리 TTS는 오디오 품질을 위해 별도 모델을 사용합니다.
 const TTS_MODEL = 'gemini-3.8-flash-tts';
+
+// 서버(api/gemini.js)의 MAX_TTS_TEXT_CHARS 와 일치시킵니다.
+const TTS_MAX_CHARS = 1600;
+
+// 너무 긴 텍스트는 문장 경계에서 잘라 400 오류 대신 대부분을 읽어주도록 합니다.
+const trimForTts = (text) => {
+    const clean = typeof text === 'string' ? text.replace(/\*\*(.*?)\*\*/g, '$1').trim() : '';
+    if (clean.length <= TTS_MAX_CHARS) return clean;
+
+    const sliced = clean.slice(0, TTS_MAX_CHARS);
+    const lastStop = Math.max(
+        sliced.lastIndexOf('. '),
+        sliced.lastIndexOf('! '),
+        sliced.lastIndexOf('? ')
+    );
+    return lastStop > TTS_MAX_CHARS * 0.5 ? sliced.slice(0, lastStop + 1) : sliced;
+};
 
 export const useAudio = () => {
     const [audioStates, setAudioStates] = useState({});
@@ -60,31 +77,22 @@ export const useAudio = () => {
             let blob = await getCachedAudio(sentence);
 
             if (!blob) {
-                const payload = {
-                    contents: [{ parts: [{ text: sentence }] }],
-                    generationConfig: { responseModalities: ['AUDIO'] },
-                    model: TTS_MODEL
-                };
+                const ttsText = trimForTts(sentence);
 
-                // TTS는 중복 과금/요청을 막기 위해 클라이언트 자동 재시도를 하지 않습니다.
-            const result = await callGeminiAPI(payload, TTS_MODEL, 1);
-                const part = result?.candidates?.[0]?.content?.parts?.[0];
-                const audioData = part?.inlineData?.data;
-                const mimeType = part?.inlineData?.mimeType;
-
-                if (!audioData || !mimeType?.startsWith('audio/')) {
-                    throw new Error('유효한 오디오 데이터를 받지 못했습니다.');
+                if (!ttsText) {
+                    throw new Error('읽을 텍스트가 없습니다.');
                 }
 
-                const audioBytes = base64ToArrayBuffer(audioData);
+                // TTS는 중복 과금/요청을 막기 위해 클라이언트 자동 재시도를 하지 않습니다.
+                const audioBlob = await requestTtsAudio(ttsText, TTS_MODEL);
 
-                if (/audio\/(wav|wave|x-wav)/i.test(mimeType)) {
+                if (/audio\/(wav|wave|x-wav)/i.test(audioBlob.type)) {
                     // 3.8 TTS는 완성된 WAV를 반환합니다.
-                    blob = new Blob([audioBytes], { type: 'audio/wav' });
+                    blob = new Blob([audioBlob], { type: 'audio/wav' });
                 } else {
                     // 이전 모델은 raw PCM(L16)을 반환하므로 WAV로 감쌉니다.
-                    const sampleRate = parseInt(mimeType.match(/rate=(\d+)/)?.[1] || '24000', 10);
-                    const pcm16 = new Int16Array(audioBytes);
+                    const sampleRate = parseInt(audioBlob.type.match(/rate=(\d+)/)?.[1] || '24000', 10);
+                    const pcm16 = new Int16Array(await audioBlob.arrayBuffer());
 
                     if (pcm16.length === 0) {
                         throw new Error('유효하지 않은 PCM 데이터');

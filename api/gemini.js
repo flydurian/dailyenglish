@@ -44,7 +44,10 @@ const ALLOWED_MODELS = new Set([
 const GEMINI_TIMEOUT_MS = 60_000;
 const MAX_REQUEST_BYTES = 80_000;
 const MAX_TEXT_CHARS = 20_000;
-const MAX_TTS_TEXT_CHARS = 1_200;
+// 뉴스 요약이 실측 1,300~1,600자라 1,200자 상한에서는 기사 읽기 TTS가 항상 400으로
+// 거부됐습니다. 실측: 1,532자 → 84초 분량 WAV 4.0MB (24kHz 16bit mono).
+// 서버리스 응답 한도(4.5MB)를 고려해 1,600자(약 4.2MB)까지 허용합니다.
+const MAX_TTS_TEXT_CHARS = 1_600;
 const TEXT_REQUESTS_PER_MINUTE = 20;
 const TTS_REQUESTS_PER_MINUTE = 3;
 
@@ -311,11 +314,24 @@ export default async function handler(req, res) {
             return res.status(502).json({ error: 'Gemini API request failed' });
         }
 
-        if (cacheKey) writeTextCache(cacheKey, result.data);
         res.setHeader('Cache-Control', 'no-store');
         res.setHeader('X-Gemini-Cache', cacheKey ? 'MISS' : 'BYPASS');
         res.setHeader('X-Gemini-Model', actualModel);
         if (fallbackUsed) res.setHeader('X-Gemini-Fallback', '1');
+
+        // TTS는 후보 JSON 대신 오디오를 바이너리로 내려줍니다. base64 JSON 대비
+        // 응답 크기가 약 25% 작아 서버리스 응답 한도(4.5MB)를 덜 압박합니다.
+        if (TTS_MODELS.has(model)) {
+            const part = result.data?.candidates?.[0]?.content?.parts?.[0];
+            const audioBase64 = part?.inlineData?.data;
+            if (!audioBase64) {
+                return res.status(502).json({ error: 'Gemini API request failed' });
+            }
+            res.setHeader('Content-Type', part?.inlineData?.mimeType || 'audio/wav');
+            return res.status(200).end(Buffer.from(audioBase64, 'base64'));
+        }
+
+        if (cacheKey) writeTextCache(cacheKey, result.data);
         res.status(200).json(result.data);
     } catch (error) {
         console.error('Gemini API Server Error:', error);

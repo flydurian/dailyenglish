@@ -53,6 +53,39 @@ export const callGeminiAPI = async (payload, model, maxRetries = 3) => {
     }
 };
 
+// TTS는 서버(api/gemini.js)가 오디오를 JSON이 아닌 바이너리(Content-Type: audio/*)로
+// 내려주므로 텍스트 생성과 다른 방식으로 받습니다.
+export const requestTtsAudio = async (sentence, model) => {
+    const response = await fetch(GEMINI_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            payload: {
+                contents: [{ parts: [{ text: sentence }] }],
+                generationConfig: { responseModalities: ['AUDIO'] }
+            },
+            model
+        })
+    });
+
+    if (!response.ok) {
+        if (response.status === 429) {
+            throw new Error('이용자가 많아 잠시 후 다시 시도해주세요. (API 할당량 초과)');
+        }
+
+        const errorText = await response.text().catch(() => '');
+        console.error('[tts] 오류 응답:', response.status, errorText);
+        throw new Error(`TTS 요청 실패: ${response.status}`);
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.startsWith('audio/')) {
+        throw new Error('유효한 오디오 데이터를 받지 못했습니다.');
+    }
+
+    return response.blob();
+};
+
 export const levelDescriptions = {
     A1: "Beginner",
     A2: "Elementary",
