@@ -1,11 +1,13 @@
 {
   "name": "daily-english-expressions",
   "version": "1.0.0",
-  "description": "\ub9e4\uc77c 3\uac1c\uc758 \uc601\uc5b4 \uad6c\ub3d9\uc0ac\ub97c \ud559\uc2b5\ud558\ub294 React \uc571",
+  "description": "매일 3개의 영어 구동사를 학습하는 React 앱",
   "private": true,
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
+    "libopus-wasm": "^0.4.1",
+    "mediabunny": "^1.65.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

@@ -53,9 +53,21 @@ export const callGeminiAPI = async (payload, model, maxRetries = 3) => {
     }
 };
 
+// 서버가 기본으로 내려주는 Opus/WebM을 재생할 수 있는지 확인합니다.
+// WebM/Opus는 Chrome·Firefox는 물론 iOS Safari 17.4+에서도 재생됩니다.
+// 미지원 브라우저(iOS 17.3 이하 등)는 서버에 format:'wav'를 요청합니다.
+export const supportsOpusWebm = (() => {
+    if (typeof Audio === 'undefined') return false;
+    try {
+        return !!document.createElement('audio').canPlayType('audio/webm; codecs="opus"');
+    } catch {
+        return false;
+    }
+})();
+
 // TTS는 서버(api/gemini.js)가 오디오를 JSON이 아닌 바이너리(Content-Type: audio/*)로
 // 내려주므로 텍스트 생성과 다른 방식으로 받습니다.
-export const requestTtsAudio = async (sentence, model) => {
+export const requestTtsAudio = async (sentence, model, format = 'webm') => {
     const response = await fetch(GEMINI_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -64,7 +76,8 @@ export const requestTtsAudio = async (sentence, model) => {
                 contents: [{ parts: [{ text: sentence }] }],
                 generationConfig: { responseModalities: ['AUDIO'] }
             },
-            model
+            model,
+            format
         })
     });
 

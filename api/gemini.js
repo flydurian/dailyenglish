@@ -8,6 +8,7 @@ import {
     checkRateLimit,
     setApiSecurityHeaders,
 } from '../lib/security.js';
+import { transcodeWavToOpusWebm } from '../lib/audioTranscode.js';
 // API 키는 서버 환경변수(GEMINI_API_KEY)에만 존재하며 클라이언트로 전달되지 않습니다.
 
 // 텍스트 생성에 사용할 기본 모델 (2026-10 기준 Gemini 3.5 Flash Lite)
@@ -45,8 +46,8 @@ const GEMINI_TIMEOUT_MS = 60_000;
 const MAX_REQUEST_BYTES = 80_000;
 const MAX_TEXT_CHARS = 20_000;
 // 뉴스 요약이 실측 1,300~1,600자라 1,200자 상한에서는 기사 읽기 TTS가 항상 400으로
-// 거부됐습니다. 실측: 1,532자 → 84초 분량 WAV 4.0MB (24kHz 16bit mono).
-// 서버리스 응답 한도(4.5MB)를 고려해 1,600자(약 4.2MB)까지 허용합니다.
+// 거부됐습니다. Opus 트랜스코딩(84초 → 약 700KB) 덕분에 응답 크기는 더 이상 병목이
+// 아니고, 실제 제약은 생성 시간(15~22초)이라 상한은 안전 마진을 두고 1,600자로 유지합니다.
 const MAX_TTS_TEXT_CHARS = 1_600;
 const TEXT_REQUESTS_PER_MINUTE = 20;
 const TTS_REQUESTS_PER_MINUTE = 3;
@@ -241,7 +242,7 @@ export default async function handler(req, res) {
         return res.status(413).json({ error: 'Payload too large' });
     }
 
-    const { payload, model: requestedModel } = req.body || {};
+    const { payload, model: requestedModel, format: requestedTtsFormat } = req.body || {};
 
     if (!payload || typeof payload !== 'object' || !requestedModel) {
         return res.status(400).json({ error: 'Missing payload or model' });
@@ -254,6 +255,17 @@ export default async function handler(req, res) {
     const model = MODEL_ALIASES[requestedModel] || requestedModel;
     if (!ALLOWED_MODELS.has(model)) {
         return res.status(400).json({ error: 'Unsupported model' });
+    }
+
+    // TTS 출력 포맷 옵션: 'webm'(기본, Opus/WebM) | 'wav'(WebM 미지원 브라우저 폴백).
+    // 포맷이 없는 구형 클라이언트 번호도 기본값 webm으로 트랜스코딩합니다.
+    // 텍스트 모델 요청에서는 이 값을 무시합니다.
+    let ttsOutputFormat = TTS_MODELS.has(model) ? 'webm' : undefined;
+    if (requestedTtsFormat !== undefined) {
+        if (requestedTtsFormat !== 'webm' && requestedTtsFormat !== 'wav') {
+            return res.status(400).json({ error: 'Invalid request payload' });
+        }
+        if (TTS_MODELS.has(model)) ttsOutputFormat = requestedTtsFormat;
     }
 
     const sanitizedPayload = sanitizeGeminiPayload(payload, model);
@@ -319,16 +331,31 @@ export default async function handler(req, res) {
         res.setHeader('X-Gemini-Model', actualModel);
         if (fallbackUsed) res.setHeader('X-Gemini-Fallback', '1');
 
-        // TTS는 후보 JSON 대신 오디오를 바이너리로 내려줍니다. base64 JSON 대비
-        // 응답 크기가 약 25% 작아 서버리스 응답 한도(4.5MB)를 덜 압박합니다.
+        // TTS는 후보 JSON 대신 오디오를 바이너리로 내려줍니다. WAV(24kHz s16 mono)를
+        // 그대로 내려주면 84초 기준 4.0MB라 서버리스 응답 한도(4.5MB)에 근접하므로,
+        // 기본값은 서버에서 Opus/WebM으로 트랜스코딩해 약 700KB(약 5.7배 작게)로 내립니다.
+        // 트랜스코딩 실패 시 원본 오디오를 그대로 내려 폴백합니다.
         if (TTS_MODELS.has(model)) {
             const part = result.data?.candidates?.[0]?.content?.parts?.[0];
             const audioBase64 = part?.inlineData?.data;
             if (!audioBase64) {
                 return res.status(502).json({ error: 'Gemini API request failed' });
             }
+            const audioBytes = Buffer.from(audioBase64, 'base64');
+
+            if (ttsOutputFormat !== 'webm') {
+                res.setHeader('Content-Type', part?.inlineData?.mimeType || 'audio/wav');
+                return res.status(200).end(audioBytes);
+            }
+
+            const transcoded = await transcodeWavToOpusWebm(audioBytes);
+            if (transcoded) {
+                res.setHeader('Content-Type', 'audio/webm; codecs="opus"');
+                return res.status(200).end(Buffer.from(transcoded.webm));
+            }
+
             res.setHeader('Content-Type', part?.inlineData?.mimeType || 'audio/wav');
-            return res.status(200).end(Buffer.from(audioBase64, 'base64'));
+            return res.status(200).end(audioBytes);
         }
 
         if (cacheKey) writeTextCache(cacheKey, result.data);

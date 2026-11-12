@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { requestTtsAudio } from '../utils/apiUtils';
+import { requestTtsAudio, supportsOpusWebm } from '../utils/apiUtils';
 import { pcmToWav } from '../utils/audioUtils';
 import { getCachedAudio, setCachedAudio, clearAudioCache } from '../utils/audioCache';
 
@@ -84,11 +84,13 @@ export const useAudio = () => {
                 }
 
                 // TTS는 중복 과금/요청을 막기 위해 클라이언트 자동 재시도를 하지 않습니다.
-                const audioBlob = await requestTtsAudio(ttsText, TTS_MODEL);
+                // 서버가 트랜스코딩한 작은 Opus/WebM을 기본으로 받고, 미지원 브라우저는
+                // WAV로 요청합니다. 서버 트랜스코딩 실패 시에도 WAV로 내려오므로 둘 다 재생 가능.
+                const audioBlob = await requestTtsAudio(ttsText, TTS_MODEL, supportsOpusWebm ? 'webm' : 'wav');
 
-                if (/audio\/(wav|wave|x-wav)/i.test(audioBlob.type)) {
-                    // 3.8 TTS는 완성된 WAV를 반환합니다.
-                    blob = new Blob([audioBlob], { type: 'audio/wav' });
+                if (/audio\/(wav|wave|x-wav|webm)/i.test(audioBlob.type)) {
+                    // 서버가 완성된 WebM(Opus) 또는 WAV를 반환합니다.
+                    blob = audioBlob;
                 } else {
                     // 이전 모델은 raw PCM(L16)을 반환하므로 WAV로 감쌉니다.
                     const sampleRate = parseInt(audioBlob.type.match(/rate=(\d+)/)?.[1] || '24000', 10);
