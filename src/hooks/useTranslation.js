@@ -86,7 +86,7 @@ export const useTranslation = () => {
                     }
                 };
 
-                const result = await callGeminiAPI(payload, 'gemini-flash-latest');
+                const result = await callGeminiAPI(payload, 'tier:fast');
 
                 if (result?.candidates?.[0]?.content?.parts?.[0]?.text) {
                     const translation = result.candidates[0].content.parts[0].text.trim();
@@ -160,7 +160,7 @@ export const useTranslation = () => {
                 }
             };
 
-            const result = await callGeminiAPI(payload, 'gemini-flash-latest');
+            const result = await callGeminiAPI(payload, 'tier:fast');
 
             if (!result?.candidates || result.candidates.length === 0) {
                 throw new Error("API 응답에 candidates가 없습니다.");
@@ -250,7 +250,7 @@ export const useTranslation = () => {
                 }
             };
 
-            const result = await callGeminiAPI(payload, 'gemini-flash-latest');
+            const result = await callGeminiAPI(payload, 'tier:fast');
 
             if (!result?.candidates || result.candidates.length === 0) {
                 throw new Error("API 응답에 candidates가 없습니다.");
@@ -317,7 +317,7 @@ Return ONLY the 2 sentences, each on a separate line, nothing else:`;
                 }
             };
 
-            const result = await callGeminiAPI(payload, 'gemini-flash-latest');
+            const result = await callGeminiAPI(payload, 'tier:generate');
 
             if (!result?.candidates || result.candidates.length === 0) {
                 throw new Error("API 응답에 candidates가 없습니다.");
@@ -416,7 +416,7 @@ Use Markdown for formatting (bolding, bullet points).
                 }
             };
 
-            const result = await callGeminiAPI(payload, 'gemini-flash-latest');
+            const result = await callGeminiAPI(payload, 'tier:generate');
 
             if (!result?.candidates || result.candidates.length === 0) {
                 throw new Error("API 응답에 candidates가 없습니다.");

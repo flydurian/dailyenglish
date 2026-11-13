@@ -3,7 +3,8 @@
 // localStorage에 캐시해 같은 구동사는 두 번 요청하지 않습니다.
 import { callGeminiAPI } from './apiUtils';
 
-const DETAIL_MODEL = 'gemini-3.5-flash-lite';
+// 예문·설명 생성 체인(좋은 모델 먼저, lib/modelChains.js)을 씁니다.
+const DETAIL_MODEL = 'tier:generate';
 const CACHE_KEY = 'dailyenglish.verbDetails.v1';
 const CACHE_MAX_ENTRIES = 200;
 

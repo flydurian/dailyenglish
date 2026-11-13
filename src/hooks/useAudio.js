@@ -3,8 +3,8 @@ import { requestTtsAudio, supportsOpusWebm } from '../utils/apiUtils';
 import { pcmToWav } from '../utils/audioUtils';
 import { getCachedAudio, setCachedAudio, clearAudioCache } from '../utils/audioCache';
 
-// 텍스트 생성(3.5 Flash Lite)과 달리 TTS는 오디오 품질을 위해 별도 모델을 사용합니다.
-const TTS_MODEL = 'gemini-3.8-flash-tts';
+// TTS 전용 모델 체인(3.8 Flash TTS → 예비 TTS 모델들, lib/modelChains.js)을 씁니다.
+const TTS_MODEL = 'tier:tts';
 
 // 서버(api/gemini.js)의 MAX_TTS_TEXT_CHARS 와 일치시킵니다.
 const TTS_MAX_CHARS = 1600;

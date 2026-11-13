@@ -59,7 +59,7 @@ Return ONLY the English translation, nothing else. Make it suitable for ${target
             }
         };
 
-        const result = await callGeminiAPI(payload, 'gemini-flash-latest');
+        const result = await callGeminiAPI(payload, 'tier:fast');
         const translatedTitle = result?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 
         if (!translatedTitle || containsHangul(translatedTitle)) return '';
@@ -329,7 +329,7 @@ export const useDataFetching = () => {
                     }
                 };
 
-                const result = await callGeminiAPI(payload, 'gemini-flash-latest');
+                const result = await callGeminiAPI(payload, 'tier:fast');
                 const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
 
                 if (!text) {
@@ -479,7 +479,7 @@ IMPORTANT:
                 }
             };
 
-            const result = await callGeminiAPI(payload, 'gemini-flash-latest');
+            const result = await callGeminiAPI(payload, 'tier:generate');
             const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
 
             if (text) {
