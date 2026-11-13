@@ -391,7 +391,7 @@ Structure your response like this:
 2. **🧐 문장별 집중 분석 (Sentence Analysis)**
    - Select 3-4 key sentences from the article that represent important grammar or useful expressions.
    - For each sentence:
-     - **Original Sentence**: Display the full sentence.
+     - **Original Sentence**: Display the full English sentence on a single line, exactly in this form: > **Original Sentence:** "<the sentence>"
      - **Structure & Grammar**: Explain the sentence structure (e.g., Subject + Verb + Object) and any important grammar points (e.g., relative clauses, participial phrases) in a simple, easy-to-understand way.
      - **Interpretation**: Explain how to translate it naturally, perhaps guiding them on how to read it in chunks (끊어 읽기).
      - **Key Vocabulary**: Point out 1-2 key words in this sentence and explain their nuance in this specific context.

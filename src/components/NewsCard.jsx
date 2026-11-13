@@ -904,6 +904,8 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                 onClose={() => setShowExplanation(false)}
                 explanation={explanation}
                 isLoading={isExplaining}
+                audioStates={audioStates}
+                onPlayAudio={onPlayAudio}
             />
         </CardContainer>
     );

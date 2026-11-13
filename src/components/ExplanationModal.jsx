@@ -1,7 +1,30 @@
 import React, { useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import styled from '@emotion/styled';
-import { CloseIcon, BookOpenIcon, LoaderIcon } from './Icons';
+import { CloseIcon, BookOpenIcon, LoaderIcon, Volume2Icon } from './Icons';
+
+// "> * **Original Sentence:** "The new game ..."" 처럼 AI가 형식을 조금씩 바꿔 써도
+// 라벨과 영어 문장을 분리합니다. 문장이 다음 줄에 오면 remainder가 빈 문자열입니다.
+const ORIGINAL_SENTENCE_RE = /^[\s>*\-]*\**\s*Original Sentence\s*(?:\([^)]*\))?\s*\**\s*:?\s*\**\s*(.*)$/i;
+
+// 따옴표로 감싼 부분만 꺼냅니다. 뒤에 붙은 마침표나 (한국어 해석)은 버립니다.
+const cleanSentence = (text) => {
+  const stripped = text.replace(/^[\s>*\-]+/, '').replace(/\*\*/g, '').trim();
+  const quoted = stripped.match(/^["“](.+)["”]/);
+  return (quoted ? quoted[1] : stripped).trim();
+};
+
+// 문장이 빠진 채 다음 라벨(**Structure & Grammar**: 등)이 오면 문장으로 오인하지 않습니다.
+const isLabelLine = (line) => /\*\*[^*]+\*\*\s*:|^[\s>*\-]*\**[A-Za-z &]+\([^)]*\)\s*\**\s*:/.test(line);
+
+// 라벨 없이 > "영어 문장" 인용만 쓰는 응답도 있습니다. 한글이 섞인 인용은 문장으로 보지 않습니다.
+const QUOTED_BLOCK_RE = /^\s*>\s*\**\s*["“]/;
+const HANGUL_RE = /[ㄱ-ㆎ가-힣]/;
+const quotedEnglishSentence = (line) => {
+  if (!QUOTED_BLOCK_RE.test(line)) return '';
+  const sentence = cleanSentence(line);
+  return /[A-Za-z]/.test(sentence) && !HANGUL_RE.test(sentence) ? sentence : '';
+};
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -193,7 +216,57 @@ const MarkdownContent = styled.div`
   }
 `;
 
-const ExplanationModal = ({ isOpen, onClose, explanation, isLoading }) => {
+const SentenceQuote = styled.blockquote`
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+`;
+
+const SentenceText = styled.div`
+  flex: 1;
+  min-width: 0;
+`;
+
+const SentenceLabel = styled.span`
+  display: block;
+  color: var(--coral);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+`;
+
+const SentenceBody = styled.span`
+  color: var(--ink);
+  font-size: 14px;
+`;
+
+const SpeakButton = styled.button`
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--card-paper);
+  color: var(--coral);
+  cursor: pointer;
+  transition: 150ms ease;
+
+  svg { width: 17px; height: 17px; }
+
+  &:hover:not(:disabled) {
+    border-color: var(--coral);
+  }
+
+  &:disabled {
+    cursor: wait;
+    opacity: 0.7;
+  }
+`;
+
+const ExplanationModal = ({ isOpen, onClose, explanation, isLoading, audioStates = {}, onPlayAudio }) => {
   const modalRef = useRef(null);
 
   useEffect(() => {
@@ -220,10 +293,58 @@ const ExplanationModal = ({ isOpen, onClose, explanation, isLoading }) => {
 
   // Convert simple markdown to JSX (basic implementation)
   // For production, use a library like react-markdown
+  const handleSpeak = (e, sentence) => {
+    // 모달은 포털이지만 React 이벤트는 NewsCard(카드 토글)까지 버블링되므로 막습니다.
+    e.stopPropagation();
+    if (!onPlayAudio) return;
+    Promise.resolve(onPlayAudio(sentence)).catch(() => { /* useAudio가 이미 로그를 남깁니다 */ });
+  };
+
+  const renderSentence = (sentence, key) => {
+    const isAudioLoading = audioStates[sentence] === 'loading';
+    return (
+      <SentenceQuote key={key}>
+        <SentenceText>
+          <SentenceLabel>Original Sentence</SentenceLabel>
+          <SentenceBody>"{sentence}"</SentenceBody>
+        </SentenceText>
+        {onPlayAudio && (
+          <SpeakButton
+            type="button"
+            onClick={(e) => handleSpeak(e, sentence)}
+            disabled={isAudioLoading}
+            aria-label="문장 음성 재생"
+            title="문장 듣기"
+          >
+            {isAudioLoading ? <LoaderIcon size="h-4 w-4" /> : <Volume2Icon />}
+          </SpeakButton>
+        )}
+      </SentenceQuote>
+    );
+  };
+
   const renderMarkdown = (text) => {
     if (!text) return null;
 
+    let awaitingSentence = false;
+
     return text.split('\n').map((line, index) => {
+      // Original Sentence: 영어 문장 + 스피커 버튼
+      const sentenceMatch = line.match(ORIGINAL_SENTENCE_RE);
+      if (sentenceMatch) {
+        const sentence = cleanSentence(sentenceMatch[1]);
+        if (sentence) return renderSentence(sentence, index);
+        awaitingSentence = true; // 문장이 다음 줄에 오는 형식
+        return null;
+      }
+      if (awaitingSentence && line.trim()) {
+        awaitingSentence = false;
+        const sentence = isLabelLine(line) ? '' : cleanSentence(line);
+        if (sentence) return renderSentence(sentence, index);
+      }
+      const quotedSentence = quotedEnglishSentence(line);
+      if (quotedSentence) return renderSentence(quotedSentence, index);
+
       // Headers
       const headingMatch = line.match(/^#{1,6}\s+(.*)$/);
       if (headingMatch) return <h3 key={index}>{headingMatch[1]}</h3>;
