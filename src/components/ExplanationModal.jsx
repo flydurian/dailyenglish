@@ -2,29 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import styled from '@emotion/styled';
 import { CloseIcon, BookOpenIcon, LoaderIcon, Volume2Icon } from './Icons';
-
-// "> * **Original Sentence:** "The new game ..."" 처럼 AI가 형식을 조금씩 바꿔 써도
-// 라벨과 영어 문장을 분리합니다. 문장이 다음 줄에 오면 remainder가 빈 문자열입니다.
-const ORIGINAL_SENTENCE_RE = /^[\s>*\-]*\**\s*Original Sentence\s*(?:\([^)]*\))?\s*\**\s*:?\s*\**\s*(.*)$/i;
-
-// 따옴표로 감싼 부분만 꺼냅니다. 뒤에 붙은 마침표나 (한국어 해석)은 버립니다.
-const cleanSentence = (text) => {
-  const stripped = text.replace(/^[\s>*\-]+/, '').replace(/\*\*/g, '').trim();
-  const quoted = stripped.match(/^["“](.+)["”]/);
-  return (quoted ? quoted[1] : stripped).trim();
-};
-
-// 문장이 빠진 채 다음 라벨(**Structure & Grammar**: 등)이 오면 문장으로 오인하지 않습니다.
-const isLabelLine = (line) => /\*\*[^*]+\*\*\s*:|^[\s>*\-]*\**[A-Za-z &]+\([^)]*\)\s*\**\s*:/.test(line);
-
-// 라벨 없이 > "영어 문장" 인용만 쓰는 응답도 있습니다. 한글이 섞인 인용은 문장으로 보지 않습니다.
-const QUOTED_BLOCK_RE = /^\s*>\s*\**\s*["“]/;
-const HANGUL_RE = /[ㄱ-ㆎ가-힣]/;
-const quotedEnglishSentence = (line) => {
-  if (!QUOTED_BLOCK_RE.test(line)) return '';
-  const sentence = cleanSentence(line);
-  return /[A-Za-z]/.test(sentence) && !HANGUL_RE.test(sentence) ? sentence : '';
-};
+import { parseLectureMarkdown } from '../utils/lectureMarkdown';
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -291,8 +269,6 @@ const ExplanationModal = ({ isOpen, onClose, explanation, isLoading, audioStates
     }
   };
 
-  // Convert simple markdown to JSX (basic implementation)
-  // For production, use a library like react-markdown
   const handleSpeak = (e, sentence) => {
     // 모달은 포털이지만 React 이벤트는 NewsCard(카드 토글)까지 버블링되므로 막습니다.
     e.stopPropagation();
@@ -323,60 +299,33 @@ const ExplanationModal = ({ isOpen, onClose, explanation, isLoading, audioStates
     );
   };
 
-  const renderMarkdown = (text) => {
-    if (!text) return null;
+  const renderInline = (segments) => segments.map((segment, i) =>
+    segment.bold ? <strong key={i}>{segment.text}</strong> : <React.Fragment key={i}>{segment.text}</React.Fragment>
+  );
 
-    let awaitingSentence = false;
-
-    return text.split('\n').map((line, index) => {
-      // Original Sentence: 영어 문장 + 스피커 버튼
-      const sentenceMatch = line.match(ORIGINAL_SENTENCE_RE);
-      if (sentenceMatch) {
-        const sentence = cleanSentence(sentenceMatch[1]);
-        if (sentence) return renderSentence(sentence, index);
-        awaitingSentence = true; // 문장이 다음 줄에 오는 형식
-        return null;
-      }
-      if (awaitingSentence && line.trim()) {
-        awaitingSentence = false;
-        const sentence = isLabelLine(line) ? '' : cleanSentence(line);
-        if (sentence) return renderSentence(sentence, index);
-      }
-      const quotedSentence = quotedEnglishSentence(line);
-      if (quotedSentence) return renderSentence(quotedSentence, index);
-
-      // Headers
-      const headingMatch = line.match(/^#{1,6}\s+(.*)$/);
-      if (headingMatch) return <h3 key={index}>{headingMatch[1]}</h3>;
-      if (/^-{3,}$/.test(line.trim())) return <hr key={index} style={{ border: 0, borderTop: '1px solid var(--line)', margin: '18px 0' }} />;
-      if (line.startsWith('**') && line.endsWith('**')) return <h3 key={index}>{line.replace(/\*\*/g, '')}</h3>;
-
-      // Bullets
-      if (line.trim().startsWith('- ')) {
+  const renderMarkdown = (text) => parseLectureMarkdown(text).map((block, index) => {
+    switch (block.type) {
+      case 'sentence':
+        return renderSentence(block.sentence, index);
+      case 'heading':
+        return <h3 key={index}>{block.text}</h3>;
+      case 'hr':
+        return <hr key={index} style={{ border: 0, borderTop: '1px solid var(--line)', margin: '18px 0' }} />;
+      case 'quote':
+        return <blockquote key={index}>{renderInline(block.inline)}</blockquote>;
+      case 'bullet':
         return (
-          <li key={index} style={{ listStyle: 'none', position: 'relative', paddingLeft: '16px' }}>
-            <span style={{ position: 'absolute', left: 0, color: 'var(--coral)' }}>•</span>
-            {line.replace('- ', '').split(/(\*\*.*?\*\*)/).map((part, i) =>
-              part.startsWith('**') && part.endsWith('**')
-                ? <strong key={i}>{part.slice(2, -2)}</strong>
-                : part
-            )}
+          <li key={index} style={{ listStyle: 'none', position: 'relative', paddingLeft: '16px', marginLeft: block.depth ? '16px' : 0 }}>
+            <span style={{ position: 'absolute', left: 0, color: 'var(--coral)' }}>{block.depth ? '◦' : '•'}</span>
+            {renderInline(block.inline)}
           </li>
         );
-      }
-
-      // Normal text with bold support
-      return (
-        <p key={index}>
-          {line.split(/(\*\*.*?\*\*)/).map((part, i) =>
-            part.startsWith('**') && part.endsWith('**')
-              ? <strong key={i}>{part.slice(2, -2)}</strong>
-              : part
-          )}
-        </p>
-      );
-    });
-  };
+      case 'blank':
+        return <p key={index} />;
+      default:
+        return <p key={index}>{renderInline(block.inline)}</p>;
+    }
+  });
 
   if (!isOpen) return null;
 

@@ -1,6 +1,7 @@
 {
   "mainBranch": "main",
   "checks": {
+    "scripts/test-lecture-markdown.mjs": "node scripts/test-lecture-markdown.mjs",
     "scripts/test-news-language.mjs": "node scripts/test-news-language.mjs",
     "scripts/test-progress.mjs": "node scripts/test-progress.mjs",
     "scripts/test-security.mjs": "node scripts/test-security.mjs",
