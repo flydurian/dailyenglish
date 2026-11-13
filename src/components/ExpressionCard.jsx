@@ -126,6 +126,13 @@ const CardFooter = styled.div`
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
+
+  /* 휴대폰에서는 버튼 4개가 줄 대부분을 차지해 뜻이 잘렸습니다.
+     구동사·뜻을 한 줄 전체로 올리고 버튼은 다음 줄에 둡니다. */
+  @media (max-width: 480px) {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
 `;
 
 const PhrasalVerbHeader = styled.div`
@@ -135,8 +142,11 @@ const PhrasalVerbHeader = styled.div`
   gap: 7px;
   min-width: 0;
   margin: 0;
-  overflow: hidden;
   text-align: left;
+
+  @media (max-width: 480px) {
+    flex-basis: 100%;
+  }
 `;
 
 const PhrasalVerbTitle = styled.button`
@@ -159,6 +169,7 @@ const PhrasalVerbTitle = styled.button`
   }
 `;
 
+// 뜻은 자르지 않고 줄바꿈합니다 (한국어는 어절 단위로).
 const PhrasalVerbMeaning = styled.span`
   flex: 1 1 auto;
   min-width: 0;
@@ -166,9 +177,8 @@ const PhrasalVerbMeaning = styled.span`
   color: var(--muted);
   font-size: 10px;
   line-height: 1.4;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 `;
 
 const ActionButtons = styled.div`
@@ -179,6 +189,7 @@ const ActionButtons = styled.div`
 
   @media (max-width: 480px) {
     gap: 10px;
+    margin-left: auto;
   }
 `;
 
