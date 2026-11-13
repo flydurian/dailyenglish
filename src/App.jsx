@@ -8,6 +8,7 @@ import ExpressionCard from './components/ExpressionCard';
 import NewsCard from './components/NewsCard';
 import FontSizeControl from './components/FontSizeControl';
 import ProgressStrip from './components/ProgressStrip';
+import AudioNotice from './components/AudioNotice';
 import { useAudio } from './hooks/useAudio';
 import { useTranslation } from './hooks/useTranslation';
 import { useDataFetching } from './hooks/useDataFetching';
@@ -389,7 +390,7 @@ export default function App() {
   const [showScrollToTop, setShowScrollToTop] = useState(false);
 
   // 커스텀 훅 사용
-  const { audioStates, playAudio } = useAudio();
+  const { audioStates, playAudio, audioNotice, dismissAudioNotice } = useAudio();
   const { translateText, summarizeText, generateExamples, explainArticle, translations } = useTranslation();
   const { loading, error, fetchExpressions, fetchNews, initializeData } = useDataFetching();
 
@@ -700,6 +701,7 @@ export default function App() {
             <p>Seoul · 2026</p>
           </Footer>
         </MainContainer>
+        <AudioNotice notice={audioNotice} onDismiss={dismissAudioNotice} />
       </AppContainer>
     </FontSizeProvider>
   );

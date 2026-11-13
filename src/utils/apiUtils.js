@@ -85,12 +85,17 @@ export const requestTtsAudio = async (sentence, model, format = 'webm') => {
 
     if (!response.ok) {
         if (response.status === 429) {
-            throw new Error('이용자가 많아 잠시 후 다시 시도해주세요. (API 할당량 초과)');
+            const error = new Error('이용자가 많아 잠시 후 다시 시도해주세요. (API 할당량 초과)');
+            error.code = 'RATE_LIMIT';
+            error.retryAfterSec = Number(response.headers.get('Retry-After')) || null;
+            throw error;
         }
 
         const errorText = await response.text().catch(() => '');
         console.error('[tts] 오류 응답:', response.status, errorText);
-        throw new Error(`TTS 요청 실패: ${response.status}`);
+        const error = new Error(`TTS 요청 실패: ${response.status}`);
+        error.status = response.status;
+        throw error;
     }
 
     const contentType = response.headers.get('content-type') || '';

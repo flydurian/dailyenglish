@@ -23,13 +23,43 @@ const trimForTts = (text) => {
     return lastStop > TTS_MAX_CHARS * 0.5 ? sliced.slice(0, lastStop + 1) : sliced;
 };
 
+// 실패 이유를 사용자에게 보여줄 짧은 문구로 바꿉니다. 빠른 실패(한도 초과 등)는 스피너가
+// 0.3초만 깜빡이고 사라져 "되고 있는 건가?" 싶었으므로 꼭 알려줍니다.
+export const describeAudioError = (error) => {
+    if (error?.code === 'RATE_LIMIT') {
+        const sec = error.retryAfterSec;
+        const wait = sec && sec <= 120 ? `약 ${sec}초 뒤` : '잠시 후';
+        return `음성 생성 한도에 걸렸어요. ${wait} 다시 눌러 주세요.`;
+    }
+    // iOS Safari는 음성을 만드는 동안 시간이 지나면 자동 재생을 막습니다. 오디오는 준비돼 있어 다시 누르면 바로 재생됩니다.
+    if (error?.name === 'NotAllowedError') {
+        return '음성이 준비됐어요. 스피커를 한 번 더 눌러 주세요.';
+    }
+    return '음성을 만들지 못했어요. 잠시 후 다시 시도해 주세요.';
+};
+
+const NOTICE_MS = 4500;
+
 export const useAudio = () => {
     const [audioStates, setAudioStates] = useState({});
+    const [audioNotice, setAudioNotice] = useState(null);
+    const noticeTimer = useRef(null);
     const audioElements = useRef(new Map());
     const objectUrls = useRef(new Map());
 
     const updateState = useCallback((text, state) => {
         setAudioStates((prev) => (prev[text] === state ? prev : { ...prev, [text]: state }));
+    }, []);
+
+    const dismissAudioNotice = useCallback(() => {
+        clearTimeout(noticeTimer.current);
+        setAudioNotice(null);
+    }, []);
+
+    const showAudioNotice = useCallback((message) => {
+        clearTimeout(noticeTimer.current);
+        setAudioNotice({ id: Date.now(), message });
+        noticeTimer.current = setTimeout(() => setAudioNotice(null), NOTICE_MS);
     }, []);
 
     const playBlob = useCallback(async (text, blob) => {
@@ -53,9 +83,10 @@ export const useAudio = () => {
         await audio.play();
     }, [updateState]);
 
+    // 성공하면 true, 실패하면 알림을 띄우고 false를 돌려줍니다 (예외를 던지지 않음).
     const playAudio = useCallback(async (sentence) => {
-        if (!sentence) return;
-        if (audioStates[sentence] === 'loading') return;
+        if (!sentence) return false;
+        if (audioStates[sentence] === 'loading') return false;
 
         const existing = audioElements.current.get(sentence);
         if (existing) {
@@ -63,7 +94,7 @@ export const useAudio = () => {
                 existing.currentTime = 0;
                 updateState(sentence, 'playing');
                 await existing.play();
-                return;
+                return true;
             } catch (error) {
                 audioElements.current.delete(sentence);
                 updateState(sentence, 'idle');
@@ -111,12 +142,14 @@ export const useAudio = () => {
             }
 
             await playBlob(sentence, blob);
+            return true;
         } catch (error) {
             console.error('음성을 재생하는 데 실패했습니다:', error);
             updateState(sentence, 'idle');
-            throw error;
+            showAudioNotice(describeAudioError(error));
+            return false;
         }
-    }, [audioStates, playBlob, updateState]);
+    }, [audioStates, playBlob, updateState, showAudioNotice]);
 
     const clearAllAudioCache = useCallback(async () => {
         objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
@@ -132,15 +165,19 @@ export const useAudio = () => {
         try { indexedDB.deleteDatabase('dailyenglish-audio'); } catch (error) { /* ignore */ }
 
         const urls = objectUrls.current;
+        const timer = noticeTimer;
         return () => {
             urls.forEach((url) => URL.revokeObjectURL(url));
             urls.clear();
+            clearTimeout(timer.current);
         };
     }, []);
 
     return {
         audioStates,
         playAudio,
-        clearAllAudioCache
+        clearAllAudioCache,
+        audioNotice,
+        dismissAudioNotice
     };
 };

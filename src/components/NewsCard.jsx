@@ -866,9 +866,14 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                                                         <PvActions>
                                                             <PvIconButton
                                                                 onClick={() => onPlayAudio(situation)}
+                                                                disabled={audioStates[situation] === 'loading'}
                                                                 aria-label="예문 음성 재생"
                                                             >
-                                                                <Volume2Icon />
+                                                                {audioStates[situation] === 'loading' ? (
+                                                                    <LoaderIcon size="h-3 w-3" />
+                                                                ) : (
+                                                                    <Volume2Icon />
+                                                                )}
                                                             </PvIconButton>
                                                             <PvIconButton
                                                                 onClick={() => handleExampleTranslation(situation)}
