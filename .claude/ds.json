@@ -1,6 +1,7 @@
 {
   "mainBranch": "main",
   "checks": {
+    "scripts/test-gemini-stream.mjs": "node scripts/test-gemini-stream.mjs",
     "scripts/test-lecture-markdown.mjs": "node scripts/test-lecture-markdown.mjs",
     "scripts/test-model-chains.mjs": "node scripts/test-model-chains.mjs",
     "scripts/test-news-language.mjs": "node scripts/test-news-language.mjs",

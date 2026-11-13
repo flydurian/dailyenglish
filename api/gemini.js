@@ -16,7 +16,9 @@ import {
     normalizeTextResponse,
     extractAudio,
     runModelChain,
+    STREAM_IDLE_MS,
 } from '../lib/modelChains.js';
+import { fetchGeminiStream } from '../lib/geminiStream.js';
 // API 키는 서버 환경변수(GEMINI_API_KEY)에만 존재하며 클라이언트로 전달되지 않습니다.
 
 // 클라이언트는 모델 대신 용도(tier:generate | tier:fast | tier:tts)를 보내고, 실제 모델은
@@ -210,6 +212,37 @@ const requestGemini = async (targetModel, targetPayload, apiKey, timeoutMs) => {
     }
 };
 
+// 텍스트는 스트리밍으로 받아 "첫 조각까지"와 "끝까지"를 따로 기다립니다 (lib/geminiStream.js).
+// 매달린 모델은 firstChunkMs 만에 포기하고, 느리지만 응답 중인 모델은 끝까지 기다립니다.
+const requestGeminiText = async (entry, targetPayload, apiKey, timeoutMs) => {
+    const result = await fetchGeminiStream({
+        url: `https://generativelanguage.googleapis.com/v1beta/models/${entry.model}:streamGenerateContent?alt=sse`,
+        init: {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+            body: JSON.stringify(targetPayload),
+        },
+        firstChunkMs: Math.min(entry.firstChunkMs ?? timeoutMs, timeoutMs),
+        idleMs: STREAM_IDLE_MS,
+        totalMs: timeoutMs,
+    });
+
+    if (result.ok) {
+        // 첫 조각 대기 시간(firstChunkMs)을 조정할 때 참고할 실측값
+        console.log(`Gemini text ok [${entry.model}] first chunk ${result.firstChunkAfterMs}ms`);
+    } else {
+        if (result.timedOut) {
+            const waited = result.reason === 'first-chunk' ? `no first chunk in ${Math.min(entry.firstChunkMs ?? timeoutMs, timeoutMs)}ms` : `${result.reason} timeout`;
+            console.error(`Gemini API stalled [${entry.model}]: ${waited}`);
+        } else if (typeof result.status === 'number') {
+            console.error(`Gemini API Error (${result.status}) [${entry.model}]:`, result.errorText);
+        } else {
+            console.error(`Gemini API network error [${entry.model}]: ${result.reason}`);
+        }
+    }
+    return result;
+};
+
 export default async function handler(req, res) {
     setApiSecurityHeaders(res);
     const corsAllowed = setCorsHeaders(req, res);
@@ -304,7 +337,9 @@ export default async function handler(req, res) {
             cooldowns: modelCooldowns,
             attempt: async (entry, timeoutMs) => {
                 const modelPayload = buildModelPayload(entry, sanitizedPayload, tier);
-                const result = await requestGemini(entry.model, modelPayload, apiKey, timeoutMs);
+                const result = isTts
+                    ? await requestGemini(entry.model, modelPayload, apiKey, timeoutMs)
+                    : await requestGeminiText(entry, modelPayload, apiKey, timeoutMs);
                 if (!result.ok) return result;
 
                 const value = isTts ? extractAudio(result.data) : normalizeTextResponse(result.data);
