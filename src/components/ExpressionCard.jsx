@@ -5,6 +5,7 @@ import { markPhrasalVerbUsage } from '../data/phrasalVerbsData';
 import { useFontSize } from '../contexts/FontSizeContext';
 import { useWordbook, makeWordbookId } from '../contexts/WordbookContext';
 import { phrasalVerbDetails } from '../data/phrasalVerbDetails';
+import { getPhrasalVerbDetail, getCachedVerbDetail } from '../utils/verbDetailService';
 import { css } from '@emotion/react';
 
 const CardContainer = styled.article`
@@ -420,6 +421,8 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
   const [showTranslation, setShowTranslation] = useState(false);
   const [translation, setTranslation] = useState('');
   const [isTranslating, setIsTranslating] = useState(false);
+  // 사전/일일 데이터에 없는 구동사의 상세 정보: AI 생성 상태(loading/ready/error)
+  const [aiDetail, setAiDetail] = useState({ verb: null, status: 'idle', data: null });
 
   // expression이 변경될 때 번역 상태 초기화
   useEffect(() => {
@@ -504,7 +507,8 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
     return expression.other_words.slice(0, limit);
   }, [expression.other_words, level]);
 
-  // 구동사 상세 정보 생성 함수
+  // 구동사 상세 정보: 일일 생성 데이터(situation/nuance/examples) 또는 사전 데이터를 사용합니다.
+  // 둘 다 없으면 템플릿 폴백 대신 null을 반환하고, aiDetail(AI 생성)로 처리합니다.
   const getPhrasalVerbDetails = useCallback(() => {
     const phrasalVerb = expression.phrasal_verb;
     const currentSentence = expression.sentence.replace(/\*\*(.*?)\*\*/g, '$1');
@@ -519,15 +523,14 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
     };
 
     if (expression.situation || expression.nuance) {
-      return {
-        nuance: expression.nuance || (defaultDetails ? defaultDetails.nuance : `이 구동사는 "${expression.meaning}"라는 의미를 가지며, 문맥에 따라 다양한 뉘앙스로 사용됩니다.`),
-        usage: expression.situation || (defaultDetails ? defaultDetails.usage : '다양한 상황에서 사용될 수 있습니다.'),
-        situations: expression.examples || (defaultDetails ? getUniqueExamples(defaultDetails.situations) : getUniqueExamples([
-          `Can you ${phrasalVerb} the answer?`,
-          `I need to ${phrasalVerb} this problem.`,
-          `Let's ${phrasalVerb} together.`
-        ]))
-      };
+      const nuance = expression.nuance || (defaultDetails ? defaultDetails.nuance : null);
+      const usage = expression.situation || (defaultDetails ? defaultDetails.usage : null);
+      const situations = expression.examples
+        || (defaultDetails ? getUniqueExamples(defaultDetails.situations) : []);
+
+      // 뉘앙스/용법/예문 중 하나라도 없으면 AI 생성으로 통일해 출처를 하나로 맞춥니다.
+      if (!nuance || !usage || situations.length === 0) return null;
+      return { nuance, usage, situations };
     }
 
     if (defaultDetails) {
@@ -537,21 +540,42 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
       };
     }
 
-    const fallbackExamples = [
-      `Can you ${phrasalVerb} the answer?`,
-      `I need to ${phrasalVerb} this problem.`,
-      `Let's ${phrasalVerb} together.`,
-      `She will ${phrasalVerb} tomorrow.`
-    ];
-
-    return {
-      nuance: `이 구동사는 "${expression.meaning}"라는 의미를 가지며, 특별한 뉘앙스와 사용 맥락이 있습니다. 문맥에 따라 의미가 달라질 수 있으니 주의 깊게 학습하세요.`,
-      usage: '이 구동사는 다양한 상황에서 사용될 수 있습니다. 문맥에 따라 의미가 달라질 수 있으니 주의 깊게 학습하세요.',
-      situations: getUniqueExamples(fallbackExamples)
-    };
+    return null;
   }, [expression.phrasal_verb, expression.meaning, expression.sentence, expression.examples, expression.nuance, expression.situation]);
 
-  const details = getPhrasalVerbDetails();
+  // 사전 데이터에도 일일 생성 데이터에도 없는 구동사: 카드를 펼칠 때 AI 생성 → 캐시
+  useEffect(() => {
+    if (!isActive) return;
+    const verbName = expression.phrasal_verb?.split(':')[0]?.trim().toLowerCase();
+    if (!verbName) return;
+    if (phrasalVerbDetails[verbName]) return;
+    if (expression.situation || expression.nuance) return;
+
+    const cached = getCachedVerbDetail(verbName);
+    if (cached) {
+      setAiDetail({ verb: verbName, status: 'ready', data: cached });
+      return;
+    }
+
+    setAiDetail((prev) => (prev.verb === verbName && prev.status === 'loading'
+      ? prev
+      : { verb: verbName, status: 'loading', data: null }));
+
+    const meaning = expression.meaning || expression.phrasal_verb.split(':').slice(1).join(':').trim();
+    const context = expression.sentence.replace(/\*\*(.*?)\*\*/g, '$1');
+    getPhrasalVerbDetail(verbName, meaning, context).then((data) => {
+      setAiDetail((prev) => (prev.verb === verbName && prev.status === 'loading'
+        ? { verb: verbName, status: data ? 'ready' : 'error', data }
+        : prev));
+    });
+  }, [isActive, expression.phrasal_verb, expression.meaning, expression.sentence, expression.situation, expression.nuance]);
+
+  const staticDetails = getPhrasalVerbDetails();
+  const detailVerbName = expression.phrasal_verb.split(':')[0].trim().toLowerCase();
+  const aiReady = aiDetail.verb === detailVerbName && aiDetail.status === 'ready' && aiDetail.data;
+  const detailLoading = !staticDetails && aiDetail.verb === detailVerbName && aiDetail.status === 'loading';
+  const detailError = !staticDetails && !aiReady && !detailLoading;
+  const details = staticDetails || (aiReady ? aiDetail.data : null);
   const phrasalVerbName = expression.phrasal_verb.split(':')[0].trim();
   const phrasalVerbMeaning = expression.meaning || expression.phrasal_verb.split(':').slice(1).join(':').trim();
   const saved = isSaved(makeWordbookId('phrasal', phrasalVerbName));
@@ -655,58 +679,77 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
 
       <ExpandedSection isActive={isActive}>
         <PhrasalVerbDetailSection>
-          <DetailTitle>Nuance</DetailTitle>
-          <DetailContent>{details.nuance}</DetailContent>
+          {detailLoading ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '20px 0' }}>
+              <LoaderIcon size="h-4 w-4" />
+              <span style={{ color: '#888', fontSize: '13px' }}>
+                AI가 이 구동사에 맞는 설명과 예문을 생성하고 있습니다...
+              </span>
+            </div>
+          ) : detailError ? (
+            <div style={{ color: '#888', fontSize: '13px', textAlign: 'center', padding: '20px 0' }}>
+              설명을 생성하지 못했습니다. 카드를 접었다가 다시 펼쳐주세요.
+            </div>
+          ) : (
+            <>
+              <DetailTitle>Nuance</DetailTitle>
+              <DetailContent>{details.nuance}</DetailContent>
 
-          <DetailTitle>Usage</DetailTitle>
-          <DetailContent>{details.usage}</DetailContent>
+              <DetailTitle>Usage</DetailTitle>
+              <DetailContent>{details.usage}</DetailContent>
 
-          <DetailTitle>Examples</DetailTitle>
-          {details.situations.map((situation, idx) => (
-            <UsageExample key={idx}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                <div style={{ flex: 1 }}>
-                  <DetailExampleText style={{ fontSize: `calc(${fontSize} * 13.5px)` }}>
-                    {situation}
-                  </DetailExampleText>
-                  {translations[situation]?.translation && (
-                    <ExampleTranslation>
-                      {translations[situation].translation}
-                    </ExampleTranslation>
-                  )}
-                </div>
-                <UsageExampleActions>
-                  <SmallActionButton
-                    onClick={(e) => {
-                      handleExampleAudioClick(e, situation);
-                    }}
-                    disabled={audioStates[situation] === 'loading'}
-                    aria-label="음성 재생"
-                  >
-                    {audioStates[situation] === 'loading' ? (
-                      <LoaderIcon size="h-1.5 w-1.5" />
-                    ) : (
-                      <Volume2Icon />
-                    )}
-                  </SmallActionButton>
-                  <SmallActionButton
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleTranslationClick(situation);
-                    }}
-                    disabled={translations[situation]?.loading}
-                    aria-label="번역"
-                  >
-                    {translations[situation]?.loading ? (
-                      <LoaderIcon size="h-1.5 w-1.5" />
-                    ) : (
-                      <TranslateIcon />
-                    )}
-                  </SmallActionButton>
-                </UsageExampleActions>
-              </div>
-            </UsageExample>
-          ))}
+              {details.situations.length > 0 && (
+                <>
+                  <DetailTitle>Examples</DetailTitle>
+                  {details.situations.map((situation, idx) => (
+                    <UsageExample key={idx}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                        <div style={{ flex: 1 }}>
+                          <DetailExampleText style={{ fontSize: `calc(${fontSize} * 13.5px)` }}>
+                            {situation}
+                          </DetailExampleText>
+                          {translations[situation]?.translation && (
+                            <ExampleTranslation>
+                              {translations[situation].translation}
+                            </ExampleTranslation>
+                          )}
+                        </div>
+                        <UsageExampleActions>
+                          <SmallActionButton
+                            onClick={(e) => {
+                              handleExampleAudioClick(e, situation);
+                            }}
+                            disabled={audioStates[situation] === 'loading'}
+                            aria-label="음성 재생"
+                          >
+                            {audioStates[situation] === 'loading' ? (
+                              <LoaderIcon size="h-1.5 w-1.5" />
+                            ) : (
+                              <Volume2Icon />
+                            )}
+                          </SmallActionButton>
+                          <SmallActionButton
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleTranslationClick(situation);
+                            }}
+                            disabled={translations[situation]?.loading}
+                            aria-label="번역"
+                          >
+                            {translations[situation]?.loading ? (
+                              <LoaderIcon size="h-1.5 w-1.5" />
+                            ) : (
+                              <TranslateIcon />
+                            )}
+                          </SmallActionButton>
+                        </UsageExampleActions>
+                      </div>
+                    </UsageExample>
+                  ))}
+                </>
+              )}
+            </>
+          )}
         </PhrasalVerbDetailSection>
 
         {expression.other_words && expression.other_words.length > 0 && (

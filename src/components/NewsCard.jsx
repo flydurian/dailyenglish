@@ -4,6 +4,7 @@ import { Volume2Icon, TranslateIcon, LoaderIcon, BookOpenIcon, CloseIcon } from 
 import { useFontSize } from '../contexts/FontSizeContext';
 import ExplanationModal from './ExplanationModal';
 import { phrasalVerbDetails } from '../data/phrasalVerbDetails';
+import { getPhrasalVerbDetail, getCachedVerbDetail } from '../utils/verbDetailService';
 
 // 최신 CSS Grid와 Flexbox를 활용한 스타일드 컴포넌트들
 const CardContainer = styled.div`
@@ -404,6 +405,8 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
     const [isTranslatingTitle, setIsTranslatingTitle] = useState(false);
     const [isTranslatingArticle, setIsTranslatingArticle] = useState(false);
     const [selectedPhrasalVerb, setSelectedPhrasalVerb] = useState(null);
+    // 사전에 없는 구동사의 상세 정보: AI 생성 상태(loading/ready/error)
+    const [aiDetail, setAiDetail] = useState({ verb: null, status: 'idle', data: null });
     const [exampleTranslations, setExampleTranslations] = useState({});
     const [showExplanation, setShowExplanation] = useState(false);
     const [explanation, setExplanation] = useState('');
@@ -544,8 +547,30 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
 
     // 구동사 클릭 핸들러
     const handlePhrasalVerbClick = useCallback((phrasalVerb) => {
+        const verbName = phrasalVerb.split(':')[0].trim().toLowerCase();
         setSelectedPhrasalVerb(phrasalVerb);
-    }, []);
+
+        // 사전 데이터가 있으면 그대로 사용하고, 없으면 캐시 → AI 생성 순서로 확인합니다.
+        if (phrasalVerbDetails[verbName]) {
+            setAiDetail({ verb: verbName, status: 'idle', data: null });
+            return;
+        }
+
+        const cached = getCachedVerbDetail(verbName);
+        if (cached) {
+            setAiDetail({ verb: verbName, status: 'ready', data: cached });
+            return;
+        }
+
+        setAiDetail({ verb: verbName, status: 'loading', data: null });
+        const meaning = phrasalVerb.split(':').slice(1).join(':').trim();
+        const context = (newsItem?.summary || '').replace(/\*\*(.*?)\*\*/g, '$1');
+        getPhrasalVerbDetail(verbName, meaning, context).then((data) => {
+            setAiDetail((prev) => (prev.verb === verbName
+                ? { verb: verbName, status: data ? 'ready' : 'error', data }
+                : prev));
+        });
+    }, [newsItem]);
 
     const handleExampleTranslation = useCallback(async (exampleText) => {
         if (exampleTranslations[exampleText]) {
@@ -578,22 +603,13 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
     }, [exampleTranslations, handleTranslationClick]);
 
     // 구동사 상세 정보 가져오기
+    // 사전 데이터(phrasalVerbDetails)에 등록된 구동사만 반환합니다. 없는 구동사는
+    // handlePhrasalVerbClick에서 AI 생성(getPhrasalVerbDetail)으로 처리하며,
+    // 여기서 틀린 문장을 만들어내는 템플릿 폴백은 사용하지 않습니다.
     const getPhrasalVerbDetails = useCallback((phrasalVerb) => {
         // 구동사 이름만 추출하여 매칭 (예: "come up with: 생각해내다" -> "come up with")
         const phrasalVerbName = phrasalVerb.split(':')[0].trim().toLowerCase();
-        const details = phrasalVerbDetails[phrasalVerbName];
-
-        return details || {
-            nuance: "이 구동사는 다양한 상황에서 사용될 수 있는 중요한 표현입니다. 문맥에 따라 여러 의미로 해석될 수 있으며, 일상 대화나 글에서 자주 접할 수 있습니다. 구동사의 의미를 정확히 이해하고 적절한 상황에서 사용할 수 있도록 다양한 예시를 통해 학습하는 것이 중요합니다.",
-            usage: "이 구동사는 일상 대화나 글에서 자주 사용되는 표현입니다. 문맥에 따라 다양한 의미로 해석될 수 있으며, 적절한 상황에서 사용하면 더 자연스러운 영어 표현이 됩니다. 구동사의 의미와 사용법을 정확히 이해하고 다양한 상황에서 연습해보는 것이 중요합니다.",
-            grammar: "문법 정보가 준비 중입니다.",
-            situations: [
-                `"Can you ${phrasalVerb.split(':')[0]} the answer?"`,
-                `"We need to ${phrasalVerb.split(':')[0]} a solution."`,
-                `"I'll ${phrasalVerb.split(':')[0]} more information about this."`,
-                `"They decided to ${phrasalVerb.split(':')[0]} the project."`
-            ]
-        };
+        return phrasalVerbDetails[phrasalVerbName] || null;
     }, []);
 
     // newsItem이 없으면 빈 객체 반환
@@ -799,7 +815,13 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
 
             {/* 구동사 상세 정보 팝업 모달 */}
             {selectedPhrasalVerb && (() => {
+                const verbName = selectedPhrasalVerb.split(':')[0].trim().toLowerCase();
                 const details = getPhrasalVerbDetails(selectedPhrasalVerb);
+                const aiReady = aiDetail.verb === verbName && aiDetail.status === 'ready' && aiDetail.data;
+                const isLoading = !details && aiDetail.verb === verbName && aiDetail.status === 'loading';
+                const isError = !details && !aiReady && !isLoading;
+                const shown = details || (aiReady ? aiDetail.data : null);
+
                 return (
                     <PvOverlay onClick={() => setSelectedPhrasalVerb(null)}>
                         <PvSheet
@@ -815,41 +837,60 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                                 </PvCloseButton>
                             </PvHeader>
 
-                            <PvLabel>Nuance</PvLabel>
-                            <PvText>{details.nuance}</PvText>
+                            {isLoading ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', padding: '36px 0' }}>
+                                    <LoaderIcon size="h-6 w-6" />
+                                    <span style={{ color: '#888', fontSize: '13px' }}>
+                                        AI가 이 구동사에 맞는 설명과 예문을 생성하고 있습니다...
+                                    </span>
+                                </div>
+                            ) : isError ? (
+                                <div style={{ color: '#888', fontSize: '13px', textAlign: 'center', padding: '36px 0' }}>
+                                    설명을 생성하지 못했습니다. 모달을 닫았다가 다시 눌러주세요.
+                                </div>
+                            ) : (
+                                <>
+                                    <PvLabel>Nuance</PvLabel>
+                                    <PvText>{shown.nuance}</PvText>
 
-                            <PvLabel>Usage</PvLabel>
-                            <PvText>{details.usage}</PvText>
+                                    <PvLabel>Usage</PvLabel>
+                                    <PvText>{shown.usage}</PvText>
 
-                            <PvLabel>Examples</PvLabel>
-                            {details.situations.map((situation, index) => (
-                                <PvExample key={index}>
-                                    <PvExampleRow>
-                                        <PvExampleText>{situation}</PvExampleText>
-                                        <PvActions>
-                                            <PvIconButton
-                                                onClick={() => onPlayAudio(situation)}
-                                                aria-label="예문 음성 재생"
-                                            >
-                                                <Volume2Icon />
-                                            </PvIconButton>
-                                            <PvIconButton
-                                                onClick={() => handleExampleTranslation(situation)}
-                                                aria-label="예문 번역"
-                                            >
-                                                {exampleTranslations[situation]?.loading ? (
-                                                    <LoaderIcon size="h-3 w-3" />
-                                                ) : (
-                                                    <TranslateIcon />
-                                                )}
-                                            </PvIconButton>
-                                        </PvActions>
-                                    </PvExampleRow>
-                                    {exampleTranslations[situation] && !exampleTranslations[situation]?.loading && (
-                                        <PvTranslation>{exampleTranslations[situation]}</PvTranslation>
+                                    {shown.situations.length > 0 && (
+                                        <>
+                                            <PvLabel>Examples</PvLabel>
+                                            {shown.situations.map((situation, index) => (
+                                                <PvExample key={index}>
+                                                    <PvExampleRow>
+                                                        <PvExampleText>{situation}</PvExampleText>
+                                                        <PvActions>
+                                                            <PvIconButton
+                                                                onClick={() => onPlayAudio(situation)}
+                                                                aria-label="예문 음성 재생"
+                                                            >
+                                                                <Volume2Icon />
+                                                            </PvIconButton>
+                                                            <PvIconButton
+                                                                onClick={() => handleExampleTranslation(situation)}
+                                                                aria-label="예문 번역"
+                                                            >
+                                                                {exampleTranslations[situation]?.loading ? (
+                                                                    <LoaderIcon size="h-3 w-3" />
+                                                                ) : (
+                                                                    <TranslateIcon />
+                                                                )}
+                                                            </PvIconButton>
+                                                        </PvActions>
+                                                    </PvExampleRow>
+                                                    {exampleTranslations[situation] && !exampleTranslations[situation]?.loading && (
+                                                        <PvTranslation>{exampleTranslations[situation]}</PvTranslation>
+                                                    )}
+                                                </PvExample>
+                                            ))}
+                                        </>
                                     )}
-                                </PvExample>
-                            ))}
+                                </>
+                            )}
 
                             <PvDoneButton onClick={() => setSelectedPhrasalVerb(null)}>
                                 닫기
