@@ -7,6 +7,7 @@ import { useWordbook, makeWordbookId } from '../contexts/WordbookContext';
 import { phrasalVerbDetails } from '../data/phrasalVerbDetails';
 import { getPhrasalVerbDetail, getCachedVerbDetail } from '../utils/verbDetailService';
 import { css } from '@emotion/react';
+import TranslationStatus from './TranslationStatus';
 
 const CardContainer = styled.article`
   position: relative;
@@ -543,11 +544,19 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
     }
 
     if (!translation) {
+      // 번역을 기다리는 동안에도 결과 영역을 열어 진행 표시를 보여줍니다.
+      setShowTranslation(true);
       setIsTranslating(true);
-      const cleanSentence = expression.sentence.replace(/\*\*(.*?)\*\*/g, '$1');
-      const result = await onTranslate(cleanSentence);
-      setTranslation(result);
-      setIsTranslating(false);
+      try {
+        const cleanSentence = expression.sentence.replace(/\*\*(.*?)\*\*/g, '$1');
+        const result = await onTranslate(cleanSentence);
+        setTranslation(result);
+      } catch (error) {
+        console.error('문장 번역 실패:', error);
+        setTranslation('번역을 불러오는 데 실패했습니다.');
+      } finally {
+        setIsTranslating(false);
+      }
     }
 
     setShowTranslation(true);
@@ -684,7 +693,7 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
           {showTranslation && (
             <TranslationSection>
               <TranslationText style={{ fontSize: `calc(${fontSize} * 12.5px)` }}>
-                {translation || '번역을 불러오는 중...'}
+                {isTranslating ? <TranslationStatus /> : (translation || '번역을 불러오는 중...')}
               </TranslationText>
             </TranslationSection>
           )}
@@ -793,11 +802,15 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
                             <DetailExampleText style={{ fontSize: `calc(${fontSize} * 13.5px)` }}>
                               {renderSentence(situation)}
                             </DetailExampleText>
-                            {shownTranslation && (
+                            {isExampleTranslating ? (
+                              <ExampleTranslation>
+                                <TranslationStatus />
+                              </ExampleTranslation>
+                            ) : shownTranslation ? (
                               <ExampleTranslation>
                                 {shownTranslation}
                               </ExampleTranslation>
-                            )}
+                            ) : null}
                           </div>
                           <UsageExampleActions>
                             <SmallActionButton

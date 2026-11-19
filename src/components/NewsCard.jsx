@@ -5,6 +5,7 @@ import { useFontSize } from '../contexts/FontSizeContext';
 import ExplanationModal from './ExplanationModal';
 import { phrasalVerbDetails } from '../data/phrasalVerbDetails';
 import { getPhrasalVerbDetail, getCachedVerbDetail } from '../utils/verbDetailService';
+import TranslationStatus from './TranslationStatus';
 
 // 최신 CSS Grid와 Flexbox를 활용한 스타일드 컴포넌트들
 const CardContainer = styled.div`
@@ -450,10 +451,17 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
 
         // 번역이 없으면 번역 요청
         if (!titleTranslation) {
+            setShowTitleTranslation(true);
             setIsTranslatingTitle(true);
-            const result = await onTranslate(cleanTitle);
-            setTitleTranslation(result);
-            setIsTranslatingTitle(false);
+            try {
+                const result = await onTranslate(cleanTitle);
+                setTitleTranslation(result);
+            } catch (error) {
+                console.error('제목 번역 실패:', error);
+                setTitleTranslation('번역을 불러오는 데 실패했습니다.');
+            } finally {
+                setIsTranslatingTitle(false);
+            }
         }
 
         // 번역 표시
@@ -471,10 +479,17 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
 
         // 번역이 없으면 번역 요청
         if (!articleTranslation) {
+            setShowArticleTranslation(true);
             setIsTranslatingArticle(true);
-            const result = await onTranslate(textToRead);
-            setArticleTranslation(result);
-            setIsTranslatingArticle(false);
+            try {
+                const result = await onTranslate(textToRead);
+                setArticleTranslation(result);
+            } catch (error) {
+                console.error('기사 번역 실패:', error);
+                setArticleTranslation('번역을 불러오는 데 실패했습니다.');
+            } finally {
+                setIsTranslatingArticle(false);
+            }
         }
 
         // 번역 표시
@@ -679,7 +694,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
 
             {showTitleTranslation && (
                 <TranslationText>
-                    {titleTranslation || '번역을 불러오는 중...'}
+                    {isTranslatingTitle ? <TranslationStatus /> : (titleTranslation || '번역을 불러오는 중...')}
                 </TranslationText>
             )}
 
@@ -736,7 +751,9 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                     {showArticleTranslation && (
                         <ArticleTranslationBox>
                             <h4>기사 번역</h4>
-                            <p>{articleTranslation || '번역을 불러오는 중...'}</p>
+                            <p>
+                                {isTranslatingArticle ? <TranslationStatus /> : (articleTranslation || '번역을 불러오는 중...')}
+                            </p>
                         </ArticleTranslationBox>
                     )}
 
@@ -887,9 +904,11 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                                                             </PvIconButton>
                                                         </PvActions>
                                                     </PvExampleRow>
-                                                    {exampleTranslations[situation] && !exampleTranslations[situation]?.loading && (
+                                                    {exampleTranslations[situation]?.loading ? (
+                                                        <PvTranslation><TranslationStatus /></PvTranslation>
+                                                    ) : exampleTranslations[situation] ? (
                                                         <PvTranslation>{exampleTranslations[situation]}</PvTranslation>
-                                                    )}
+                                                    ) : null}
                                                 </PvExample>
                                             ))}
                                         </>

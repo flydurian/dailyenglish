@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled from '@emotion/styled';
 import { Volume2Icon, TranslateIcon, LoaderIcon, CloseIcon, BookmarkIcon } from './Icons';
 import { useWordbook, makeWordbookId } from '../contexts/WordbookContext';
+import TranslationStatus from './TranslationStatus';
 
 const Overlay = styled.div`
   position: fixed;
@@ -445,12 +446,14 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
         }
 
         if (!exampleTranslation) {
+            setShowExampleTranslation(true);
             setIsTranslatingExample(true);
             try {
                 const result = await onTranslate(primaryExample);
                 setExampleTranslation(result);
             } catch (error) {
                 console.error('예문 번역 실패:', error);
+                setExampleTranslation('번역을 불러오는 데 실패했습니다.');
             } finally {
                 setIsTranslatingExample(false);
             }
@@ -563,7 +566,7 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
                             </ExampleActions>
                             {showExampleTranslation && (
                                 <MainTranslation>
-                                    {exampleTranslation || '번역을 불러오는 중...'}
+                                    {isTranslatingExample ? <TranslationStatus /> : (exampleTranslation || '번역을 불러오는 중...')}
                                 </MainTranslation>
                             )}
                         </MainExampleCard>
@@ -624,9 +627,11 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
                                     번역
                                 </ExampleAction>
                             </ExampleActions>
-                            {generatedTranslations[item] && (
+                            {translatingText === item ? (
+                                <ExampleTranslation><TranslationStatus /></ExampleTranslation>
+                            ) : generatedTranslations[item] ? (
                                 <ExampleTranslation>{generatedTranslations[item]}</ExampleTranslation>
-                            )}
+                            ) : null}
                         </ExampleCard>
                     ))
                 ) : (
