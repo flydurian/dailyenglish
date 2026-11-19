@@ -3,6 +3,7 @@ import styled from '@emotion/styled';
 import { Volume2Icon, TranslateIcon, LoaderIcon, CloseIcon, BookmarkIcon } from './Icons';
 import { useWordbook, makeWordbookId } from '../contexts/WordbookContext';
 import TranslationStatus from './TranslationStatus';
+import AccentFlags from './AccentFlags';
 
 const Overlay = styled.div`
   position: fixed;
@@ -420,8 +421,8 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
         }
     };
 
-    const playAudio = (text) => {
-        if (typeof onPlayAudio === 'function') onPlayAudio(text);
+    const playAudio = (text, accent) => {
+        if (typeof onPlayAudio === 'function') onPlayAudio(text, accent);
     };
 
     const primaryExample = (example || '').replace(/\*\*(.*?)\*\*/g, '$1').trim();
@@ -530,6 +531,12 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
                             <Volume2Icon />
                         )}
                     </AudioButton>
+                    <AccentFlags
+                      text={word}
+                      onPlayAudio={playAudio}
+                      audioState={audioStates[word]}
+                      size={24}
+                    />
                 </WordRow>
                 <Meaning>{meaning}</Meaning>
 
@@ -550,6 +557,12 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
                                     )}
                                     듣기
                                 </ExampleAction>
+                                <AccentFlags
+                                  text={primaryExample}
+                                  onPlayAudio={playAudio}
+                                  audioState={audioStates[primaryExample]}
+                                  size={22}
+                                />
                                 <ExampleAction
                                     className={showExampleTranslation ? 'on' : ''}
                                     onClick={handlePrimaryTranslate}
@@ -613,6 +626,12 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
                                     )}
                                     듣기
                                 </ExampleAction>
+                                <AccentFlags
+                                  text={item}
+                                  onPlayAudio={playAudio}
+                                  audioState={audioStates[item]}
+                                  size={22}
+                                />
                                 <ExampleAction
                                     className={generatedTranslations[item] ? 'on' : ''}
                                     onClick={() => handleGeneratedTranslate(item)}

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import styled from '@emotion/styled';
 import { Volume2Icon, LoaderIcon } from './Icons';
+import AccentFlags from './AccentFlags';
 import { useWordbook } from '../contexts/WordbookContext';
 import { useProgress } from '../contexts/ProgressContext';
 import { toLocalDateKey } from '../utils/dateUtils';
@@ -478,8 +479,8 @@ const ReviewView = ({ onPlayAudio, audioStates = {} }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentItem, finished, revealed, handleGrade]);
 
-  const play = (text) => {
-    if (canPlay) onPlayAudio(text);
+  const play = (text, accent) => {
+    if (canPlay) onPlayAudio(text, accent);
   };
 
   if (items.length === 0) {
@@ -568,6 +569,12 @@ const ReviewView = ({ onPlayAudio, audioStates = {} }) => {
           >
             {termAudioState === 'loading' ? <LoaderIcon size="h-4 w-4" /> : <Volume2Icon />}
           </AudioButton>
+          <AccentFlags
+            text={currentItem.term}
+            onPlayAudio={play}
+            audioState={termAudioState}
+            size={24}
+          />
         </CardTop>
 
         {!revealed ? (
@@ -597,6 +604,12 @@ const ReviewView = ({ onPlayAudio, audioStates = {} }) => {
                   )}
                   예문 듣기
                 </ExampleAction>
+                <AccentFlags
+                  text={currentItem.example}
+                  onPlayAudio={play}
+                  audioState={exampleAudioState}
+                  size={22}
+                />
               </ExampleBox>
             )}
 

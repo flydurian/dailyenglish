@@ -8,6 +8,7 @@ import { phrasalVerbDetails } from '../data/phrasalVerbDetails';
 import { getPhrasalVerbDetail, getCachedVerbDetail } from '../utils/verbDetailService';
 import { css } from '@emotion/react';
 import TranslationStatus from './TranslationStatus';
+import AccentFlags from './AccentFlags';
 
 const CardContainer = styled.article`
   position: relative;
@@ -725,6 +726,12 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
                 <span>듣기</span>
               </ActionButton>
 
+              <AccentFlags
+                text={expression.sentence}
+                onPlayAudio={onPlayAudio}
+                audioState={audioStates[expression.sentence]}
+              />
+
               <ActionButton
                 onClick={handleTranslateClick}
                 disabled={isTranslating}
@@ -826,6 +833,12 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
                                 <Volume2Icon />
                               )}
                             </SmallActionButton>
+                            <AccentFlags
+                              text={exampleText}
+                              onPlayAudio={onPlayAudio}
+                              audioState={audioStates[exampleText]}
+                              size={24}
+                            />
                             <SmallActionButton
                               onClick={(e) => {
                                 handleExampleTranslateClick(e, situation);

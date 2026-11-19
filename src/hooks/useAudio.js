@@ -62,33 +62,35 @@ export const useAudio = () => {
         noticeTimer.current = setTimeout(() => setAudioNotice(null), NOTICE_MS);
     }, []);
 
-    const playBlob = useCallback(async (text, blob) => {
-        const previousUrl = objectUrls.current.get(text);
+    const playBlob = useCallback(async (stateKey, cacheKey, blob) => {
+        const previousUrl = objectUrls.current.get(cacheKey);
         if (previousUrl) URL.revokeObjectURL(previousUrl);
 
         const url = URL.createObjectURL(blob);
-        objectUrls.current.set(text, url);
+        objectUrls.current.set(cacheKey, url);
 
         const audio = new Audio(url);
         audio.preload = 'auto';
-        audioElements.current.set(text, audio);
+        audioElements.current.set(cacheKey, audio);
 
-        audio.onplay = () => updateState(text, 'playing');
-        audio.onended = () => updateState(text, 'idle');
+        audio.onplay = () => updateState(stateKey, 'playing');
+        audio.onended = () => updateState(stateKey, 'idle');
         audio.onerror = () => {
-            updateState(text, 'idle');
-            audioElements.current.delete(text);
+            updateState(stateKey, 'idle');
+            audioElements.current.delete(cacheKey);
         };
 
         await audio.play();
     }, [updateState]);
 
-    // 성공하면 true, 실패하면 알림을 띄우고 false를 돌려줍니다 (예외를 던지지 않음).
-    const playAudio = useCallback(async (sentence) => {
+    // accent('us' | 'gb')가 오면 그 억양으로 생성하고 캐시 키에도 포함해 서로 섞이지 않게 합니다.
+    // 화면 로딩 상태는 텍스트 기준이라 기존 컴포넌트는 그대로 동작합니다.
+    const playAudio = useCallback(async (sentence, accent) => {
         if (!sentence) return false;
         if (audioStates[sentence] === 'loading') return false;
 
-        const existing = audioElements.current.get(sentence);
+        const cacheKey = accent ? `${accent}:${sentence}` : sentence;
+        const existing = audioElements.current.get(cacheKey);
         if (existing) {
             try {
                 existing.currentTime = 0;
@@ -96,7 +98,7 @@ export const useAudio = () => {
                 await existing.play();
                 return true;
             } catch (error) {
-                audioElements.current.delete(sentence);
+                audioElements.current.delete(cacheKey);
                 updateState(sentence, 'idle');
             }
         }
@@ -105,7 +107,7 @@ export const useAudio = () => {
 
         try {
             // 1) IndexedDB 캐시 → 2) Gemini TTS 순서로 확인합니다.
-            let blob = await getCachedAudio(sentence);
+            let blob = await getCachedAudio(cacheKey);
 
             if (!blob) {
                 const ttsText = trimForTts(sentence);
@@ -117,7 +119,7 @@ export const useAudio = () => {
                 // TTS는 중복 과금/요청을 막기 위해 클라이언트 자동 재시도를 하지 않습니다.
                 // 서버가 트랜스코딩한 작은 Opus/WebM을 기본으로 받고, 미지원 브라우저는
                 // WAV로 요청합니다. 서버 트랜스코딩 실패 시에도 WAV로 내려오므로 둘 다 재생 가능.
-                const audioBlob = await requestTtsAudio(ttsText, TTS_MODEL, supportsOpusWebm ? 'webm' : 'wav');
+                const audioBlob = await requestTtsAudio(ttsText, TTS_MODEL, supportsOpusWebm ? 'webm' : 'wav', accent);
 
                 if (/audio\/(wav|wave|x-wav|webm)/i.test(audioBlob.type)) {
                     // 서버가 완성된 WebM(Opus) 또는 WAV를 반환합니다.
@@ -138,10 +140,10 @@ export const useAudio = () => {
                     throw new Error('유효하지 않은 오디오 데이터');
                 }
 
-                await setCachedAudio(sentence, blob);
+                await setCachedAudio(cacheKey, blob);
             }
 
-            await playBlob(sentence, blob);
+            await playBlob(sentence, cacheKey, blob);
             return true;
         } catch (error) {
             console.error('음성을 재생하는 데 실패했습니다:', error);

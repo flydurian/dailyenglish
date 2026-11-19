@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import styled from '@emotion/styled';
 import { CloseIcon, BookOpenIcon, LoaderIcon, Volume2Icon } from './Icons';
+import AccentFlags from './AccentFlags';
 import { parseLectureMarkdown } from '../utils/lectureMarkdown';
 
 const ModalOverlay = styled.div`
@@ -294,6 +295,14 @@ const ExplanationModal = ({ isOpen, onClose, explanation, isLoading, audioStates
           >
             {isAudioLoading ? <LoaderIcon size="h-4 w-4" /> : <Volume2Icon />}
           </SpeakButton>
+        )}
+        {onPlayAudio && (
+          <AccentFlags
+            text={sentence}
+            onPlayAudio={onPlayAudio}
+            audioState={audioStates[sentence]}
+            size={24}
+          />
         )}
       </SentenceQuote>
     );

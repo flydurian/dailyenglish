@@ -6,6 +6,7 @@ import ExplanationModal from './ExplanationModal';
 import { phrasalVerbDetails } from '../data/phrasalVerbDetails';
 import { getPhrasalVerbDetail, getCachedVerbDetail } from '../utils/verbDetailService';
 import TranslationStatus from './TranslationStatus';
+import AccentFlags from './AccentFlags';
 
 // 최신 CSS Grid와 Flexbox를 활용한 스타일드 컴포넌트들
 const CardContainer = styled.div`
@@ -669,6 +670,12 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                             <Volume2Icon />
                         )}
                     </ActionButton>
+                    <AccentFlags
+                      text={cleanTitle}
+                      onPlayAudio={onPlayAudio}
+                      audioState={audioStates[cleanTitle]}
+                      size={24}
+                    />
                     <ActionButton
                         onClick={(e) => {
                             e.stopPropagation();
@@ -736,6 +743,12 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                                     <TranslateIcon className="h-2 w-2" />
                                 )}
                             </ActionButton>
+                            <AccentFlags
+                              text={textToRead}
+                              onPlayAudio={onPlayAudio}
+                              audioState={audioStates[textToRead]}
+                              size={22}
+                            />
                         </div>
                     </div>
 
@@ -892,6 +905,12 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                                                                     <Volume2Icon />
                                                                 )}
                                                             </PvIconButton>
+                                                            <AccentFlags
+                                                              text={situation}
+                                                              onPlayAudio={onPlayAudio}
+                                                              audioState={audioStates[situation]}
+                                                              size={24}
+                                                            />
                                                             <PvIconButton
                                                                 onClick={() => handleExampleTranslation(situation)}
                                                                 aria-label="예문 번역"

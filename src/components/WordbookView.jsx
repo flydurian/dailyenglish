@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import styled from '@emotion/styled';
 import { Volume2Icon, LoaderIcon, CloseIcon } from './Icons';
+import AccentFlags from './AccentFlags';
 import { useWordbook } from '../contexts/WordbookContext';
 
 const FILTERS = [
@@ -239,8 +240,8 @@ const WordbookView = ({ onPlayAudio, audioStates = {} }) => {
 
   const canPlay = typeof onPlayAudio === 'function';
 
-  const handlePlay = (term) => {
-    if (canPlay) onPlayAudio(term);
+  const handlePlay = (term, accent) => {
+    if (canPlay) onPlayAudio(term, accent);
   };
 
   return (
@@ -297,6 +298,12 @@ const WordbookView = ({ onPlayAudio, audioStates = {} }) => {
                     >
                       {isLoading ? <LoaderIcon size="h-3.5 w-3.5" /> : <Volume2Icon />}
                     </IconButton>
+                    <AccentFlags
+                      text={item.term}
+                      onPlayAudio={handlePlay}
+                      audioState={audioState}
+                      size={22}
+                    />
                     <IconButton
                       onClick={() => removeItem(item.id)}
                       aria-label={`${item.term} 단어장에서 삭제`}

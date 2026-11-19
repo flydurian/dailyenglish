@@ -35,6 +35,12 @@ const TEXT_REQUESTS_PER_MINUTE = 20;
 // TTS 체인은 모델 4개 × 3 RPM이라 분당 6회까지 받습니다 (강의 문장 버튼 여러 개를 연달아 눌러도 통과).
 const TTS_REQUESTS_PER_MINUTE = 6;
 
+// 국기 버튼으로 고르는 영어 억양 → Gemini TTS 목소리 ID (서버에서만 매핑).
+const TTS_ACCENT_VOICES = {
+    us: 'en-us-advisor-9', // Midwest, female — 중립적인 미국 발음
+    gb: 'en-gb-advisor-1', // Winchester, female — 중립적인 영국 발음
+};
+
 const ALLOWED_GEN_CONFIG_KEYS = new Set([
     'temperature', 'topP', 'topK', 'maxOutputTokens', 'responseMimeType',
 ]);
@@ -269,7 +275,7 @@ export default async function handler(req, res) {
         return res.status(413).json({ error: 'Payload too large' });
     }
 
-    const { payload, model: requestedModel, format: requestedTtsFormat } = req.body || {};
+    const { payload, model: requestedModel, format: requestedTtsFormat, accent: requestedAccent } = req.body || {};
 
     if (!payload || typeof payload !== 'object' || !requestedModel) {
         return res.status(400).json({ error: 'Missing payload or model' });
@@ -284,6 +290,10 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Unsupported model' });
     }
     const isTts = tier === 'tts';
+    if (isTts && requestedAccent !== undefined && !Object.hasOwn(TTS_ACCENT_VOICES, requestedAccent)) {
+        return res.status(400).json({ error: 'Invalid accent' });
+    }
+    const accentVoice = isTts ? TTS_ACCENT_VOICES[requestedAccent] : undefined;
 
     // TTS 출력 포맷 옵션: 'webm'(기본, Opus/WebM) | 'wav'(WebM 미지원 브라우저 폴백).
     // 포맷이 없는 구형 클라이언트 요청도 기본값 webm으로 트랜스코딩합니다.
@@ -336,7 +346,7 @@ export default async function handler(req, res) {
             tier,
             cooldowns: modelCooldowns,
             attempt: async (entry, timeoutMs) => {
-                const modelPayload = buildModelPayload(entry, sanitizedPayload, tier);
+                const modelPayload = buildModelPayload(entry, sanitizedPayload, tier, accentVoice);
                 const result = isTts
                     ? await requestGemini(entry.model, modelPayload, apiKey, timeoutMs)
                     : await requestGeminiText(entry, modelPayload, apiKey, timeoutMs);

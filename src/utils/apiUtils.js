@@ -69,7 +69,7 @@ export const supportsOpusWebm = (() => {
 
 // TTS는 서버(api/gemini.js)가 오디오를 JSON이 아닌 바이너리(Content-Type: audio/*)로
 // 내려주므로 텍스트 생성과 다른 방식으로 받습니다.
-export const requestTtsAudio = async (sentence, model, format = 'webm') => {
+export const requestTtsAudio = async (sentence, model, format = 'webm', accent) => {
     const response = await fetch(GEMINI_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -79,7 +79,8 @@ export const requestTtsAudio = async (sentence, model, format = 'webm') => {
                 generationConfig: { responseModalities: ['AUDIO'] }
             },
             model,
-            format
+            format,
+            ...(accent ? { accent } : {})
         })
     });
 
