@@ -305,6 +305,14 @@ const DetailExampleText = styled.p`
   font-weight: 600;
   line-height: 1.5;
   letter-spacing: -0.01em;
+
+  em {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 500;
+    border-bottom: 1px solid var(--coral);
+    padding-bottom: 0.5px;
+  }
 `;
 
 const UsageExampleActions = styled.div`
@@ -336,6 +344,11 @@ const SmallActionButton = styled.button`
 
   &:hover {
     border-color: var(--ink);
+  }
+
+  &.on {
+    border-color: var(--coral);
+    color: var(--coral);
   }
 
   &:active {
@@ -426,12 +439,19 @@ const renderSentence = (sentence) => {
   });
 };
 
+// 번역·TTS 캐시 키는 마크다운 기호가 없는 문장을 씁니다.
+const stripExampleMarkdown = (sentence) => (
+  typeof sentence === 'string' ? sentence.replace(/\*\*(.*?)\*\*/g, '$1').trim() : ''
+);
+
 const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, onPlayAudio, onWordClick, onTranslate, level, translations, handleTranslationClick }) => {
   const { fontSize } = useFontSize();
   const { isSaved, toggleItem } = useWordbook();
   const [showTranslation, setShowTranslation] = useState(false);
   const [translation, setTranslation] = useState('');
   const [isTranslating, setIsTranslating] = useState(false);
+  // 예문 번역: { [기호 없는 문장]: { translation, shown, loading } }
+  const [exampleTranslations, setExampleTranslations] = useState({});
   // 사전/일일 데이터에 없는 구동사의 상세 정보: AI 생성 상태(loading/ready/error)
   const [aiDetail, setAiDetail] = useState({ verb: null, status: 'idle', data: null });
 
@@ -440,6 +460,7 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
     setShowTranslation(false);
     setTranslation('');
     setIsTranslating(false);
+    setExampleTranslations({});
   }, [expression.sentence]);
 
   const handleCardClick = useCallback(() => {
@@ -464,6 +485,52 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
     }
     onPlayAudio(text);
   }, [onPlayAudio]);
+
+  const handleExampleTranslateClick = useCallback(async (e, situation) => {
+    if (e && e.stopPropagation) {
+      e.stopPropagation();
+    }
+
+    const cleanText = stripExampleMarkdown(situation);
+    if (!cleanText) return;
+
+    const entry = exampleTranslations[cleanText];
+    // 이전에 받아 둔 번역(로컬 또는 localStorage 캐시)이 있으면 보이기/숨기기만 합니다.
+    const savedTranslation = entry?.translation || translations?.[cleanText]?.translation;
+
+    if (savedTranslation) {
+      setExampleTranslations((prev) => ({
+        ...prev,
+        [cleanText]: {
+          translation: savedTranslation,
+          shown: !prev[cleanText]?.shown,
+        },
+      }));
+      return;
+    }
+
+    if (entry?.loading) return;
+
+    setExampleTranslations((prev) => ({
+      ...prev,
+      [cleanText]: { loading: true, shown: true },
+    }));
+
+    try {
+      const result = await handleTranslationClick(cleanText);
+      setExampleTranslations((prev) => ({
+        ...prev,
+        [cleanText]: { translation: result, shown: true },
+      }));
+    } catch (error) {
+      console.error('예문 번역 실패:', error);
+      setExampleTranslations((prev) => {
+        const next = { ...prev };
+        delete next[cleanText];
+        return next;
+      });
+    }
+  }, [exampleTranslations, handleTranslationClick, translations]);
 
   const handleTranslateClick = useCallback(async (e) => {
     if (e && e.stopPropagation) {
@@ -712,51 +779,60 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
               {details.situations.length > 0 && (
                 <>
                   <DetailTitle>Examples</DetailTitle>
-                  {details.situations.map((situation, idx) => (
-                    <UsageExample key={idx}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                        <div style={{ flex: 1 }}>
-                          <DetailExampleText style={{ fontSize: `calc(${fontSize} * 13.5px)` }}>
-                            {situation}
-                          </DetailExampleText>
-                          {translations[situation]?.translation && (
-                            <ExampleTranslation>
-                              {translations[situation].translation}
-                            </ExampleTranslation>
-                          )}
+                  {details.situations.map((situation, idx) => {
+                    const exampleText = stripExampleMarkdown(situation);
+                    const exampleState = exampleTranslations[exampleText];
+                    const isExampleTranslating = Boolean(exampleState?.loading);
+                    const shownTranslation = exampleState?.shown ? exampleState.translation : '';
+                    const isAudioLoading = audioStates[exampleText] === 'loading';
+
+                    return (
+                      <UsageExample key={idx}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                          <div style={{ flex: 1 }}>
+                            <DetailExampleText style={{ fontSize: `calc(${fontSize} * 13.5px)` }}>
+                              {renderSentence(situation)}
+                            </DetailExampleText>
+                            {shownTranslation && (
+                              <ExampleTranslation>
+                                {shownTranslation}
+                              </ExampleTranslation>
+                            )}
+                          </div>
+                          <UsageExampleActions>
+                            <SmallActionButton
+                              onClick={(e) => {
+                                handleExampleAudioClick(e, exampleText);
+                              }}
+                              disabled={isAudioLoading}
+                              aria-label="음성 재생"
+                            >
+                              {isAudioLoading ? (
+                                <LoaderIcon size="h-1.5 w-1.5" />
+                              ) : (
+                                <Volume2Icon />
+                              )}
+                            </SmallActionButton>
+                            <SmallActionButton
+                              onClick={(e) => {
+                                handleExampleTranslateClick(e, situation);
+                              }}
+                              disabled={isExampleTranslating}
+                              className={shownTranslation ? 'on' : ''}
+                              aria-label={shownTranslation ? '번역 숨기기' : '예문 번역'}
+                              aria-expanded={Boolean(shownTranslation)}
+                            >
+                              {isExampleTranslating ? (
+                                <LoaderIcon size="h-1.5 w-1.5" />
+                              ) : (
+                                <TranslateIcon />
+                              )}
+                            </SmallActionButton>
+                          </UsageExampleActions>
                         </div>
-                        <UsageExampleActions>
-                          <SmallActionButton
-                            onClick={(e) => {
-                              handleExampleAudioClick(e, situation);
-                            }}
-                            disabled={audioStates[situation] === 'loading'}
-                            aria-label="음성 재생"
-                          >
-                            {audioStates[situation] === 'loading' ? (
-                              <LoaderIcon size="h-1.5 w-1.5" />
-                            ) : (
-                              <Volume2Icon />
-                            )}
-                          </SmallActionButton>
-                          <SmallActionButton
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleTranslationClick(situation);
-                            }}
-                            disabled={translations[situation]?.loading}
-                            aria-label="번역"
-                          >
-                            {translations[situation]?.loading ? (
-                              <LoaderIcon size="h-1.5 w-1.5" />
-                            ) : (
-                              <TranslateIcon />
-                            )}
-                          </SmallActionButton>
-                        </UsageExampleActions>
-                      </div>
-                    </UsageExample>
-                  ))}
+                      </UsageExample>
+                    );
+                  })}
                 </>
               )}
             </>
