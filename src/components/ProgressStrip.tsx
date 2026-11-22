@@ -3,7 +3,7 @@ import styled from '@emotion/styled';
 import { useProgress } from '../contexts/ProgressContext';
 import { useWordbook } from '../contexts/WordbookContext';
 
-const formatDayLabel = (dateKey) => {
+const formatDayLabel = (dateKey: string): string => {
   const [, month, day] = dateKey.split('-').map(Number);
   return `${month}월 ${day}일`;
 };
@@ -35,12 +35,12 @@ const Days = styled.span`
   flex: 0 0 auto;
 `;
 
-const DayDot = styled.span`
+const DayDot = styled.span<{ $today: boolean; $active: boolean }>`
   width: 9px;
   height: 9px;
-  border: 1px solid ${props => props.$today ? 'var(--ink)' : 'var(--line)'};
+  border: 1px solid ${(props) => (props.$today ? 'var(--ink)' : 'var(--line)')};
   border-radius: 50%;
-  background: ${props => props.$active ? 'var(--coral)' : 'transparent'};
+  background: ${(props) => (props.$active ? 'var(--coral)' : 'transparent')};
   box-sizing: border-box;
 `;
 

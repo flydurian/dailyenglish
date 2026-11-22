@@ -9,7 +9,7 @@ const Group = styled.span`
   flex: 0 0 auto;
 `;
 
-const FlagButton = styled.button`
+const FlagButton = styled.button<{ $size: number }>`
   display: grid;
   place-items: center;
   width: ${({ $size }) => $size}px;
@@ -39,11 +39,18 @@ const FlagButton = styled.button`
   }
 `;
 
-const AccentFlags = ({ text, onPlayAudio, audioState, size = 26 }) => {
+interface AccentFlagsProps {
+  text: string;
+  onPlayAudio?: (text: string, accent: 'us' | 'gb') => void;
+  audioState?: string;
+  size?: number;
+}
+
+const AccentFlags = ({ text, onPlayAudio, audioState, size = 26 }: AccentFlagsProps) => {
   if (typeof onPlayAudio !== 'function' || !text) return null;
 
-  const play = (event, accent) => {
-    if (event && event.stopPropagation) event.stopPropagation();
+  const play = (event: React.MouseEvent<HTMLButtonElement>, accent: 'us' | 'gb') => {
+    event.stopPropagation();
     onPlayAudio(text, accent);
   };
 

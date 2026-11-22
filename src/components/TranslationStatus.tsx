@@ -18,7 +18,11 @@ const Status = styled.span`
   }
 `;
 
-const TranslationStatus = ({ label = '번역하고 있어요...' }) => (
+interface TranslationStatusProps {
+  label?: string;
+}
+
+const TranslationStatus = ({ label = '번역하고 있어요...' }: TranslationStatusProps) => (
   <Status role="status" aria-live="polite">
     <LoaderIcon />
     <span>{label}</span>

@@ -56,7 +56,17 @@ const DismissButton = styled.button`
   &:hover { opacity: 1; }
 `;
 
-const AudioNotice = ({ notice, onDismiss }) => {
+interface AudioNoticeData {
+  id: number;
+  message: string;
+}
+
+interface AudioNoticeProps {
+  notice: AudioNoticeData | null;
+  onDismiss: () => void;
+}
+
+const AudioNotice = ({ notice, onDismiss }: AudioNoticeProps) => {
   if (!notice) return null;
 
   return createPortal(

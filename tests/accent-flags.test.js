@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import AccentFlags from '../src/components/AccentFlags.jsx';
+import AccentFlags from '../src/components/AccentFlags';
 
 describe('AccentFlags', () => {
   it('us/gb 버튼을 렌더링하고 클릭 시 onPlayAudio(text, accent)를 호출한다', () => {

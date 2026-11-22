@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import TranslationStatus from '../src/components/TranslationStatus.jsx';
+import TranslationStatus from '../src/components/TranslationStatus';
 
 describe('TranslationStatus', () => {
   it('기본 라벨과 함께 접근 가능한 status 영역을 렌더링한다', () => {

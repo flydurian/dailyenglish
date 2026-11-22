@@ -12,7 +12,7 @@ const iconProps = {
     strokeLinejoin: 'round',
     'aria-hidden': 'true',
     focusable: 'false',
-};
+} as const;
 
 export const ChevronLeftIcon = () => (
     <svg {...iconProps} strokeWidth="1.6" className="h-5 w-5 sm:h-6 sm:w-6">
