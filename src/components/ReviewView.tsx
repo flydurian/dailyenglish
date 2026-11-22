@@ -7,8 +7,14 @@ import { useProgress } from '../contexts/ProgressContext';
 import { toLocalDateKey } from '../utils/dateUtils';
 import { getDueItems, getNextDueDate, gradeItem } from '../utils/srs';
 import type { WordbookItem } from '../utils/wordbookUtils';
+import type { Accent, AudioStates, PlayAudio } from '../types';
 
-const shuffle = (list) => {
+interface ReviewViewProps {
+  onPlayAudio: PlayAudio;
+  audioStates?: AudioStates;
+}
+
+const shuffle = (list: WordbookItem[]) => {
   const shuffled = [...list];
   for (let i = shuffled.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -17,12 +23,13 @@ const shuffle = (list) => {
   return shuffled;
 };
 
-const isTypingTarget = (target) => {
-  if (!target || typeof target.tagName !== 'string') return false;
-  const tag = target.tagName.toUpperCase();
+const isTypingTarget = (target: unknown) => {
+  const el = target as { tagName?: unknown; getAttribute?: (name: string) => string | null; isContentEditable?: boolean } | null;
+  if (!el || typeof el.tagName !== 'string') return false;
+  const tag = el.tagName.toUpperCase();
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
-    || tag === 'BUTTON' || tag === 'A' || target.getAttribute?.('role') === 'button'
-    || target.isContentEditable;
+    || tag === 'BUTTON' || tag === 'A' || el.getAttribute?.('role') === 'button'
+    || el.isContentEditable;
 };
 
 const getDueItemIds = (items: WordbookItem[], todayKey: string): string[] => (
@@ -386,7 +393,7 @@ const EndBadge = styled.div`
   margin-bottom: 10px;
 `;
 
-const ReviewView = ({ onPlayAudio, audioStates = {} }) => {
+const ReviewView = ({ onPlayAudio, audioStates = {} }: ReviewViewProps) => {
   const { items, updateItem } = useWordbook();
   const { record } = useProgress();
   const [todayKey] = useState(() => toLocalDateKey());
@@ -410,7 +417,7 @@ const ReviewView = ({ onPlayAudio, audioStates = {} }) => {
   const currentItem = sessionItems[index];
   const canPlay = typeof onPlayAudio === 'function';
 
-  const handleGrade = useCallback((known) => {
+  const handleGrade = useCallback((known: boolean) => {
     if (!currentItem || !revealed || finished) return;
 
     record('reviewed');
@@ -456,7 +463,7 @@ const ReviewView = ({ onPlayAudio, audioStates = {} }) => {
   }, [items, resetSessionState]);
 
   useEffect(() => {
-    const handleKeyDown = (event) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
       if (isTypingTarget(event.target)) return;
       if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
       if (!currentItem || finished) return;
@@ -482,7 +489,7 @@ const ReviewView = ({ onPlayAudio, audioStates = {} }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentItem, finished, revealed, handleGrade]);
 
-  const play = (text, accent?) => {
+  const play = (text: string, accent?: Accent) => {
     if (canPlay) onPlayAudio(text, accent);
   };
 
@@ -610,7 +617,7 @@ const ReviewView = ({ onPlayAudio, audioStates = {} }) => {
                 <AccentFlags
                   text={currentItem.example}
                   onPlayAudio={play}
-                  audioState={exampleAudioState}
+                  audioState={exampleAudioState as string | undefined}
                   size={22}
                 />
               </ExampleBox>

@@ -5,16 +5,16 @@
 // '|' 같은 정규식 메타 문자는 한글로 취급하지 않습니다.
 const HANGUL_PATTERN = /[\uAC00-\uD7A3\u1100-\u11FF\u3130-\u318F]/;
 
-export function containsHangul(text) {
+export function containsHangul(text: unknown) {
     if (typeof text !== 'string') return false;
     return HANGUL_PATTERN.test(text);
 }
 
 // 제목이나 요약이 비어 있거나 한글이 섞여 있으면 영어로 다시 써야 합니다.
-export function needsEnglishRewrite(item) {
+export function needsEnglishRewrite(item: unknown) {
     if (!item || typeof item !== 'object') return true;
 
-    const { title, summary } = item;
+    const { title, summary } = item as { title?: unknown; summary?: unknown };
     if (typeof title !== 'string' || !title.trim()) return true;
     if (typeof summary !== 'string' || !summary.trim()) return true;
 

@@ -3,14 +3,22 @@ import styled from '@emotion/styled';
 import { Volume2Icon, LoaderIcon, CloseIcon } from './Icons';
 import AccentFlags from './AccentFlags';
 import { useWordbook } from '../contexts/WordbookContext';
+import type { Accent, AudioStates, PlayAudio } from '../types';
 
-const FILTERS = [
+interface WordbookViewProps {
+  onPlayAudio: PlayAudio;
+  audioStates?: AudioStates;
+}
+
+type FilterKey = 'all' | 'phrasal' | 'word';
+
+const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'all', label: '전체' },
   { key: 'phrasal', label: '구동사' },
   { key: 'word', label: '단어' },
 ];
 
-const TYPE_LABELS = {
+const TYPE_LABELS: Record<string, string> = {
   phrasal: '구동사',
   word: '단어',
 };
@@ -224,11 +232,11 @@ const EmptyHint = styled.p`
   line-height: 1.6;
 `;
 
-const WordbookView = ({ onPlayAudio, audioStates = {} }) => {
+const WordbookView = ({ onPlayAudio, audioStates = {} }: WordbookViewProps) => {
   const { items, removeItem } = useWordbook();
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState<FilterKey>('all');
 
-  const counts = useMemo(() => ({
+  const counts: Record<FilterKey, number> = useMemo(() => ({
     all: items.length,
     phrasal: items.filter((item) => item.type === 'phrasal').length,
     word: items.filter((item) => item.type === 'word').length,
@@ -240,7 +248,7 @@ const WordbookView = ({ onPlayAudio, audioStates = {} }) => {
 
   const canPlay = typeof onPlayAudio === 'function';
 
-  const handlePlay = (term, accent?) => {
+  const handlePlay = (term: string, accent?: Accent) => {
     if (canPlay) onPlayAudio(term, accent);
   };
 

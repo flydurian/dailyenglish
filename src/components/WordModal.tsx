@@ -4,6 +4,20 @@ import { Volume2Icon, TranslateIcon, LoaderIcon, CloseIcon, BookmarkIcon } from 
 import { useWordbook, makeWordbookId } from '../contexts/WordbookContext';
 import TranslationStatus from './TranslationStatus';
 import AccentFlags from './AccentFlags';
+import type { Accent, AudioStates, PlayAudio, Translate, WordDetailInfo } from '../types';
+
+interface WordModalProps {
+  isOpen: boolean;
+  word: string;
+  meaning: string;
+  example: string;
+  detailedInfo: WordDetailInfo | null;
+  onClose: () => void;
+  onPlayAudio?: PlayAudio;
+  audioStates?: AudioStates;
+  onGenerateExamples?: (word: string, meaning: string) => Promise<string[]>;
+  onTranslate?: Translate;
+}
 
 const Overlay = styled.div`
   position: fixed;
@@ -352,14 +366,14 @@ const EmptyText = styled.p`
   font-style: italic;
 `;
 
-const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPlayAudio, audioStates = {}, onGenerateExamples, onTranslate }) => {
+const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPlayAudio, audioStates = {}, onGenerateExamples, onTranslate }: WordModalProps) => {
     const { isSaved, toggleItem } = useWordbook();
-    const [examples, setExamples] = useState([]);
+    const [examples, setExamples] = useState<string[]>([]);
     const [isGeneratingExamples, setIsGeneratingExamples] = useState(false);
     const [exampleTranslation, setExampleTranslation] = useState('');
     const [showExampleTranslation, setShowExampleTranslation] = useState(false);
     const [isTranslatingExample, setIsTranslatingExample] = useState(false);
-    const [generatedTranslations, setGeneratedTranslations] = useState({});
+    const [generatedTranslations, setGeneratedTranslations] = useState<Record<string, string>>({});
     const [translatingText, setTranslatingText] = useState('');
 
     useEffect(() => {
@@ -403,7 +417,7 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
 
     useEffect(() => {
         if (!isOpen) return undefined;
-        const handleKeyDown = (event) => {
+        const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') onClose?.();
         };
         window.addEventListener('keydown', handleKeyDown);
@@ -415,7 +429,7 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
     const wordbookType = word && word.trim().includes(' ') ? 'phrasal' : 'word';
     const saved = word ? isSaved(makeWordbookId(wordbookType, word)) : false;
 
-    const handleSaveClick = (e) => {
+    const handleSaveClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (!word || !word.trim()) return;
 
@@ -427,19 +441,19 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
         });
     };
 
-    const handleBackdropClick = (e) => {
+    const handleBackdropClick = (e: React.MouseEvent) => {
         if (e.target === e.currentTarget) {
             onClose();
         }
     };
 
-    const playAudio = (text, accent?) => {
+    const playAudio = (text: string, accent?: Accent) => {
         if (typeof onPlayAudio === 'function') onPlayAudio(text, accent);
     };
 
     const primaryExample = (example || '').replace(/\*\*(.*?)\*\*/g, '$1').trim();
 
-    const highlightWord = (sentence) => {
+    const highlightWord = (sentence: string) => {
         if (!word) return sentence;
         const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const parts = sentence.split(new RegExp(`(${escaped})`, 'ig'));
@@ -475,7 +489,7 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
         setShowExampleTranslation(true);
     };
 
-    const handleGeneratedTranslate = async (text) => {
+    const handleGeneratedTranslate = async (text: string) => {
         if (!text || typeof onTranslate !== 'function') return;
 
         if (generatedTranslations[text]) {

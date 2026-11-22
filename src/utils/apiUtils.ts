@@ -11,7 +11,7 @@ export interface ApiError extends Error {
 // 모든 환경에서 서버리스 함수(/api/gemini)를 통해 Gemini를 호출합니다.
 // model 인자는 용도(tier:generate = 예문·설명, tier:fast = 번역·요약)이며, 실제 모델은 서버 체인이 고릅니다.
 // API 키는 서버의 GEMINI_API_KEY 에만 있으며 클라이언트 번들에 포함되지 않습니다.
-export const callGeminiAPI = async (payload, model, maxRetries = 3) => {
+export const callGeminiAPI = async (payload: unknown, model: string, maxRetries = 3) => {
     if (!payload || !model) {
         throw new Error('Gemini API requires payload and model');
     }
@@ -41,15 +41,17 @@ export const callGeminiAPI = async (payload, model, maxRetries = 3) => {
 
             return await response.json();
         } catch (e) {
-            if (e.message === 'USAGE_LIMIT_EXCEEDED') {
+            const err = e as ApiError;
+            if (err.message === 'USAGE_LIMIT_EXCEEDED') {
                 throw new Error("이용자가 많아 잠시 후 다시 시도해주세요. (API 할당량 초과)");
             }
 
-            console.error(`[gemini] 호출 실패 (시도 ${attempt + 1}/${maxRetries}):`, e.message);
+            console.error(`[gemini] 호출 실패 (시도 ${attempt + 1}/${maxRetries}):`, err.message);
 
             // 4xx(잘못된 요청/모델)는 재시도해도 결과가 같으므로 즉시 중단합니다.
             // 503은 서버가 이미 모델 체인 전체(주 모델 + 예비 모델)를 시도한 결과라 재시도하지 않습니다.
-            const isFinal = (e.status >= 400 && e.status < 500) || e.status === 503;
+            const status = err.status ?? 0;
+            const isFinal = (status >= 400 && status < 500) || err.status === 503;
             if (attempt >= maxRetries - 1 || isFinal) {
                 throw e;
             }
@@ -76,7 +78,7 @@ export const supportsOpusWebm = (() => {
 
 // TTS는 서버(api/gemini.js)가 오디오를 JSON이 아닌 바이너리(Content-Type: audio/*)로
 // 내려주므로 텍스트 생성과 다른 방식으로 받습니다.
-export const requestTtsAudio = async (sentence, model, format = 'webm', accent) => {
+export const requestTtsAudio = async (sentence: string, model: string, format = 'webm', accent?: string) => {
     const response = await fetch(GEMINI_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

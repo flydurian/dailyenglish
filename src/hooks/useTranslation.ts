@@ -1,10 +1,11 @@
 import { useState, useCallback, useEffect } from 'react';
 import { callGeminiAPI } from '../utils/apiUtils';
+import type { TranslationEntry, Translations } from '../types';
 
 export const useTranslation = () => {
-    const [translations, setTranslations] = useState({});
+    const [translations, setTranslations] = useState<Translations>({});
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState(null);
+    const [error, setError] = useState<string | null>(null);
 
     // 로컬 스토리지에서 번역 캐시 로드
     useEffect(() => {
@@ -14,8 +15,8 @@ export const useTranslation = () => {
                 const parsed = JSON.parse(cachedTranslations);
                 // 7일 이상 된 캐시는 제거
                 const now = Date.now();
-                const filtered = {};
-                Object.keys(parsed).forEach(key => {
+                const filtered: Translations = {};
+                Object.keys(parsed).forEach((key: string) => {
                     if (parsed[key].timestamp && (now - parsed[key].timestamp) < 7 * 24 * 60 * 60 * 1000) {
                         filtered[key] = parsed[key];
                     }
@@ -28,7 +29,7 @@ export const useTranslation = () => {
     }, []);
 
     // 번역 캐시를 로컬 스토리지에 저장
-    const saveToCache = useCallback((key, data) => {
+    const saveToCache = useCallback((key: string, data: TranslationEntry) => {
         setTranslations((prev) => {
             const updated = { ...prev, [key]: data };
             try {
@@ -41,10 +42,10 @@ export const useTranslation = () => {
     }, []);
 
     // 긴 텍스트를 청크로 나누어 번역하는 함수
-    const translateLongText = useCallback(async (text) => {
+    const translateLongText = useCallback(async (text: string) => {
         try {
             // 텍스트를 문장 단위로 나누기
-            const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+            const sentences = text.split(/[.!?]+/).filter((s: string) => s.trim().length > 0);
             const chunks: string[] = [];
             let currentChunk = '';
 
@@ -125,7 +126,7 @@ export const useTranslation = () => {
         }
     }, [translations, saveToCache]);
 
-    const translateText = useCallback(async (text) => {
+    const translateText = useCallback(async (text: string) => {
         if (!text || text.trim().length === 0) {
             return '';
         }
@@ -203,10 +204,11 @@ export const useTranslation = () => {
 
         } catch (e) {
             console.error("번역 실패:", e);
-            setError(e.message);
+            const err = e as Error;
+            setError(err.message);
 
             // API 키가 없는 경우 안내 메시지
-            if (e.message && e.message.includes('API_KEY')) {
+            if (err.message && err.message.includes('API_KEY')) {
                 return "API 키가 설정되지 않았습니다.";
             }
 
@@ -217,7 +219,7 @@ export const useTranslation = () => {
     }, [translations, saveToCache, translateLongText]);
 
 
-    const summarizeText = useCallback(async (text) => {
+    const summarizeText = useCallback(async (text: string) => {
         if (!text || text.trim().length === 0) {
             return '';
         }
@@ -287,7 +289,7 @@ export const useTranslation = () => {
         }
     }, [translations, saveToCache]);
 
-    const generateExamples = useCallback(async (word, meaning) => {
+    const generateExamples = useCallback(async (word: string, meaning: string) => {
         if (!word || !meaning) {
             return [];
         }
@@ -336,8 +338,8 @@ Return ONLY the 2 sentences, each on a separate line, nothing else:`;
             }
 
             const examples = response.split('\n')
-                .map(line => line.trim())
-                .filter(line => line.length > 0)
+                .map((line: string) => line.trim())
+                .filter((line: string) => line.length > 0)
                 .slice(0, 2); // 정확히 2개만 가져오기
 
             // 캐시에 저장
@@ -354,7 +356,7 @@ Return ONLY the 2 sentences, each on a separate line, nothing else:`;
         }
     }, [translations, saveToCache]);
 
-    const explainArticle = useCallback(async (text, level = 'B1') => {
+    const explainArticle = useCallback(async (text: string, level = 'B1') => {
         if (!text || text.trim().length === 0) {
             return '';
         }
@@ -439,7 +441,7 @@ Use Markdown for formatting (bolding, bullet points).
 
         } catch (e) {
             console.error("설명 생성 실패:", e);
-            setError(e.message);
+            setError((e as Error).message);
             return "선생님이 설명을 준비하는 도중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.";
         } finally {
             setIsLoading(false);

@@ -13,7 +13,19 @@ import {
     buildNewsRewritePrompt
 } from '../utils/newsLanguage';
 
-const buildFallbackSummary = (isKorean) => `${isKorean ? 'South Korea' : 'International communities'} continue to make significant progress in various fields. Recent developments show promising trends in technology, economy, and social innovation.
+interface RawNewsItem {
+    title: string;
+    full_text?: string;
+    description?: string;
+    content?: string;
+    source?: string;
+    date?: string;
+    category?: string;
+    publishedAt?: string;
+    url?: string;
+}
+
+const buildFallbackSummary = (isKorean: boolean) => `${isKorean ? 'South Korea' : 'International communities'} continue to make significant progress in various fields. Recent developments show promising trends in technology, economy, and social innovation.
 
 Key sectors are experiencing growth and transformation. Innovation and cooperation play crucial roles in addressing current challenges. Stakeholders are working together to create sustainable solutions for the future.
 
@@ -40,7 +52,7 @@ const FALLBACK_VOCABULARY_NOTES = [
 ];
 
 // 한국 뉴스 제목을 영어로 번역합니다. 한글이 남으면 빈 문자열을 돌려줍니다.
-const translateKoreanHeadlineToEnglish = async (headline, targetLevel) => {
+const translateKoreanHeadlineToEnglish = async (headline: unknown, targetLevel: string) => {
     if (typeof headline !== 'string' || !containsHangul(headline)) return '';
 
     try {
@@ -77,14 +89,14 @@ Return ONLY the English translation, nothing else. Make it suitable for ${target
 export const useDataFetching = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const inFlight = useRef(new Map());
+    const inFlight = useRef(new Map<string, Promise<unknown>>());
     // 인자가 같은 중복 호출(StrictMode 이중 effect)은 같은 세대로 두고, 값이 바뀌면 세대를 올립니다.
     // 오래된 세대의 응답은 상태와 소비자에게 반영하지 않습니다.
     const lastRequest = useRef<{ expressions: string | null; news: string | null }>({ expressions: null, news: null });
     const generations = useRef({ expressions: 0, news: 0 });
 
     // 최소한의 폴백 뉴스 데이터 (Gemini API 실패 시에만 사용)
-    const getFallbackNews = useCallback((type, dayOfYear) => {
+    const getFallbackNews = useCallback((type: string, dayOfYear: number) => {
         const sources = type === 'korean' ? [
             'KBS News', 'MBC News', 'SBS News', 'YTN News', 'Arirang News', 'Korea Herald'
         ] : [
@@ -110,7 +122,7 @@ export const useDataFetching = () => {
     }, []);
 
     // RSS 피드를 사용해서 실제 뉴스 기사 가져오기
-    const fetchRealNews = useCallback(async (type, targetLevel = 'B1') => {
+    const fetchRealNews = useCallback(async (type: string, targetLevel = 'B1') => {
         try {
             console.log(`${type} 뉴스 가져오는 중...`);
 
@@ -152,16 +164,16 @@ export const useDataFetching = () => {
                 const proxies = [
                     {
                         name: 'AllOrigins',
-                        getUrl: url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-                        parse: async (res) => {
+                        getUrl: (url: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+                        parse: async (res: Response) => {
                             const data = await res.json();
                             return data.contents;
                         }
                     },
                     {
                         name: 'CodeTabs',
-                        getUrl: url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-                        parse: async (res) => {
+                        getUrl: (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+                        parse: async (res: Response) => {
                             return await res.text();
                         }
                     }
@@ -289,17 +301,17 @@ export const useDataFetching = () => {
 
 
     // 한국 뉴스 가져오기
-    const fetchKoreanNews = useCallback(async (date, targetLevel = 'B1') => {
+    const fetchKoreanNews = useCallback(async (date: Date | string, targetLevel = 'B1') => {
         return fetchRealNews('korean', targetLevel);
     }, [fetchRealNews]);
 
     // 세계 뉴스 가져오기
-    const fetchWorldNews = useCallback(async (date) => {
+    const fetchWorldNews = useCallback(async (date: Date | string) => {
         return fetchRealNews('world');
     }, [fetchRealNews]);
 
     // 레벨별 뉴스 요약 생성
-    const summarizeNewsForLevel = useCallback(async (newsItem, targetLevel) => {
+    const summarizeNewsForLevel = useCallback(async (newsItem: RawNewsItem, targetLevel: string) => {
         // 뉴스 데이터 유효성 검사
         if (!newsItem || !newsItem.title) {
             console.error('뉴스 데이터가 유효하지 않습니다:', newsItem);
@@ -329,7 +341,7 @@ export const useDataFetching = () => {
                 date: newsItem.date
             });
 
-            const requestSummary = async (prompt) => {
+            const requestSummary = async (prompt: string) => {
                 const payload = {
                     contents: [{ role: "user", parts: [{ text: prompt }] }],
                     generationConfig: {
@@ -412,7 +424,7 @@ IMPORTANT: Your previous answer still contained Korean (Hangul) in "title" or "s
         }
     }, []);
 
-    const fetchExpressionsInternal = useCallback(async (date, selectedLevel, generation) => {
+    const fetchExpressionsInternal = useCallback(async (date: Date | string, selectedLevel: string, generation: number) => {
         if (generation !== generations.current.expressions) return undefined;
         setLoading(true);
         setError(null);
@@ -444,7 +456,7 @@ IMPORTANT: Your previous answer still contained Korean (Hangul) in "title" or "s
             const dailyVerbs = await getDailyPhrasalVerbs(dateObj);
             const verbsList = dailyVerbs.map(v => `${v.verb} (meaning: ${v.meaning})`).join(', ');
 
-            const prompt = `You are an expert English teacher for a language learning app. The learner's level is CEFR ${selectedLevel} (${levelDescriptions[selectedLevel]}). 
+            const prompt = `You are an expert English teacher for a language learning app. The learner's level is CEFR ${selectedLevel} (${(levelDescriptions as Record<string, string>)[selectedLevel]}). 
             
 TASK: Generate practical usage examples and details for these specific 3 phrasal verbs: ${verbsList}.
 
@@ -582,7 +594,7 @@ IMPORTANT:
         }
     }, []);
 
-    const fetchNewsInternal = useCallback(async (date, selectedLevel, generation) => {
+    const fetchNewsInternal = useCallback(async (date: Date | string, selectedLevel: string, generation: number) => {
         if (generation !== generations.current.news) return undefined;
         setLoading(true);
         setError(null);
@@ -646,7 +658,7 @@ IMPORTANT:
             if (generation !== generations.current.news) return undefined;
 
             // 날짜별 캐시 저장
-            const cacheData = { data: {} };
+            const cacheData: { data: Record<string, unknown> } = { data: {} };
             cacheData.data[selectedLevel] = summarizedNews;
             setCachedData('news', dateObj, cacheData.data);
 
@@ -691,9 +703,9 @@ IMPORTANT:
         cleanupOldMonthlyData();
     }, []);
 
-    const withDedupe = useCallback((key, request) => {
+    const withDedupe = useCallback(<T,>(key: string, request: () => Promise<T>): Promise<T> => {
         if (inFlight.current.has(key)) {
-            return inFlight.current.get(key);
+            return inFlight.current.get(key) as Promise<T>;
         }
         const promise = request().finally(() => {
             inFlight.current.delete(key);
@@ -702,7 +714,7 @@ IMPORTANT:
         return promise;
     }, []);
 
-    const fetchExpressions = useCallback((date, selectedLevel) => {
+    const fetchExpressions = useCallback((date: Date | string, selectedLevel: string) => {
         const dateObj = date instanceof Date ? date : new Date(date);
         const dateKey = isNaN(dateObj.getTime()) ? String(date) : dateObj.toISOString().split('T')[0];
         const params = `${dateKey}|${selectedLevel}`;
@@ -717,7 +729,7 @@ IMPORTANT:
         );
     }, [fetchExpressionsInternal, withDedupe]);
 
-    const fetchNews = useCallback((date, selectedLevel) => {
+    const fetchNews = useCallback((date: Date | string, selectedLevel: string) => {
         const dateObj = date instanceof Date ? date : new Date(date);
         const dateKey = isNaN(dateObj.getTime()) ? String(date) : dateObj.toISOString().split('T')[0];
         const params = `${dateKey}|${selectedLevel}`;

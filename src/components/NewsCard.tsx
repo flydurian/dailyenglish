@@ -3,6 +3,25 @@ import styled from '@emotion/styled';
 import { Volume2Icon, TranslateIcon, LoaderIcon, BookOpenIcon, CloseIcon } from './Icons';
 import { useFontSize } from '../contexts/FontSizeContext';
 import ExplanationModal from './ExplanationModal';
+import type { AudioStates, NewsItemData, OnToggle, PlayAudio, Translations, Translate, WordClickHandler } from '../types';
+
+interface NewsCardProps {
+  newsItem: NewsItemData;
+  index: number;
+  isActive: boolean;
+  onToggle: OnToggle;
+  audioStates: AudioStates;
+  onPlayAudio: PlayAudio;
+  onWordClick: WordClickHandler;
+  onTranslate: Translate;
+  onSummarize: Translate;
+  onGenerateExamples: (word: string, meaning: string) => Promise<string[]>;
+  onExplain: Translate;
+  translations: Translations;
+  handleTranslationClick: Translate;
+}
+
+type ExampleTranslationEntry = { loading?: boolean } | string;
 import { phrasalVerbDetails } from '../data/phrasalVerbDetails';
 import { getPhrasalVerbDetail, getCachedVerbDetail, type AiDetailState } from '../utils/verbDetailService';
 import TranslationStatus from './TranslationStatus';
@@ -388,7 +407,7 @@ const PvDoneButton = styled.button`
   &:active { opacity: 0.85; }
 `;
 
-const parseVocabularyNote = (note) => {
+const parseVocabularyNote = (note: unknown) => {
     const raw = String(note || '').trim();
     const separator = raw.indexOf(':');
     if (separator === -1) return { word: raw, meaning: '' };
@@ -398,7 +417,7 @@ const parseVocabularyNote = (note) => {
     };
 };
 
-const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudio, onWordClick, onTranslate, onSummarize, onGenerateExamples, onExplain, translations, handleTranslationClick }) => {
+const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudio, onWordClick, onTranslate, onSummarize, onGenerateExamples, onExplain, translations, handleTranslationClick }: NewsCardProps) => {
     const { fontSize } = useFontSize();
     const [showTitleTranslation, setShowTitleTranslation] = useState(false);
     const [showArticleTranslation, setShowArticleTranslation] = useState(false);
@@ -409,7 +428,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
     const [selectedPhrasalVerb, setSelectedPhrasalVerb] = useState<string | null>(null);
     // 사전에 없는 구동사의 상세 정보: AI 생성 상태(loading/ready/error)
     const [aiDetail, setAiDetail] = useState<AiDetailState>({ verb: null, status: 'idle', data: null });
-    const [exampleTranslations, setExampleTranslations] = useState({});
+    const [exampleTranslations, setExampleTranslations] = useState<Record<string, ExampleTranslationEntry>>({});
     const [showExplanation, setShowExplanation] = useState(false);
     const [explanation, setExplanation] = useState('');
     const [isExplaining, setIsExplaining] = useState(false);
@@ -434,7 +453,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
 
     useEffect(() => {
         if (!selectedPhrasalVerb) return undefined;
-        const handleKeyDown = (event) => {
+        const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') setSelectedPhrasalVerb(null);
         };
         window.addEventListener('keydown', handleKeyDown);
@@ -445,12 +464,12 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
         onToggle(index);
     }, [onToggle, index]);
 
-    const handleAudioClick = useCallback((e, text) => {
+    const handleAudioClick = useCallback((e: React.MouseEvent, text: string) => {
         e.stopPropagation();
         onPlayAudio(text);
     }, [onPlayAudio]);
 
-    const handleTitleTranslateClick = useCallback(async (e) => {
+    const handleTitleTranslateClick = useCallback(async (e: React.MouseEvent) => {
         e.stopPropagation();
 
         // 이미 번역이 표시 중이면 토글로 숨기기
@@ -478,7 +497,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
         setShowTitleTranslation(true);
     }, [showTitleTranslation, titleTranslation, onTranslate, cleanTitle]);
 
-    const handleArticleTranslateClick = useCallback(async (e) => {
+    const handleArticleTranslateClick = useCallback(async (e: React.MouseEvent) => {
         e.stopPropagation();
 
         // 이미 번역이 표시 중이면 토글로 숨기기
@@ -506,7 +525,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
         setShowArticleTranslation(true);
     }, [showArticleTranslation, articleTranslation, onTranslate, textToRead]);
 
-    const handleExplainClick = useCallback(async (e) => {
+    const handleExplainClick = useCallback(async (e: React.MouseEvent) => {
         e.stopPropagation();
 
         if (showExplanation) {
@@ -537,7 +556,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
 
 
 
-    const findVocabularyExample = useCallback((word) => {
+    const findVocabularyExample = useCallback((word: string) => {
         // 한국 뉴스는 한글 원문으로 대체하지 않고 영어 summary/title 안에서만 예문을 찾습니다.
         const source = isKoreanNews
             ? (newsItem?.summary || newsItem?.title || '')
@@ -554,7 +573,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
         return (matched || sentences[0] || text).trim();
     }, [isKoreanNews, newsItem?.summary, newsItem?.full_text, newsItem?.title]);
 
-    const handleVocabularyClick = useCallback((event, note) => {
+    const handleVocabularyClick = useCallback((event: React.MouseEvent, note: string) => {
         event.stopPropagation();
 
         if (typeof onWordClick !== 'function') return;
@@ -571,7 +590,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
     }, [onWordClick, findVocabularyExample]);
 
     // 구동사 클릭 핸들러
-    const handlePhrasalVerbClick = useCallback((phrasalVerb) => {
+    const handlePhrasalVerbClick = useCallback((phrasalVerb: string) => {
         const verbName = phrasalVerb.split(':')[0].trim().toLowerCase();
         setSelectedPhrasalVerb(phrasalVerb);
 
@@ -597,7 +616,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
         });
     }, [newsItem]);
 
-    const handleExampleTranslation = useCallback(async (exampleText) => {
+    const handleExampleTranslation = useCallback(async (exampleText: string) => {
         if (exampleTranslations[exampleText]) {
             return; // 이미 번역된 경우
         }
@@ -631,7 +650,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
     // 사전 데이터(phrasalVerbDetails)에 등록된 구동사만 반환합니다. 없는 구동사는
     // handlePhrasalVerbClick에서 AI 생성(getPhrasalVerbDetail)으로 처리하며,
     // 여기서 틀린 문장을 만들어내는 템플릿 폴백은 사용하지 않습니다.
-    const getPhrasalVerbDetails = useCallback((phrasalVerb) => {
+    const getPhrasalVerbDetails = useCallback((phrasalVerb: string) => {
         // 구동사 이름만 추출하여 매칭 (예: "come up with: 생각해내다" -> "come up with")
         const phrasalVerbName = phrasalVerb.split(':')[0].trim().toLowerCase();
         return phrasalVerbDetails[phrasalVerbName] || null;
@@ -930,7 +949,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                                                                 onClick={() => handleExampleTranslation(situation)}
                                                                 aria-label="예문 번역"
                                                             >
-                                                                {exampleTranslations[situation]?.loading ? (
+                                                                {(exampleTranslations[situation] as { loading?: boolean } | undefined)?.loading ? (
                                                                     <LoaderIcon size="h-3 w-3" />
                                                                 ) : (
                                                                     <TranslateIcon />
@@ -938,10 +957,10 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                                                             </PvIconButton>
                                                         </PvActions>
                                                     </PvExampleRow>
-                                                    {exampleTranslations[situation]?.loading ? (
+                                                    {(exampleTranslations[situation] as { loading?: boolean } | undefined)?.loading ? (
                                                         <PvTranslation><TranslationStatus /></PvTranslation>
                                                     ) : exampleTranslations[situation] ? (
-                                                        <PvTranslation>{exampleTranslations[situation]}</PvTranslation>
+                                                        <PvTranslation>{exampleTranslations[situation] as string}</PvTranslation>
                                                     ) : null}
                                                 </PvExample>
                                             ))}

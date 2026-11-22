@@ -1,5 +1,14 @@
 // 구동사 상세 학습 정보 통합 데이터 사전
-export const phrasalVerbDetails = {
+export interface PhrasalVerbDetail {
+  verb: string;
+  meaning: string;
+  nuance: string;
+  usage: string;
+  grammar: string;
+  situations: string[];
+}
+
+export const phrasalVerbDetails: Record<string, PhrasalVerbDetail> = {
   'come up with': {
     verb: 'come up with',
     meaning: '생각해내다, 제안하다',

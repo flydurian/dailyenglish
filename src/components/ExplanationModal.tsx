@@ -3,7 +3,17 @@ import { createPortal } from 'react-dom';
 import styled from '@emotion/styled';
 import { CloseIcon, BookOpenIcon, LoaderIcon, Volume2Icon } from './Icons';
 import AccentFlags from './AccentFlags';
-import { parseLectureMarkdown } from '../utils/lectureMarkdown';
+import { parseLectureMarkdown, type InlineSegment } from '../utils/lectureMarkdown';
+import type { AudioStates, PlayAudio } from '../types';
+
+interface ExplanationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  explanation: string;
+  isLoading: boolean;
+  audioStates?: AudioStates;
+  onPlayAudio?: PlayAudio;
+}
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -245,11 +255,11 @@ const SpeakButton = styled.button`
   }
 `;
 
-const ExplanationModal = ({ isOpen, onClose, explanation, isLoading, audioStates = {}, onPlayAudio }) => {
+const ExplanationModal = ({ isOpen, onClose, explanation, isLoading, audioStates = {}, onPlayAudio }: ExplanationModalProps) => {
   const modalRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const handleEscape = (e) => {
+    const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
 
@@ -264,22 +274,22 @@ const ExplanationModal = ({ isOpen, onClose, explanation, isLoading, audioStates
     };
   }, [isOpen, onClose]);
 
-  const handleOverlayClick = (e) => {
+  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
     // 포털이라도 React 이벤트는 CardContainer까지 버블되므로 여기서 막습니다.
     e.stopPropagation();
-    if (modalRef.current && !modalRef.current.contains(e.target)) {
+    if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
       onClose();
     }
   };
 
-  const handleSpeak = (e, sentence) => {
+  const handleSpeak = (e: React.MouseEvent<HTMLButtonElement>, sentence: string) => {
     // 모달은 포털이지만 React 이벤트는 NewsCard(카드 토글)까지 버블링되므로 막습니다.
     e.stopPropagation();
     if (!onPlayAudio) return;
     Promise.resolve(onPlayAudio(sentence)).catch(() => { /* useAudio가 이미 로그를 남깁니다 */ });
   };
 
-  const renderSentence = (sentence, key) => {
+  const renderSentence = (sentence: string, key: React.Key) => {
     const isAudioLoading = audioStates[sentence] === 'loading';
     return (
       <SentenceQuote key={key}>
@@ -310,11 +320,11 @@ const ExplanationModal = ({ isOpen, onClose, explanation, isLoading, audioStates
     );
   };
 
-  const renderInline = (segments) => segments.map((segment, i) =>
+  const renderInline = (segments: InlineSegment[]) => segments.map((segment, i) =>
     segment.bold ? <strong key={i}>{segment.text}</strong> : <React.Fragment key={i}>{segment.text}</React.Fragment>
   );
 
-  const renderMarkdown = (text) => parseLectureMarkdown(text).map((block, index) => {
+  const renderMarkdown = (text: string) => parseLectureMarkdown(text).map((block, index) => {
     switch (block.type) {
       case 'sentence':
         return renderSentence(block.sentence, index);

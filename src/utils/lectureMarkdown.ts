@@ -11,16 +11,16 @@ const QUOTED_BLOCK_RE = /^\s*>\s*\**\s*["“]/;
 const HANGUL_RE = /[ㄱ-ㆎ가-힣]/;
 
 // 따옴표로 감싼 부분만 꺼냅니다. 뒤에 붙은 마침표나 (한국어 해석)은 버립니다.
-export const cleanSentence = (text) => {
+export const cleanSentence = (text: string) => {
   const stripped = text.replace(/^[\s>*\-]+/, '').replace(/\*\*/g, '').trim();
   const quoted = stripped.match(/^["“](.+)["”]/);
   return (quoted ? quoted[1] : stripped).trim();
 };
 
 // 문장이 빠진 채 다음 라벨(**Structure & Grammar**: 등)이 오면 문장으로 오인하지 않습니다.
-const isLabelLine = (line) => /\*\*[^*]+\*\*\s*:|^[\s>*\-]*\**[A-Za-z &]+\([^)]*\)\s*\**\s*:/.test(line);
+const isLabelLine = (line: string) => /\*\*[^*]+\*\*\s*:|^[\s>*\-]*\**[A-Za-z &]+\([^)]*\)\s*\**\s*:/.test(line);
 
-const quotedEnglishSentence = (line) => {
+const quotedEnglishSentence = (line: string) => {
   if (!QUOTED_BLOCK_RE.test(line)) return '';
   const sentence = cleanSentence(line);
   return /[A-Za-z]/.test(sentence) && !HANGUL_RE.test(sentence) ? sentence : '';
@@ -45,14 +45,14 @@ export type LectureBlock =
   | BulletBlock | ParagraphBlock | BlankBlock;
 
 // 굵게(**) 밖의 기호를 지웁니다: `코드`, *기울임*, 짝이 안 맞는 **.
-const stripMarks = (text) => text
+const stripMarks = (text: string) => text
   .replace(/`([^`]*)`/g, '$1')
   .replace(/(^|[^\w*])\*(?=\S)([^*\n]*?\S)\*(?![\w*])/g, '$1$2')
   .replace(/\*\*/g, '')
   .replace(/`/g, '');
 
 // 한 줄을 [{ text, bold }] 조각으로 나눕니다.
-export const parseInline = (text): InlineSegment[] => {
+export const parseInline = (text: string): InlineSegment[] => {
   const segments: InlineSegment[] = [];
   text.split(/(\*\*[^*]+?\*\*)/).forEach((part) => {
     if (!part) return;
@@ -63,7 +63,7 @@ export const parseInline = (text): InlineSegment[] => {
   return segments;
 };
 
-const plainText = (text) => parseInline(text).map((segment) => segment.text).join('').trim();
+const plainText = (text: string) => parseInline(text).map((segment) => segment.text).join('').trim();
 
 const BULLET_RE = /^(\s*)(?:[-*+•])\s+(.*)$/;
 
@@ -77,7 +77,7 @@ const BULLET_RE = /^(\s*)(?:[-*+•])\s+(.*)$/;
  * - { type: 'paragraph', inline }
  * - { type: 'blank' }
  */
-export const parseLectureMarkdown = (markdown): LectureBlock[] => {
+export const parseLectureMarkdown = (markdown: string | null | undefined): LectureBlock[] => {
   if (!markdown) return [];
 
   const blocks: LectureBlock[] = [];

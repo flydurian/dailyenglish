@@ -1,5 +1,5 @@
 // 캐시 관리 유틸리티 함수들
-export const getCacheKey = (type, date) => {
+export const getCacheKey = (type: string, date: Date | string) => {
     // Date 객체 유효성 검사
     const dateObj = date instanceof Date ? date : new Date(date);
     if (isNaN(dateObj.getTime())) {
@@ -9,7 +9,7 @@ export const getCacheKey = (type, date) => {
     return `${type}_${dateObj.toISOString().split('T')[0]}`;
 };
 
-export const getCachedData = (type, date) => {
+export const getCachedData = (type: string, date: Date | string) => {
     const cacheKey = getCacheKey(type, date);
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
@@ -23,7 +23,7 @@ export const getCachedData = (type, date) => {
     return null;
 };
 
-export const setCachedData = (type, date, data) => {
+export const setCachedData = (type: string, date: Date | string, data: unknown) => {
     const cacheKey = getCacheKey(type, date);
     // Date 객체 유효성 검사
     const dateObj = date instanceof Date ? date : new Date(date);
@@ -38,7 +38,7 @@ export const setCachedData = (type, date, data) => {
     }));
 };
 
-export const isCacheValid = (type, date) => {
+export const isCacheValid = (type: string, date: Date | string) => {
     const cached = getCachedData(type, date);
     if (!cached) return false;
     

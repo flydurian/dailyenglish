@@ -40,10 +40,10 @@ const persistCache = () => {
 };
 
 // 같은 구동사를 여러 카드에서 동시에 열 때 중복 요청을 막습니다.
-const inflight = new Map();
+const inflight = new Map<string, Promise<VerbDetail | null>>();
 
 // 캐시된 항목을 동기적으로 확인 (컴포넌트에서 로딩 없이 쓰기 위함)
-export const getCachedVerbDetail = (verbName) => {
+export const getCachedVerbDetail = (verbName: string | null | undefined) => {
     if (!verbName) return null;
     const key = String(verbName).trim().toLowerCase();
     const cache = loadCache();
@@ -55,13 +55,13 @@ export const getCachedVerbDetail = (verbName) => {
     return value;
 };
 
-const cleanText = (value) => (typeof value === 'string' ? value.trim().replace(/^["“”']+|["“”']+$/g, '') : '');
+const cleanText = (value: unknown) => (typeof value === 'string' ? value.trim().replace(/^["“”']+|["“”']+$/g, '') : '');
 
 // get together → get/gets/got/gotten/getting 처럼 활용형까지 인정합니다.
 // 규칙(과거형 + ed/ing)으로 유도되지 않는 형태는 여기에 명시합니다.
 // 예전에는 과거형만 저장해 'be → was/washing', 'see → seing' 같은 오답이 생겨
 // "I am fed up with ..." 같은 정상 예문이 전부 기각되는 문제가 있었습니다.
-const IRREGULAR_FORMS = {
+const IRREGULAR_FORMS: Record<string, string[]> = {
     be: ['am', 'is', 'are', 'was', 'were', 'been', 'being'],
     have: ['has', 'had', 'having'],
     do: ['does', 'did', 'done', 'doing'],
@@ -138,7 +138,7 @@ const IRREGULAR_FORMS = {
     freeze: ['froze', 'frozen'],
 };
 
-export const verbFormRegex = (verbName) => {
+export const verbFormRegex = (verbName: string | null | undefined) => {
     const base = String(verbName).trim().toLowerCase().split(/\s+/)[0].replace(/[^a-z]/g, '');
     if (!base) return null;
 
@@ -163,11 +163,12 @@ export const verbFormRegex = (verbName) => {
 };
 
 // 생성 결과 검증: 불량 예문은 걷어내고, 부족하면 null 반환해 재시도/오류로 갑니다.
-export const sanitizeEntry = (raw, verbName) => {
+export const sanitizeEntry = (raw: unknown, verbName: string | null | undefined) => {
     if (!raw || typeof raw !== 'object') return null;
 
-    const nuance = cleanText(raw.nuance);
-    const usage = cleanText(raw.usage);
+    const source = raw as { nuance?: unknown; usage?: unknown; examples?: unknown };
+    const nuance = cleanText(source.nuance);
+    const usage = cleanText(source.usage);
     if (!/[가-힣]/.test(nuance) || !/[가-힣]/.test(usage)) return null;
     if (nuance.length < 20 || usage.length < 20) return null;
     if (nuance === usage) return null;
@@ -175,7 +176,7 @@ export const sanitizeEntry = (raw, verbName) => {
     const formRegex = verbFormRegex(verbName);
     const seen = new Set<string>();
     const situations: string[] = [];
-    for (const example of Array.isArray(raw.examples) ? raw.examples : []) {
+    for (const example of Array.isArray(source.examples) ? source.examples : []) {
         const text = cleanText(example);
         if (!text || /[가-힣]/.test(text)) continue;
         if (text.length < 10 || text.length > 180) continue;
@@ -193,7 +194,7 @@ export const sanitizeEntry = (raw, verbName) => {
     return { nuance, usage, situations };
 };
 
-const buildPrompt = (verbName, meaning, contextSentence, isRetry) => {
+const buildPrompt = (verbName: string, meaning: string | undefined, contextSentence: string | undefined, isRetry: boolean) => {
     const context = contextSentence
         ? `\n실제 사용된 문맥(참고용): "${contextSentence.slice(0, 300)}"`
         : '';
@@ -229,13 +230,13 @@ examples (영어, 정확히 4개): 이 구동사가 실제로 가장 자주 쓰�
  * @returns {Promise<{nuance: string, usage: string, situations: string[]} | null>}
  *          두 번 시도 후 실패하면 null. 컴포넌트는 null이면 오류 UI를 보여줍니다.
  */
-export const getPhrasalVerbDetail = async (verbName, meaning, contextSentence = '') => {
+export const getPhrasalVerbDetail = async (verbName: string | null | undefined, meaning: string | undefined, contextSentence = '') => {
     const key = String(verbName).trim().toLowerCase();
     if (!key) return null;
 
     const cached = getCachedVerbDetail(key);
     if (cached) return cached;
-    if (inflight.has(key)) return inflight.get(key);
+    if (inflight.has(key)) return inflight.get(key)!;
 
     const task = (async () => {
         for (let attempt = 0; attempt < 2; attempt++) {
@@ -261,7 +262,8 @@ export const getPhrasalVerbDetail = async (verbName, meaning, contextSentence = 
                 }
                 console.warn(`[verbDetail] ${key} 검증 실패 (시도 ${attempt + 1}/2)`);
             } catch (error) {
-                console.error(`[verbDetail] ${key} 생성 실패 (시도 ${attempt + 1}/2):`, error?.message || error);
+                const err = error as { message?: string } | null | undefined;
+                console.error(`[verbDetail] ${key} 생성 실패 (시도 ${attempt + 1}/2):`, err?.message || error);
             }
         }
         return null;

@@ -9,6 +9,27 @@ import { getPhrasalVerbDetail, getCachedVerbDetail, type AiDetailState } from '.
 import { css } from '@emotion/react';
 import TranslationStatus from './TranslationStatus';
 import AccentFlags from './AccentFlags';
+import type { AudioStates, ExpressionItem, OnToggle, PlayAudio, Translations, Translate, WordClickHandler, WordDetailInfo } from '../types';
+
+interface ExpressionCardProps {
+  expression: ExpressionItem;
+  index: number;
+  isActive: boolean;
+  onToggle: OnToggle;
+  audioStates: AudioStates;
+  onPlayAudio: PlayAudio;
+  onWordClick: WordClickHandler;
+  onTranslate: Translate;
+  level: string;
+  translations: Translations;
+  handleTranslationClick: Translate;
+}
+
+interface ExampleTranslationEntry {
+  translation?: string;
+  shown?: boolean;
+  loading?: boolean;
+}
 
 const CardContainer = styled.article`
   position: relative;
@@ -432,7 +453,7 @@ const KeyWordMeaning = styled.div`
   line-height: 1.45;
 `;
 
-const renderSentence = (sentence) => {
+const renderSentence = (sentence: string) => {
   return sentence.split(/(\*\*.*?\*\*)/g).map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
       return <em key={i}>{part.slice(2, -2)}</em>;
@@ -442,18 +463,18 @@ const renderSentence = (sentence) => {
 };
 
 // 번역·TTS 캐시 키는 마크다운 기호가 없는 문장을 씁니다.
-const stripExampleMarkdown = (sentence) => (
+const stripExampleMarkdown = (sentence: string) => (
   typeof sentence === 'string' ? sentence.replace(/\*\*(.*?)\*\*/g, '$1').trim() : ''
 );
 
-const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, onPlayAudio, onWordClick, onTranslate, level, translations, handleTranslationClick }) => {
+const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, onPlayAudio, onWordClick, onTranslate, level, translations, handleTranslationClick }: ExpressionCardProps) => {
   const { fontSize } = useFontSize();
   const { isSaved, toggleItem } = useWordbook();
   const [showTranslation, setShowTranslation] = useState(false);
   const [translation, setTranslation] = useState('');
   const [isTranslating, setIsTranslating] = useState(false);
   // 예문 번역: { [기호 없는 문장]: { translation, shown, loading } }
-  const [exampleTranslations, setExampleTranslations] = useState({});
+  const [exampleTranslations, setExampleTranslations] = useState<Record<string, ExampleTranslationEntry>>({});
   // 사전/일일 데이터에 없는 구동사의 상세 정보: AI 생성 상태(loading/ready/error)
   const [aiDetail, setAiDetail] = useState<AiDetailState>({ verb: null, status: 'idle', data: null });
 
@@ -469,26 +490,26 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
     onToggle(index);
   }, [onToggle, index]);
 
-  const handleDetailsClick = useCallback((e) => {
+  const handleDetailsClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     onToggle(index);
   }, [onToggle, index]);
 
-  const handleAudioClick = useCallback((e) => {
+  const handleAudioClick = useCallback((e: React.MouseEvent) => {
     if (e && e.stopPropagation) {
       e.stopPropagation();
     }
     onPlayAudio(expression.sentence);
   }, [onPlayAudio, expression.sentence]);
 
-  const handleExampleAudioClick = useCallback((e, text) => {
+  const handleExampleAudioClick = useCallback((e: React.MouseEvent, text: string) => {
     if (e && e.stopPropagation) {
       e.stopPropagation();
     }
     onPlayAudio(text);
   }, [onPlayAudio]);
 
-  const handleExampleTranslateClick = useCallback(async (e, situation) => {
+  const handleExampleTranslateClick = useCallback(async (e: React.MouseEvent, situation: string) => {
     if (e && e.stopPropagation) {
       e.stopPropagation();
     }
@@ -534,7 +555,7 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
     }
   }, [exampleTranslations, handleTranslationClick, translations]);
 
-  const handleTranslateClick = useCallback(async (e) => {
+  const handleTranslateClick = useCallback(async (e: React.MouseEvent) => {
     if (e && e.stopPropagation) {
       e.stopPropagation();
     }
@@ -563,12 +584,12 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
     setShowTranslation(true);
   }, [showTranslation, translation, onTranslate, expression.sentence]);
 
-  const handleWordClick = useCallback((e, word, meaning, example, detailedInfo) => {
+  const handleWordClick = useCallback((e: React.MouseEvent, word: string, meaning: string, example: string, detailedInfo: WordDetailInfo) => {
     e.stopPropagation();
     onWordClick(word, meaning, example, detailedInfo);
   }, [onWordClick]);
 
-  const handlePhrasalVerbClick = useCallback(async (e) => {
+  const handlePhrasalVerbClick = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
 
     if (expression.phrasal_verb) {
@@ -582,7 +603,7 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
   const getFilteredWords = useCallback(() => {
     if (!expression.other_words) return [];
 
-    const levelLimits = {
+    const levelLimits: Record<string, number> = {
       'A1': 2,
       'A2': 3,
       'B1': 4,
@@ -603,7 +624,7 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
     const phrasalVerbName = phrasalVerb.split(':')[0].trim().toLowerCase();
     const defaultDetails = phrasalVerbDetails[phrasalVerbName];
 
-    const getUniqueExamples = (examples) => {
+    const getUniqueExamples = (examples: string[] | undefined) => {
       if (!examples) return [];
       return examples.filter(example =>
         example.toLowerCase() !== currentSentence.toLowerCase()
@@ -663,12 +684,12 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
   const aiReady = aiDetail.verb === detailVerbName && aiDetail.status === 'ready' && aiDetail.data;
   const detailLoading = !staticDetails && aiDetail.verb === detailVerbName && aiDetail.status === 'loading';
   const detailError = !staticDetails && !aiReady && !detailLoading;
-  const details = staticDetails || (aiReady ? aiDetail.data : null);
+  const details = (staticDetails || (aiReady ? aiDetail.data : null))!;
   const phrasalVerbName = expression.phrasal_verb.split(':')[0].trim();
   const phrasalVerbMeaning = expression.meaning || expression.phrasal_verb.split(':').slice(1).join(':').trim();
   const saved = isSaved(makeWordbookId('phrasal', phrasalVerbName));
 
-  const handleSaveClick = useCallback((e) => {
+  const handleSaveClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     toggleItem({
       type: 'phrasal',

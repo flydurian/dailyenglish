@@ -8,8 +8,6 @@
     "allowJs": true,
     "checkJs": false,
     "strict": true,
-    "noImplicitAny": false,
-    "useUnknownInCatchVariables": false,
     "noEmit": true,
     "skipLibCheck": true,
     "esModuleInterop": true,

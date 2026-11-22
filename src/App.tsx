@@ -19,27 +19,14 @@ import { levelDescriptions } from './utils/apiUtils';
 import { detectHotReload } from './utils/versionUtils';
 import { getDueItems } from './utils/srs';
 import { toLocalDateKey } from './utils/dateUtils';
-
-// API/캐시에서 오는 항목은 필드가 일부 없을 수 있어 느슨하게 둡니다.
-interface ExpressionItem {
-  phrasal_verb?: string;
-  [key: string]: any;
-}
-
-interface NewsItemData {
-  title?: string;
-  summary?: string;
-  key_points?: string[];
-  vocabulary_notes?: string[];
-  [key: string]: any;
-}
+import type { ExpressionItem, NewsItemData, WordDetailInfo } from './types';
 
 interface WordModalState {
   isOpen: boolean;
   word: string;
   meaning: string;
   example: string;
-  detailedInfo: any;
+  detailedInfo: WordDetailInfo | null;
 }
 
 // Editorial Paper 디자인 시스템
@@ -406,7 +393,7 @@ export default function App() {
   const [activeNewsIndex, setActiveNewsIndex] = useState<number | null>(null);
   const [wordModal, setWordModal] = useState<WordModalState>({ isOpen: false, word: '', meaning: '', example: '', detailedInfo: null });
 
-  const openWordModal = useCallback((word, meaning, example, detailedInfo) => {
+  const openWordModal = useCallback((word: string, meaning: string, example: string, detailedInfo: WordDetailInfo) => {
     setWordModal({ isOpen: true, word, meaning, example, detailedInfo });
   }, []);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
@@ -447,7 +434,7 @@ export default function App() {
 
   // 스크롤 이벤트 처리
   useEffect(() => {
-    let scrollTimeout;
+    let scrollTimeout: ReturnType<typeof setTimeout> | undefined;
 
     const handleScroll = () => {
       setShowScrollToTop(window.scrollY > 300);
@@ -636,8 +623,8 @@ export default function App() {
                   <LoadingText>
                     <h3>
                       {activeTab === 'expressions'
-                        ? `${levelDescriptions[level]} 레벨 표현을 만들고 있어요...`
-                        : `${levelDescriptions[level]} 레벨 뉴스를 만들고 있어요...`
+                        ? `${(levelDescriptions as Record<string, string>)[level]} 레벨 표현을 만들고 있어요...`
+                        : `${(levelDescriptions as Record<string, string>)[level]} 레벨 뉴스를 만들고 있어요...`
                       }
                     </h3>
                     <p>AI가 최적화된 학습 콘텐츠를 생성하고 있습니다</p>
@@ -658,7 +645,7 @@ export default function App() {
                       expression={expression}
                       index={index}
                       isActive={activeCardIndex === index}
-                      onToggle={(index) => {
+                      onToggle={(index: number) => {
                         const isOpening = activeCardIndex !== index;
 
                         if (isOpening) {
@@ -691,7 +678,7 @@ export default function App() {
                       newsItem={newsItem}
                       index={index}
                       isActive={activeNewsIndex === index}
-                      onToggle={(index) => {
+                      onToggle={(index: number) => {
                         setActiveNewsIndex(activeNewsIndex === index ? null : index);
                       }}
                       audioStates={audioStates}

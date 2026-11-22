@@ -35,7 +35,7 @@ export const getDateSeed = (date = new Date()) => {
 };
 
 // 시드 기반 랜덤 함수
-function seededRandom(seed) {
+function seededRandom(seed: number) {
   let state = seed;
   return function () {
     state = (state * 9301 + 49297) % 233280;
@@ -94,6 +94,6 @@ export const getRandomPhrasalVerbs = async (count = 5) => {
 };
 
 // 구동사 사용 기록 추가
-export const markPhrasalVerbUsage = async (phrasalVerb, date = new Date()) => {
+export const markPhrasalVerbUsage = async (phrasalVerb: string, date: Date = new Date()) => {
   return await markPhrasalVerbAsUsed(phrasalVerb, date);
 };
