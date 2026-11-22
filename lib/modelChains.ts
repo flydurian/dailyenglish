@@ -10,6 +10,20 @@
 // - 강의(출력 ~1,000토큰): 4 Hydrogen(low) 11.7초·생각 1,188토큰, 3.6 Flash 17초, 3.5 Flash Lite 6.7초
 // - 3.8 Flash는 이날 세 번 모두 60~90초 무응답 (과부하로 추정), 프로덕션에서는 3.6 Flash도 같은 증상
 
+import type {
+    AudioBytes,
+    ChainAttemptResult,
+    ChainEntry,
+    ChainOutcome,
+    CooldownTracker,
+    FailureInfo,
+    GeminiResult,
+    GenerationConfig,
+    ModelTier,
+    RunChainOptions,
+    SanitizedPayload,
+} from './types.ts';
+
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;
 const HOUR = 60 * MINUTE;
@@ -27,7 +41,7 @@ const MIN_THINKING = { thinkingLevel: 'minimal', firstChunkMs: 8 * SECOND };
 export const STREAM_IDLE_MS = 20 * SECOND;
 
 // 무료 티어 한도(RPM/RPD)는 2026-11-13 AI Studio 사용량 화면 기준입니다.
-export const MODEL_CHAINS = {
+export const MODEL_CHAINS: Record<ModelTier, ChainEntry[]> = {
     // 예문·설명 생성: 품질 우선. 상위 4개는 각각 하루 20회라 소진되면 Lite(하루 500회)로 내려갑니다.
     generate: [
         { model: 'gemini-4-hydrogen', ...LOW_THINKING, timeoutMs: 60 * SECOND }, // 5 RPM, 20 RPD
@@ -58,7 +72,7 @@ export const MODEL_CHAINS = {
 };
 
 // 요청 하나가 체인 전체에 쓸 수 있는 시간 (vercel.json maxDuration 100초 안쪽)
-export const CHAIN_BUDGET_MS = { generate: 85 * SECOND, fast: 50 * SECOND, tts: 85 * SECOND };
+export const CHAIN_BUDGET_MS: Record<ModelTier, number> = { generate: 85 * SECOND, fast: 50 * SECOND, tts: 85 * SECOND };
 const MIN_ATTEMPT_MS = 4 * SECOND;
 
 // 클라이언트는 용도('tier:generate' 등)를 보냅니다. 예전 클라이언트가 보내는 모델 이름도 받아줍니다.
@@ -68,18 +82,18 @@ const LEGACY_TEXT_MODELS = new Set([
 ]);
 const LEGACY_TTS_MODELS = new Set(['gemini-3.8-flash-tts', 'gemini-3.8-flash-lite-tts']);
 
-export const resolveTier = (requested) => {
+export const resolveTier = (requested: unknown): ModelTier | null => {
     if (typeof requested !== 'string') return null;
     const tier = requested.startsWith('tier:') ? requested.slice(5) : null;
-    if (tier) return Object.hasOwn(MODEL_CHAINS, tier) ? tier : null;
+    if (tier) return Object.hasOwn(MODEL_CHAINS, tier) ? (tier as ModelTier) : null;
     if (LEGACY_TTS_MODELS.has(requested)) return 'tts';
     if (LEGACY_TEXT_MODELS.has(requested)) return 'fast';
     return null;
 };
 
 // 모델별 설정(thinking, voice)을 정제된 페이로드에 덧붙입니다. 원본은 바꾸지 않습니다.
-export const buildModelPayload = (entry, payload, tier, voiceName) => {
-    const generationConfig = { ...payload.generationConfig };
+export const buildModelPayload = (entry: ChainEntry, payload: SanitizedPayload, tier: ModelTier, voiceName?: string): SanitizedPayload => {
+    const generationConfig: GenerationConfig = { ...payload.generationConfig };
     if (tier === 'tts') {
         const selectedVoice = voiceName || entry.voiceName;
         if (selectedVoice) {
@@ -88,7 +102,7 @@ export const buildModelPayload = (entry, payload, tier, voiceName) => {
     } else if (entry.thinkingLevel) {
         generationConfig.thinkingConfig = { thinkingLevel: entry.thinkingLevel };
         if (entry.thinkingHeadroom && Number.isInteger(generationConfig.maxOutputTokens)) {
-            generationConfig.maxOutputTokens += entry.thinkingHeadroom;
+            (generationConfig.maxOutputTokens as number) += entry.thinkingHeadroom;
         }
     }
     return { ...payload, generationConfig };
@@ -103,7 +117,7 @@ const PACIFIC_PARTS = new Intl.DateTimeFormat('en-US', {
     hour: '2-digit', minute: '2-digit', second: '2-digit',
 });
 
-const pacificDateParts = (timestamp) => Object.fromEntries(
+const pacificDateParts = (timestamp: number): Record<string, string> => Object.fromEntries(
     PACIFIC_PARTS.formatToParts(new Date(timestamp)).map((p) => [p.type, p.value])
 );
 
@@ -129,7 +143,7 @@ export const msUntilPacificMidnight = (now = Date.now()) => {
     return 24 * HOUR + MINUTE; // 예상치 못한 경우의 기존 폴백
 };
 
-const parseRetryDelayMs = (errorText) => {
+const parseRetryDelayMs = (errorText: string): number | null => {
     const match = /"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/.exec(errorText || '');
     return match ? Math.ceil(Number(match[1]) * SECOND) : null;
 };
@@ -138,7 +152,7 @@ const parseRetryDelayMs = (errorText) => {
  * 실패를 분류해 이 모델을 얼마나 쉬게 할지 정합니다.
  * @returns {{ cooldownMs: number, quota: boolean }}
  */
-export const classifyFailure = ({ status, errorText = '', timedOut = false }, now = Date.now()) => {
+export const classifyFailure = ({ status, errorText = '', timedOut = false }: FailureInfo, now = Date.now()): { cooldownMs: number; quota: boolean } => {
     // 응답 없이 매달리는 모델은 다음 요청도 오래 붙잡으므로 길게 쉬게 합니다.
     if (timedOut) return { cooldownMs: 10 * MINUTE, quota: false };
     if (status === 429) {
@@ -148,25 +162,25 @@ export const classifyFailure = ({ status, errorText = '', timedOut = false }, no
         return { cooldownMs: parseRetryDelayMs(errorText) ?? MINUTE, quota: true };
     }
     if (status === 404) return { cooldownMs: 24 * HOUR, quota: false };
-    if (status >= 500 || status === 'network') return { cooldownMs: 2 * MINUTE, quota: false };
+    if ((status as number) >= 500 || status === 'network') return { cooldownMs: 2 * MINUTE, quota: false };
     // 400 등: 요청 자체 문제일 수 있어 쉬게 하지 않고 다음 모델만 시도합니다.
     return { cooldownMs: 0, quota: false };
 };
 
 // 서버리스 인스턴스가 살아있는 동안 모델별 휴식 시간을 기억합니다.
-export const createCooldownTracker = () => {
-    const until = new Map();
+export const createCooldownTracker = (): CooldownTracker => {
+    const until = new Map<string, number>();
     return {
-        isCooling: (model, now = Date.now()) => (until.get(model) ?? 0) > now,
-        remainingMs: (model, now = Date.now()) => Math.max(0, (until.get(model) ?? 0) - now),
-        coolDown: (model, ms, now = Date.now()) => { if (ms > 0) until.set(model, now + ms); },
-        clear: (model) => until.delete(model),
+        isCooling: (model: string, now = Date.now()) => (until.get(model) ?? 0) > now,
+        remainingMs: (model: string, now = Date.now()) => Math.max(0, (until.get(model) ?? 0) - now),
+        coolDown: (model: string, ms: number, now = Date.now()) => { if (ms > 0) until.set(model, now + ms); },
+        clear: (model: string) => until.delete(model),
     };
 };
 
 // 텍스트 응답을 parts[0].text 하나로 합칩니다. 클라이언트는 parts[0].text만 읽는데,
 // thinking 모델은 생각 서명 등으로 parts를 나눠 보낼 수 있습니다. 본문이 없으면 null.
-export const normalizeTextResponse = (data) => {
+export const normalizeTextResponse = (data: GeminiResult | null | undefined): GeminiResult | null => {
     const candidate = data?.candidates?.[0];
     const parts = candidate?.content?.parts;
     if (!Array.isArray(parts)) return null;
@@ -174,12 +188,12 @@ export const normalizeTextResponse = (data) => {
     if (!text.trim()) return null;
     return {
         ...data,
-        candidates: [{ ...candidate, content: { ...candidate.content, role: 'model', parts: [{ text }] } }],
+        candidates: [{ ...candidate, content: { ...candidate!.content, role: 'model', parts: [{ text }] } }],
     };
 };
 
 // raw PCM(audio/L16; rate=24000)을 WAV로 감쌉니다. 이미 WAV면 그대로 둡니다.
-export const toWavBytes = (bytes, mimeType = '') => {
+export const toWavBytes = (bytes: Uint8Array, mimeType = ''): AudioBytes => {
     if (bytes.length >= 12 && String.fromCharCode(...bytes.subarray(0, 4)) === 'RIFF') {
         return { bytes, mimeType: 'audio/wav' };
     }
@@ -204,10 +218,10 @@ export const toWavBytes = (bytes, mimeType = '') => {
     return { bytes: new Uint8Array(Buffer.concat([header, Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)])), mimeType: 'audio/wav' };
 };
 
-export const extractAudio = (data) => {
+export const extractAudio = (data: GeminiResult | null | undefined): AudioBytes | null => {
     const inline = data?.candidates?.[0]?.content?.parts?.find((p) => p?.inlineData?.data)?.inlineData;
     if (!inline) return null;
-    const raw = new Uint8Array(Buffer.from(inline.data, 'base64'));
+    const raw = new Uint8Array(Buffer.from(inline.data as string, 'base64'));
     if (raw.length === 0) return null;
     return toWavBytes(raw, inline.mimeType || '');
 };
@@ -223,9 +237,9 @@ export const extractAudio = (data) => {
  * @param {number} [opts.budgetMs]
  * @returns {Promise<{ok: true, value: any, model: string, tried: string[]} | {ok: false, status: number, retryAfterSec: number, tried: string[]}>}
  */
-export const runModelChain = async ({ tier, attempt, cooldowns, now = Date.now, chain = MODEL_CHAINS[tier], budgetMs = CHAIN_BUDGET_MS[tier] }) => {
+export const runModelChain = async ({ tier, attempt, cooldowns, now = Date.now, chain = MODEL_CHAINS[tier], budgetMs = CHAIN_BUDGET_MS[tier] }: RunChainOptions): Promise<ChainOutcome> => {
     const start = now();
-    const tried = [];
+    const tried: string[] = [];
     let allQuota = true;
     let clientErrors = 0;
     let attempted = 0;

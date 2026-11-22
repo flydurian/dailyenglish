@@ -30,8 +30,8 @@ const host = process.env.DEV_API_HOST || '127.0.0.1';
 
 // URL 경로 -> Vercel 핸들러 파일
 const routes = new Map([
-  ['/api/news', path.join(rootDir, 'api', 'news.js')],
-  ['/api/gemini', path.join(rootDir, 'api', 'gemini.js')],
+  ['/api/news', path.join(rootDir, 'api', 'news.ts')],
+  ['/api/gemini', path.join(rootDir, 'api', 'gemini.ts')],
 ]);
 
 const handlers = new Map(

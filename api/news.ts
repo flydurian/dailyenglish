@@ -1,9 +1,18 @@
 // Vercel Serverless Function for RSS News Feed
-import { setApiSecurityHeaders } from '../lib/security.js';
+import { setApiSecurityHeaders } from '../lib/security.ts';
+import type { ApiRequest, ApiResponse } from '../lib/types.ts';
 const MAX_RSS_BYTES = 1_500_000;
 const MAX_ITEMS = 50;
 
-export default async function handler(req, res) {
+interface NewsArticle {
+    title: string;
+    description: string;
+    url: string;
+    publishedAt: string;
+    source: { name: string };
+}
+
+export default async function handler(req: ApiRequest, res: ApiResponse) {
     setApiSecurityHeaders(res);
 
     if (req.method === 'OPTIONS') {
@@ -22,7 +31,7 @@ export default async function handler(req, res) {
         }
 
         // RSS 피드 URL 설정
-        let rssUrl;
+        let rssUrl: string;
         if (type === 'korean') {
             // Google News 한국 뉴스 RSS
             rssUrl = 'https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko';
@@ -59,7 +68,7 @@ export default async function handler(req, res) {
         }
         
         // XML 파싱 (간단한 정규식 기반 파싱)
-        const items = [];
+        const items: NewsArticle[] = [];
         const itemRegex = /<item>(.*?)<\/item>/gs;
         let match;
         

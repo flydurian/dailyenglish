@@ -6,7 +6,7 @@
     "icn1"
   ],
   "functions": {
-    "api/gemini.js": {
+    "api/gemini.ts": {
       "maxDuration": 100
     }
   },

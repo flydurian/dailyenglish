@@ -12,8 +12,8 @@ import {
   normalizeTextResponse,
   toWavBytes,
   extractAudio,
-} from '../lib/modelChains.js';
-import { parseWavChunks, transcodeWavToOpusWebm } from '../lib/audioTranscode.js';
+} from '../lib/modelChains';
+import { parseWavChunks, transcodeWavToOpusWebm } from '../lib/audioTranscode';
 
 const SEC = 1000;
 const MIN = 60 * SEC;
