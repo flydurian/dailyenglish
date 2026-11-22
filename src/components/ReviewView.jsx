@@ -19,7 +19,9 @@ const shuffle = (list) => {
 const isTypingTarget = (target) => {
   if (!target || typeof target.tagName !== 'string') return false;
   const tag = target.tagName.toUpperCase();
-  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+    || tag === 'BUTTON' || tag === 'A' || target.getAttribute?.('role') === 'button'
+    || target.isContentEditable;
 };
 
 const getDueItemIds = (items, todayKey) => (

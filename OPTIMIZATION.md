@@ -42,24 +42,24 @@ Cache-Control: public, max-age=300, s-maxage=1800, stale-while-revalidate=86400
 
 ### TTS 모델 분리 + 오디오 캐시를 IndexedDB로 이전
 - 기존 localStorage 캐시는 동기 I/O + 5MB 제한 + 실제 복원이 되지 않는 구조였음
-- 텍스트는 `gemini-3.5-flash-lite`, TTS는 최신 `gemini-3.8-flash-tts`로 분리
-- 3.8 TTS의 WAV 응답을 그대로 저장 (구형 PCM 응답은 WAV로 변환)
-- IndexedDB에 WAV Blob을 저장하고, 재생 시 메모리 → IndexedDB → Gemini TTS 순서로 확인
+- 텍스트는 `tier:generate`/`tier:fast`, TTS는 `tier:tts` 체인(4개 모델)으로 분리
+- 서버가 WAV/PCM을 Opus/WebM으로 트랜스코딩해 기본 반환 (미지원 브라우저만 WAV)
+- IndexedDB에 오디오 Blob(WebM 또는 WAV)을 저장하고, 재생 시 메모리 → IndexedDB → Gemini TTS 순서로 확인. 국기 버튼으로 억양을 고르면 캐시 키도 `accent:문장`으로 분리
 - 최대 25개, 7일 TTL, 초과분 자동 정리
 - 탭/레벨 전환 때 오디오 캐시를 지우던 동작 제거
 - 기존 `tts_audio_cache` localStorage 키는 1회 정리
 
 
 ### 무료 티어 전용 TTS 폴백과 과금 방지
-- 1차 TTS: `gemini-3.8-flash-tts`
-- 1차가 **429(무료 한도)** 일 때만 2차 `gemini-3.8-flash-lite-tts`로 서버에서 1회 폴백
-- 5xx/400 등 다른 오류에는 폴백하지 않음 (원인 은폐 방지)
+- TTS 체인: `gemini-3.8-flash-tts` → `gemini-3.8-flash-lite-tts` → `gemini-3.1-flash-tts-preview` → `gemini-2.5-flash-preview-tts`
+- 429·과부하·매달림·빈 응답이면 다음 모델로 넘어가고, 성공하면 해당 모델의 쿨다운을 해제
+- 400은 요청 자체 오류로 분류해 쿨다운 없이 다음 모델을 시도하며, 모두 실패하면 400 반환
 - 클라이언트 TTS 자동 재시도 없음 (중복 호출 방지), 폴백은 서버에서만 수행
 - 허용 모델 목록을 무료 티어 모델로 제한하고, 유료 모델 폴백 경로를 두지 않음
-- 둘 다 429면 `Retry-After: 20`과 함께 429 반환 (추가 호출 없음)
-- TTS는 IndexedDB 캐시를 사용하므로 같은 문장 재생은 API를 호출하지 않음
+- 체인이 소진되면 가장 이른 복구 시각(최대 태평양 자정)을 `Retry-After`로 반환
+- TTS는 IndexedDB 캐시를 사용하므로 같은 문장·억양 재생은 API를 호출하지 않음
 - **과금 방지의 최종 보장은 Google Cloud 프로젝트에 결제 계정이 연결되지 않은 상태**입니다. 코드는 유료 모델을 호출하지 않지만, 결제 계정이 연결된 프로젝트에서는 Google 정책상 과금될 수 있으므로 배포 전 결제 상태를 확인해야 합니다.
-- 무료 티어 공개 기준: TTS 3 RPM / 10K input TPM, 텍스트 3.5 Flash-Lite 10 RPM / 250K TPM / 500 RPD (정확한 값은 AI Studio Rate limit에서 프로젝트별 확인)
+- 앱 설정: TTS 6 RPM/IP + 6 RPM 전역, 텍스트 20 RPM/IP (인스턴스 메모리 기반 best-effort. 정확한 한도는 AI Studio Rate limit에서 프로젝트별 확인)
 
 ### 번역 캐시 안정화
 - `saveToCache`가 이전 state를 참조해 동시 번역 시 캐시가 덮어써지던 문제를 함수형 업데이트로 수정

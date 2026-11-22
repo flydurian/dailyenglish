@@ -31,7 +31,20 @@ export const useProgress = () => {
 
 export const ProgressProvider = ({ children }) => {
   const [data, setData] = useState(loadData);
-  const todayKey = toLocalDateKey();
+  const [todayKey, setTodayKey] = useState(toLocalDateKey);
+
+  // 앱을 자정까지 열어두어도 오늘/연속일이 어제 기준으로 남지 않게 갱신합니다.
+  useEffect(() => {
+    const refresh = () => setTodayKey(toLocalDateKey());
+    const timer = setInterval(refresh, 60_000);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, []);
 
   useEffect(() => {
     try {

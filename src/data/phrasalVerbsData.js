@@ -1,7 +1,11 @@
 // 구동사 데이터 관리 시스템
 import {
   markPhrasalVerbAsUsed
-} from '../utils/usageTracker';
+} from '../utils/usageTracker.js';
+
+// 셔플 순서는 날짜와 무관하게 고정합니다. 날마다 새 시드로 섞으면 인덱스만 3씩 옮겨도
+// 인접한 날에 같은 구동사가 다시 나와 "매일 다른 3개" 계약이 깨집니다.
+const SHUFFLE_SEED = 20260101;
 
 // 구동사 데이터 로드
 export const loadPhrasalVerbsData = async () => {
@@ -37,11 +41,9 @@ export const getDailyPhrasalVerbs = async (date = new Date()) => {
   const phrasalVerbsData = await loadPhrasalVerbsData();
   if (phrasalVerbsData.length === 0) return [];
 
-  // 날짜 기반 시드 생성 (년-월-일)
-  const seed = getDateSeed(date);
-  const random = seededRandom(seed);
+  const random = seededRandom(SHUFFLE_SEED);
 
-  // 전체 리스트를 셔플 (시드 기반)
+  // 전체 리스트를 셔플 (고정 시드 기반)
   const shuffled = [...phrasalVerbsData];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
@@ -51,9 +53,14 @@ export const getDailyPhrasalVerbs = async (date = new Date()) => {
   // 날짜에 따라 3개씩 선택
   // 매일 다른 3개를 선택하기 위해 날짜를 인덱스로 사용
   // 전체 리스트를 순환하도록 함
-  const dayOfYear = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
+  // DST 전환일에는 로컬 자정 기준 ms 차이가 23/25시간이 되어 이틀이 같은 값이 될 수 있으므로
+  // 연/월/일 필드를 UTC로 계산합니다. 연도 기준 대신 epoch 일수를 써서 연말에도 인덱스가
+  // 뒤로 튀지 않게 합니다.
+  const dayNumber = Math.floor(
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000
+  );
   const totalVerbs = shuffled.length;
-  const startIndex = (dayOfYear * 3) % totalVerbs;
+  const startIndex = (dayNumber * 3) % totalVerbs;
 
   const selected = [];
   for (let i = 0; i < 3; i++) {

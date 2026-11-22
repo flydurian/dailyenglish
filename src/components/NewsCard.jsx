@@ -432,6 +432,15 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
         return () => { document.body.style.overflow = previous; };
     }, [selectedPhrasalVerb]);
 
+    useEffect(() => {
+        if (!selectedPhrasalVerb) return undefined;
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape') setSelectedPhrasalVerb(null);
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedPhrasalVerb]);
+
     const handleCardClick = useCallback(() => {
         onToggle(index);
     }, [onToggle, index]);
@@ -789,6 +798,12 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                                                     e.stopPropagation();
                                                     handlePhrasalVerbClick(point);
                                                 }}
+                                                onKeyDown={(e) => {
+                                                    if (e.key !== 'Enter' && e.key !== ' ') return;
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    handlePhrasalVerbClick(point);
+                                                }}
                                             >
                                                 <KeyPointText style={{ fontSize: '11px', lineHeight: '1.3' }}>{point}</KeyPointText>
                                             </KeyPointCard>
@@ -853,7 +868,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                 const shown = details || (aiReady ? aiDetail.data : null);
 
                 return (
-                    <PvOverlay onClick={() => setSelectedPhrasalVerb(null)}>
+                    <PvOverlay onClick={(e) => { e.stopPropagation(); setSelectedPhrasalVerb(null); }}>
                         <PvSheet
                             role="dialog"
                             aria-modal="true"
@@ -862,7 +877,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                         >
                             <PvHeader>
                                 <PvTitle>{selectedPhrasalVerb}</PvTitle>
-                                <PvCloseButton onClick={() => setSelectedPhrasalVerb(null)} aria-label="닫기">
+                                <PvCloseButton onClick={(e) => { e.stopPropagation(); setSelectedPhrasalVerb(null); }} aria-label="닫기">
                                     <CloseIcon />
                                 </PvCloseButton>
                             </PvHeader>
@@ -935,7 +950,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                                 </>
                             )}
 
-                            <PvDoneButton onClick={() => setSelectedPhrasalVerb(null)}>
+                            <PvDoneButton onClick={(e) => { e.stopPropagation(); setSelectedPhrasalVerb(null); }}>
                                 닫기
                             </PvDoneButton>
                         </PvSheet>

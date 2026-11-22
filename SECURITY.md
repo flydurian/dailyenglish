@@ -1,6 +1,6 @@
 # Security Notes
 
-Last reviewed: 2026-10-24
+Last reviewed: 2026-11-22
 
 ## Stack scope
 
@@ -27,13 +27,13 @@ There is no PHP, Apache, MySQL, or WordPress runtime, so PHP-specific advisories
 - Origin allowlist + same-origin browser check. Cross-site requests receive `403`.
 - Strict request schema:
   - text: user text parts only, safe `generationConfig` keys, max 20,000 characters
-  - TTS: one text part, `responseModalities: ["AUDIO"]`, max 1,200 characters
+  - TTS: one text part, `responseModalities: ["AUDIO"]`, max 1,600 characters
   - unknown fields (`tools`, `systemInstruction`, arbitrary config) are rejected
 - Request body cap: 80 KB.
 - Rate limits (best-effort, per serverless instance):
   - text: 20 requests/minute/IP
-  - TTS: 3 requests/minute/IP and 3 requests/minute globally
-- TTS 429 falls back only to `gemini-3.8-flash-lite-tts`; no paid model fallback.
+  - TTS: 6 requests/minute/IP and 6 requests/minute globally
+- TTS failures fall back through a four-model chain (`gemini-3.8-flash-tts` → `gemini-3.8-flash-lite-tts` → `gemini-3.1-flash-tts-preview` → `gemini-2.5-flash-preview-tts`); no paid model fallback. Origin is required; `Referer`/`Sec-Fetch-Site` alone are rejected.
 - No client-side TTS retry; cache prevents duplicate generation.
 - Upstream error bodies are not returned to clients.
 
@@ -83,6 +83,6 @@ API checks performed locally:
 - allowed origin → `200`
 - invalid schema → `400`
 - oversized body → `413`
-- TTS returns `audio/wav`
+- TTS returns `audio/webm` (Opus) by default, `audio/wav` only for browsers without WebM/Opus support
 - `/api/news` returns `200` without wildcard CORS
 - built app served with the production CSP → no CSP violations

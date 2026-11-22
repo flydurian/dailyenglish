@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import ReactDOM from 'react-dom';
+import { createPortal } from 'react-dom';
 import styled from '@emotion/styled';
 import { CloseIcon, BookOpenIcon, LoaderIcon, Volume2Icon } from './Icons';
 import AccentFlags from './AccentFlags';
@@ -265,6 +265,8 @@ const ExplanationModal = ({ isOpen, onClose, explanation, isLoading, audioStates
   }, [isOpen, onClose]);
 
   const handleOverlayClick = (e) => {
+    // 포털이라도 React 이벤트는 CardContainer까지 버블되므로 여기서 막습니다.
+    e.stopPropagation();
     if (modalRef.current && !modalRef.current.contains(e.target)) {
       onClose();
     }
@@ -338,9 +340,9 @@ const ExplanationModal = ({ isOpen, onClose, explanation, isLoading, audioStates
 
   if (!isOpen) return null;
 
-  return ReactDOM.createPortal(
+  return createPortal(
     <ModalOverlay onClick={handleOverlayClick}>
-      <ModalContent ref={modalRef}>
+      <ModalContent ref={modalRef} onClick={(e) => e.stopPropagation()}>
         <Header>
           <TitleWrapper>
             <IconWrapper>
@@ -348,7 +350,7 @@ const ExplanationModal = ({ isOpen, onClose, explanation, isLoading, audioStates
             </IconWrapper>
             <Title>AI 선생님의 문장 강의</Title>
           </TitleWrapper>
-          <CloseButton onClick={onClose} aria-label="닫기">
+          <CloseButton onClick={(e) => { e.stopPropagation(); onClose(); }} aria-label="닫기">
             <CloseIcon />
           </CloseButton>
         </Header>

@@ -6,13 +6,19 @@ const DB_VERSION = 1;
 const TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_ENTRIES = 25;
 
-let dbPromise = null;
+interface AudioEntry {
+    text: string;
+    blob: Blob;
+    timestamp: number;
+}
 
-const openDb = () => {
+let dbPromise: Promise<IDBDatabase | null> | null = null;
+
+const openDb = (): Promise<IDBDatabase | null> => {
     if (typeof indexedDB === 'undefined') return Promise.resolve(null);
     if (dbPromise) return dbPromise;
 
-    dbPromise = new Promise((resolve) => {
+    dbPromise = new Promise<IDBDatabase | null>((resolve) => {
         const request = indexedDB.open(DB_NAME, DB_VERSION);
 
         request.onupgradeneeded = () => {
@@ -30,69 +36,75 @@ const openDb = () => {
     return dbPromise;
 };
 
-const runTransaction = async (mode, operation) => {
+const runTransaction = async <T>(
+    mode: IDBTransactionMode,
+    operation: (store: IDBObjectStore) => IDBRequest<T> | void,
+): Promise<T | null> => {
     const db = await openDb();
     if (!db) return null;
 
     try {
-        return await new Promise((resolve) => {
+        return await new Promise<T | null>((resolve) => {
             const tx = db.transaction(STORE_NAME, mode);
             const result = operation(tx.objectStore(STORE_NAME));
-            tx.oncomplete = () => resolve(result);
+            tx.oncomplete = () => resolve(result ? result.result : null);
             tx.onerror = () => resolve(null);
             tx.onabort = () => resolve(null);
         });
-    } catch (error) {
+    } catch {
         return null;
     }
 };
 
-export const getCachedAudio = async (text) => {
+export const getCachedAudio = async (text: string): Promise<Blob | null> => {
     const db = await openDb();
     if (!db || !text) return null;
 
-    return new Promise((resolve) => {
+    return new Promise<Blob | null>((resolve) => {
         try {
             const request = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(text);
             request.onsuccess = () => {
-                const entry = request.result;
-                if (!entry || !entry.blob || !entry.timestamp || Date.now() - entry.timestamp > TTL_MS) {
-                    if (entry) deleteCachedAudio(text);
+                const entry = request.result as AudioEntry | undefined;
+                if (!entry?.blob || !entry.timestamp || Date.now() - entry.timestamp > TTL_MS) {
+                    if (entry) void deleteCachedAudio(text);
                     resolve(null);
                     return;
                 }
                 resolve(entry.blob);
             };
             request.onerror = () => resolve(null);
-        } catch (error) {
+        } catch {
             resolve(null);
         }
     });
 };
 
-export const setCachedAudio = async (text, blob) => {
+export const setCachedAudio = async (text: string, blob: Blob): Promise<void> => {
     if (!text || !blob) return;
     await runTransaction('readwrite', (store) => {
-        store.put({ text, blob, timestamp: Date.now() });
+        store.put({ text, blob, timestamp: Date.now() } satisfies AudioEntry);
     });
     await pruneCache();
 };
 
-export const deleteCachedAudio = async (text) => {
+export const deleteCachedAudio = async (text: string): Promise<void> => {
     await runTransaction('readwrite', (store) => {
         store.delete(text);
     });
 };
 
-const pruneCache = async () => {
-    const entries = await new Promise((resolve) => {
-        openDb().then((db) => {
-            if (!db) { resolve([]); return; }
+const pruneCache = async (): Promise<void> => {
+    const entries = await new Promise<AudioEntry[]>((resolve) => {
+        void openDb().then((db) => {
+            if (!db) {
+                resolve([]);
+                return;
+            }
             try {
                 const request = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).getAll();
-                request.onsuccess = () => resolve(request.result || []);
+                request.onsuccess = () => resolve((request.result || []) as AudioEntry[]);
                 request.onerror = () => resolve([]);
-            } catch (error) {
+            } catch {
                 resolve([]);
             }
         });
@@ -115,7 +127,7 @@ const pruneCache = async () => {
     });
 };
 
-export const clearAudioCache = async () => {
+export const clearAudioCache = async (): Promise<void> => {
     await runTransaction('readwrite', (store) => {
         store.clear();
     });

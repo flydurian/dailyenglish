@@ -407,12 +407,14 @@ export default function App() {
     try {
       if (activeTab === 'expressions') {
         const data = await fetchExpressions(currentDate, level);
+        if (data === undefined) return; // 더 이상 최신 요청이 아니면 화면을 덮어쓰지 않습니다.
         setExpressions(data);
         setActiveCardIndex(null);
       } else if (activeTab === 'news') {
         // 뉴스학습은 항상 오늘 날짜 사용
         const today = new Date();
         const data = await fetchNews(today, level);
+        if (data === undefined) return;
         setNews(data);
         setActiveNewsIndex(null);
       }

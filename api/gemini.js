@@ -32,7 +32,8 @@ const MAX_TEXT_CHARS = 20_000;
 // 아니고, 실제 제약은 생성 시간(15~22초)이라 상한은 안전 마진을 두고 1,600자로 유지합니다.
 const MAX_TTS_TEXT_CHARS = 1_600;
 const TEXT_REQUESTS_PER_MINUTE = 20;
-// TTS 체인은 모델 4개 × 3 RPM이라 분당 6회까지 받습니다 (강의 문장 버튼 여러 개를 연달아 눌러도 통과).
+// TTS 체인 4개 모델이 각각 3 RPM이라 업스트림 이론 용량은 12회/분입니다.
+// 한 요청이 실패 시 여러 모델을 순차 호출할 수 있어 절반인 6회로 제한합니다.
 const TTS_REQUESTS_PER_MINUTE = 6;
 
 // 국기 버튼으로 고르는 영어 억양 → Gemini TTS 목소리 ID (서버에서만 매핑).
@@ -40,6 +41,9 @@ const TTS_ACCENT_VOICES = {
     us: 'en-us-advisor-9', // Midwest, female — 중립적인 미국 발음
     gb: 'en-gb-advisor-1', // Winchester, female — 중립적인 영국 발음
 };
+// 위 ID는 Gemini 3.8 TTS의 Extended Voice Library 목소리입니다. 구형 모델은
+// prebuilt voice만 지원하므로 폴백 모델에는 억양 ID를 넘기지 않습니다.
+const EXTENDED_VOICE_MODELS = new Set(['gemini-3.8-flash-tts', 'gemini-3.8-flash-lite-tts']);
 
 const ALLOWED_GEN_CONFIG_KEYS = new Set([
     'temperature', 'topP', 'topK', 'maxOutputTokens', 'responseMimeType',
@@ -317,17 +321,6 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'API key not configured' });
     }
 
-    const cacheKey = isTts ? null : getRequestCacheKey(tier, sanitizedPayload);
-
-    if (cacheKey) {
-        const cached = readTextCache(cacheKey);
-        if (cached) {
-            res.setHeader('Cache-Control', 'no-store');
-            res.setHeader('X-Gemini-Cache', 'HIT');
-            return res.status(200).json(cached);
-        }
-    }
-
     const clientIp = getClientIp(req);
     if (isTts) {
         const ipLimit = checkRateLimit(`tts:ip:${clientIp}`, TTS_REQUESTS_PER_MINUTE);
@@ -340,13 +333,28 @@ export default async function handler(req, res) {
         if (!ipLimit.allowed) return tooManyRequests(res, ipLimit.retryAfter);
     }
 
+    // 캐시 히트도 한도에 포함되어야 합니다. 캐시 조회를 먼저 하면 동일 payload를
+    // 무제한으로 반환해 인스턴스 메모리 기반 제한을 우회할 수 있습니다.
+    const cacheKey = isTts ? null : getRequestCacheKey(tier, sanitizedPayload);
+
+    if (cacheKey) {
+        const cached = readTextCache(cacheKey);
+        if (cached) {
+            res.setHeader('Cache-Control', 'no-store');
+            res.setHeader('X-Gemini-Cache', 'HIT');
+            return res.status(200).json(cached);
+        }
+    }
+
     try {
         // 체인 순서대로 시도: 성공하면 바로 반환, 한도 초과·과부하·지연·빈 응답이면 다음 모델.
         const outcome = await runModelChain({
             tier,
             cooldowns: modelCooldowns,
             attempt: async (entry, timeoutMs) => {
-                const modelPayload = buildModelPayload(entry, sanitizedPayload, tier, accentVoice);
+                // 구형 TTS 모델에 Extended Voice ID를 보내면 400이 나 체인 전체가 실패합니다.
+                const voice = EXTENDED_VOICE_MODELS.has(entry.model) ? accentVoice : undefined;
+                const modelPayload = buildModelPayload(entry, sanitizedPayload, tier, voice);
                 const result = isTts
                     ? await requestGemini(entry.model, modelPayload, apiKey, timeoutMs)
                     : await requestGeminiText(entry, modelPayload, apiKey, timeoutMs);

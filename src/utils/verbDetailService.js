@@ -1,7 +1,7 @@
 // 구동사 상세 정보(뉘앙스/용법/예문)를 모달을 열 때 Gemini로 그때그때 생성합니다.
 // 사전 데이터(phrasalVerbDetails)에 없는 구동사만 여기서 생성하고, 결과는
 // localStorage에 캐시해 같은 구동사는 두 번 요청하지 않습니다.
-import { callGeminiAPI } from './apiUtils';
+import { callGeminiAPI } from './apiUtils.js';
 
 // 예문·설명 생성 체인(좋은 모델 먼저, lib/modelChains.js)을 씁니다.
 const DETAIL_MODEL = 'tier:generate';
@@ -40,29 +40,99 @@ const inflight = new Map();
 export const getCachedVerbDetail = (verbName) => {
     if (!verbName) return null;
     const key = String(verbName).trim().toLowerCase();
-    return loadCache().get(key) || null;
+    const cache = loadCache();
+    const value = cache.get(key);
+    if (!value) return null;
+    // 조회한 항목을 뒤로 옮겨 Evict 순서를 LRU로 유지합니다 (작업노트의 캐시 계약).
+    cache.delete(key);
+    cache.set(key, value);
+    return value;
 };
 
 const cleanText = (value) => (typeof value === 'string' ? value.trim().replace(/^["“”']+|["“”']+$/g, '') : '');
 
-// get together → get/gets/got/getting 처럼 활용형까지 인정
-const IRREGULAR_PAST = {
-    get: 'got', go: 'went', come: 'came', run: 'ran', take: 'took', make: 'made',
-    put: 'put', set: 'set', break: 'broke', bring: 'brought', cut: 'cut',
-    keep: 'kept', hold: 'held', let: 'let', stand: 'stood', give: 'gave',
-    find: 'found', think: 'thought', buy: 'bought', catch: 'caught',
-    teach: 'taught', leave: 'left', feel: 'felt', mean: 'meant', meet: 'met',
-    lead: 'led', lose: 'lost', blow: 'blew', grow: 'grew', know: 'knew',
-    throw: 'threw', draw: 'drew', fly: 'flew', fall: 'fell', rise: 'rose',
-    write: 'wrote', drive: 'drove', speak: 'spoke', wake: 'woke', win: 'won',
-    sit: 'sat', hang: 'hung', stick: 'stuck', strike: 'struck', build: 'built',
-    send: 'sent', spend: 'spent', pay: 'paid', say: 'said', tell: 'told',
-    sell: 'sold', shut: 'shut', split: 'split', cast: 'cast', burst: 'burst',
-    lay: 'laid', lie: 'lay', wear: 'wore', tear: 'tore', swear: 'swore',
-    choose: 'chose', steal: 'stole', freeze: 'froze',
+// get together → get/gets/got/gotten/getting 처럼 활용형까지 인정합니다.
+// 규칙(과거형 + ed/ing)으로 유도되지 않는 형태는 여기에 명시합니다.
+// 예전에는 과거형만 저장해 'be → was/washing', 'see → seing' 같은 오답이 생겨
+// "I am fed up with ..." 같은 정상 예문이 전부 기각되는 문제가 있었습니다.
+const IRREGULAR_FORMS = {
+    be: ['am', 'is', 'are', 'was', 'were', 'been', 'being'],
+    have: ['has', 'had', 'having'],
+    do: ['does', 'did', 'done', 'doing'],
+    see: ['saw', 'seen', 'seeing'],
+    eat: ['ate', 'eaten', 'eating'],
+    deal: ['dealt', 'dealing'],
+    dig: ['dug', 'digging'],
+    sleep: ['slept', 'sleeping'],
+    fight: ['fought', 'fighting'],
+    hear: ['heard', 'hearing'],
+    bend: ['bent', 'bending'],
+    get: ['got', 'gotten', 'getting'],
+    go: ['went', 'gone', 'going'],
+    come: ['came', 'coming'],
+    run: ['ran', 'running'],
+    take: ['took', 'taken'],
+    make: ['made'],
+    put: ['put', 'putting'],
+    set: ['set', 'setting'],
+    break: ['broke', 'broken'],
+    bring: ['brought'],
+    cut: ['cut', 'cutting'],
+    keep: ['kept'],
+    hold: ['held'],
+    let: ['let', 'letting'],
+    stand: ['stood'],
+    give: ['gave', 'given'],
+    find: ['found'],
+    think: ['thought'],
+    buy: ['bought'],
+    catch: ['caught'],
+    teach: ['taught'],
+    leave: ['left'],
+    feel: ['felt'],
+    mean: ['meant'],
+    meet: ['met'],
+    lead: ['led'],
+    lose: ['lost'],
+    blow: ['blew', 'blown'],
+    grow: ['grew', 'grown'],
+    know: ['knew', 'known'],
+    throw: ['threw', 'thrown'],
+    draw: ['drew', 'drawn'],
+    fly: ['flew', 'flown'],
+    fall: ['fell', 'fallen'],
+    rise: ['rose', 'risen'],
+    write: ['wrote', 'written'],
+    drive: ['drove', 'driven'],
+    speak: ['spoke', 'spoken'],
+    wake: ['woke', 'woken'],
+    win: ['won', 'winning'],
+    sit: ['sat', 'sitting'],
+    hang: ['hung'],
+    stick: ['stuck'],
+    strike: ['struck'],
+    build: ['built'],
+    send: ['sent'],
+    spend: ['spent'],
+    pay: ['paid'],
+    say: ['said'],
+    tell: ['told'],
+    sell: ['sold'],
+    shut: ['shut', 'shutting'],
+    split: ['split', 'splitting'],
+    cast: ['cast'],
+    burst: ['burst'],
+    lay: ['laid'],
+    lie: ['lay', 'lain', 'lying'],
+    wear: ['wore', 'worn'],
+    tear: ['tore', 'torn'],
+    swear: ['swore', 'sworn'],
+    choose: ['chose', 'chosen'],
+    steal: ['stole', 'stolen'],
+    freeze: ['froze', 'frozen'],
 };
 
-const verbFormRegex = (verbName) => {
+export const verbFormRegex = (verbName) => {
     const base = String(verbName).trim().toLowerCase().split(/\s+/)[0].replace(/[^a-z]/g, '');
     if (!base) return null;
 
@@ -70,7 +140,8 @@ const verbFormRegex = (verbName) => {
     if (!base.endsWith('s')) forms.add(base + 's');
     if (base.endsWith('e')) {
         forms.add(base + 'd');
-        forms.add(base.slice(0, -1) + 'ing');
+        forms.add(base.slice(0, -1) + 'ing'); // make → making
+        forms.add(base + 'ing');              // see → seeing, be → being
     } else {
         forms.add(base + 'ed');
         forms.add(base + 'ing');
@@ -81,17 +152,12 @@ const verbFormRegex = (verbName) => {
         forms.add(base + doubled[1] + 'ed');
         forms.add(base + doubled[1] + 'ing');
     }
-    const past = IRREGULAR_PAST[base];
-    if (past) {
-        forms.add(past);
-        forms.add(past + 's');
-        forms.add(past + 'ing');
-    }
+    for (const form of IRREGULAR_FORMS[base] || []) forms.add(form);
     return new RegExp(`\\b(${[...forms].join('|')})\\b`, 'i');
 };
 
 // 생성 결과 검증: 불량 예문은 걷어내고, 부족하면 null 반환해 재시도/오류로 갑니다.
-const sanitizeEntry = (raw, verbName) => {
+export const sanitizeEntry = (raw, verbName) => {
     if (!raw || typeof raw !== 'object') return null;
 
     const nuance = cleanText(raw.nuance);

@@ -1,8 +1,10 @@
-// 개발용 스크립트: 로컬 API 서버와 CRA 개발 서버를 함께 실행합니다.
+// 개발용 스크립트: 로컬 API 서버와 Vite 개발 서버를 함께 실행합니다.
 // 사용법: npm run dev
-const { spawn } = require('child_process');
-const path = require('path');
+import { spawn } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 const children = [];
 let shuttingDown = false;

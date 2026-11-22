@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   makeWordbookId,
   normalizeType,
@@ -45,6 +45,16 @@ export const WordbookProvider = ({ children }) => {
     }
   }, [items]);
 
+  // 학습 기록은 실제로 추가된 항목 수만큼만 남깁니다. 클로저의 items로 판단하면
+  // 같은 렌더에서 연속 클릭했을 때 토글 결과와 기록이 어긋납니다.
+  const previousItems = useRef(items);
+  useEffect(() => {
+    const previousIds = new Set(previousItems.current.map((item) => item.id));
+    const added = items.filter((item) => !previousIds.has(item.id));
+    previousItems.current = items;
+    added.forEach(() => record('saved'));
+  }, [items, record]);
+
   const isSaved = useCallback((id) => items.some((item) => item.id === id), [items]);
 
   const addItem = useCallback(({ type, term, meaning, example }) => {
@@ -57,8 +67,7 @@ export const WordbookProvider = ({ children }) => {
       if (prev.some((item) => item.id === id)) return prev;
       return [createItem({ type, term, meaning, example }), ...prev];
     });
-    record('saved');
-  }, [items, record]);
+  }, [items]);
 
   const removeItem = useCallback((id) => {
     setItems((prev) => prev.filter((item) => item.id !== id));
@@ -68,7 +77,6 @@ export const WordbookProvider = ({ children }) => {
     if (typeof term !== 'string' || !term.trim()) return;
 
     const id = makeWordbookId(normalizeType(type), term);
-    const alreadySaved = items.some((item) => item.id === id);
 
     setItems((prev) => {
       if (prev.some((item) => item.id === id)) {
@@ -76,9 +84,7 @@ export const WordbookProvider = ({ children }) => {
       }
       return [createItem({ type, term, meaning, example }), ...prev];
     });
-
-    if (!alreadySaved) record('saved');
-  }, [items, record]);
+  }, [items]);
 
   const updateItem = useCallback((id, patch) => {
     setItems((prev) => prev.map((item) => (

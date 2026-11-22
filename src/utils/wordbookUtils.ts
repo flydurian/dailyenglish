@@ -1,31 +1,47 @@
-import { toLocalDateKey } from './dateUtils.js';
+import { toLocalDateKey } from './dateUtils';
+import type { SrsState } from './srs';
 
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-const isPlainObject = (value) => (
+const isPlainObject = (value: unknown): value is Record<string, unknown> => (
   typeof value === 'object' && value !== null && !Array.isArray(value)
 );
 
-const isDateKey = (value) => (
+const isDateKey = (value: unknown): value is string => (
   typeof value === 'string' && DATE_KEY_PATTERN.test(value)
 );
 
-const isBoxValue = (value) => Number.isInteger(value) && value >= 1 && value <= 5;
+const isBoxValue = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 5;
 
-const isReviewCount = (value) => Number.isInteger(value) && value >= 0;
+const isReviewCount = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 0;
 
-const defaultSrs = () => ({
+export const defaultSrs = (): SrsState => ({
   box: 1,
   nextReview: toLocalDateKey(),
   reviewCount: 0,
   lastReviewed: null,
 });
 
-export const makeWordbookId = (type, term) => `${type}:${term.trim().toLowerCase()}`;
+export const makeWordbookId = (type: string, term: string): string => `${type}:${term.trim().toLowerCase()}`;
 
-export const normalizeType = (type) => (type === 'word' ? 'word' : 'phrasal');
+export const normalizeType = (type: unknown): 'word' | 'phrasal' => (type === 'word' ? 'word' : 'phrasal');
 
-export const createItem = ({ type, term, meaning, example }) => {
+export interface WordbookItem {
+  id: string;
+  type: 'word' | 'phrasal';
+  term: string;
+  meaning: string;
+  example: string;
+  addedAt: string;
+  srs: SrsState;
+}
+
+export const createItem = ({ type, term, meaning, example }: {
+  type: unknown;
+  term: string;
+  meaning?: string;
+  example?: string;
+}): WordbookItem => {
   const normalizedType = normalizeType(type);
   return {
     id: makeWordbookId(normalizedType, term),
@@ -38,7 +54,7 @@ export const createItem = ({ type, term, meaning, example }) => {
   };
 };
 
-const sanitizeSrs = (srs) => {
+const sanitizeSrs = (srs: unknown): SrsState => {
   if (!isPlainObject(srs)) return defaultSrs();
 
   return {
@@ -50,13 +66,13 @@ const sanitizeSrs = (srs) => {
 };
 
 // localStorage 등에서 읽은 신뢰할 수 없는 값을 UI가 바로 쓸 수 있는 형태로 정규화한다.
-export function sanitizeWordbookItems(raw) {
+export function sanitizeWordbookItems(raw: unknown): WordbookItem[] {
   if (!Array.isArray(raw)) return [];
 
-  const seenIds = new Set();
-  const items = [];
+  const seenIds = new Set<string>();
+  const items: WordbookItem[] = [];
 
-  raw.forEach((entry) => {
+  raw.forEach((entry: unknown) => {
     if (!isPlainObject(entry)) return;
     if (typeof entry.term !== 'string' || !entry.term.trim()) return;
 

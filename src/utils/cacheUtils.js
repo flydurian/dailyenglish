@@ -63,25 +63,25 @@ export const isCacheValid = (type, date) => {
 };
 
 export const cleanupOldMonthlyData = () => {
-    const today = new Date();
-    const oneWeekAgo = new Date(today);
-    oneWeekAgo.setDate(today.getDate() - 7);
-    
+    // 캐시 키와 cached.date는 getCacheKey/setCachedData와 같은 UTC 기반 YYYY-MM-DD 입니다.
+    // new Date(문자열).toDateString()으로 비교하면 UTC 서쪽 타임존에서 하루 전으로 밀려
+    // 오늘 캐시까지 삭제되므로 문자열 키끼리 비교합니다.
+    const todayKey = new Date().toISOString().split('T')[0];
+    const oneWeekAgoKey = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
     Object.keys(localStorage).forEach(key => {
         if (key.startsWith('expressions_') || key.startsWith('news_')) {
             try {
                 const cached = JSON.parse(localStorage.getItem(key));
                 if (cached && cached.date) {
-                    const cacheDate = new Date(cached.date);
-                    
                     if (key.startsWith('news_')) {
                         // 뉴스: 오늘 이외의 모든 데이터 삭제
-                        if (cacheDate.toDateString() !== today.toDateString()) {
+                        if (cached.date !== todayKey) {
                             localStorage.removeItem(key);
                         }
                     } else if (key.startsWith('expressions_')) {
-                        // 표현: 일주일 이전 데이터 삭제
-                        if (cacheDate < oneWeekAgo) {
+                        // 표현: 일주일 이전 데이터 삭제 (ISO 문자열은 사전순 비교가 날짜순과 같음)
+                        if (cached.date < oneWeekAgoKey) {
                             localStorage.removeItem(key);
                         }
                     }

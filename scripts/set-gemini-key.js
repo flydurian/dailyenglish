@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-'use strict';
 
 // Gemini API 키를 화면에 노출하지 않고 .env 에 저장하는 스크립트입니다.
 // 사용법: npm run key:set
-const fs = require('fs');
-const path = require('path');
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 const envPath = path.join(rootDir, '.env');
 const gitignorePath = path.join(rootDir, '.gitignore');
@@ -217,10 +218,10 @@ async function main() {
   console.log('  3. Google AI Studio에서 기존 키를 삭제(폐기)하세요.\n');
 }
 
-if (require.main === module) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error) => {
     fail(error.message);
   });
 }
 
-module.exports = { normalizeKey, validateFormat, loadEnvKey };
+export { normalizeKey, validateFormat, loadEnvKey };

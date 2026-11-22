@@ -78,6 +78,10 @@ export const useDataFetching = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const inFlight = useRef(new Map());
+    // 인자가 같은 중복 호출(StrictMode 이중 effect)은 같은 세대로 두고, 값이 바뀌면 세대를 올립니다.
+    // 오래된 세대의 응답은 상태와 소비자에게 반영하지 않습니다.
+    const lastRequest = useRef({ expressions: null, news: null });
+    const generations = useRef({ expressions: 0, news: 0 });
 
     // 최소한의 폴백 뉴스 데이터 (Gemini API 실패 시에만 사용)
     const getFallbackNews = useCallback((type, dayOfYear) => {
@@ -402,7 +406,8 @@ IMPORTANT: Your previous answer still contained Korean (Hangul) in "title" or "s
         }
     }, []);
 
-    const fetchExpressionsInternal = useCallback(async (date, selectedLevel) => {
+    const fetchExpressionsInternal = useCallback(async (date, selectedLevel, generation) => {
+        if (generation !== generations.current.expressions) return undefined;
         setLoading(true);
         setError(null);
 
@@ -419,6 +424,7 @@ IMPORTANT: Your previous answer still contained Korean (Hangul) in "title" or "s
             if (isCacheValid('expressions', dateObj)) {
                 const cached = getCachedData('expressions', dateObj);
                 if (cached && cached.data[selectedLevel]) {
+                    if (generation !== generations.current.expressions) return undefined;
                     setError(null);
                     setLoading(false);
                     return cached.data[selectedLevel];
@@ -484,6 +490,7 @@ IMPORTANT:
 
             if (text) {
                 const expressionsData = JSON.parse(text);
+                if (generation !== generations.current.expressions) return undefined;
 
                 // 캐시 업데이트 (하루에 한 번만 저장)
                 const cached = getCachedData('expressions', dateObj) || { data: {} };
@@ -498,6 +505,7 @@ IMPORTANT:
                 throw new Error("API 응답에서 콘텐츠를 찾을 수 없습니다.");
             }
         } catch (e) {
+            if (generation !== generations.current.expressions) return undefined;
             console.error("표현을 가져오는 데 실패했습니다:", e);
             setLoading(false);
 
@@ -568,7 +576,8 @@ IMPORTANT:
         }
     }, []);
 
-    const fetchNewsInternal = useCallback(async (date, selectedLevel) => {
+    const fetchNewsInternal = useCallback(async (date, selectedLevel, generation) => {
+        if (generation !== generations.current.news) return undefined;
         setLoading(true);
         setError(null);
 
@@ -592,6 +601,7 @@ IMPORTANT:
             );
 
             if (cachedNews && !cachedNeedsRefresh) {
+                if (generation !== generations.current.news) return undefined;
                 console.log('캐시된 뉴스 데이터 사용:', dateKey);
                 // 캐시된 데이터를 사용할 때도 에러 상태 초기화
                 setError(null);
@@ -627,6 +637,8 @@ IMPORTANT:
                 { ...worldSummary, category: 'world', original: worldNews }
             ];
 
+            if (generation !== generations.current.news) return undefined;
+
             // 날짜별 캐시 저장
             const cacheData = { data: {} };
             cacheData.data[selectedLevel] = summarizedNews;
@@ -639,6 +651,7 @@ IMPORTANT:
             return summarizedNews;
 
         } catch (e) {
+            if (generation !== generations.current.news) return undefined;
             console.error("뉴스를 가져오는 데 실패했습니다:", e);
             setLoading(false);
 
@@ -686,13 +699,31 @@ IMPORTANT:
     const fetchExpressions = useCallback((date, selectedLevel) => {
         const dateObj = date instanceof Date ? date : new Date(date);
         const dateKey = isNaN(dateObj.getTime()) ? String(date) : dateObj.toISOString().split('T')[0];
-        return withDedupe(`expressions:${dateKey}:${selectedLevel}`, () => fetchExpressionsInternal(date, selectedLevel));
+        const params = `${dateKey}|${selectedLevel}`;
+        if (lastRequest.current.expressions !== params) {
+            lastRequest.current.expressions = params;
+            generations.current.expressions += 1;
+        }
+        const generation = generations.current.expressions;
+        return withDedupe(
+            `expressions:${dateKey}:${selectedLevel}#${generation}`,
+            () => fetchExpressionsInternal(date, selectedLevel, generation)
+        );
     }, [fetchExpressionsInternal, withDedupe]);
 
     const fetchNews = useCallback((date, selectedLevel) => {
         const dateObj = date instanceof Date ? date : new Date(date);
         const dateKey = isNaN(dateObj.getTime()) ? String(date) : dateObj.toISOString().split('T')[0];
-        return withDedupe(`news:${dateKey}:${selectedLevel}`, () => fetchNewsInternal(date, selectedLevel));
+        const params = `${dateKey}|${selectedLevel}`;
+        if (lastRequest.current.news !== params) {
+            lastRequest.current.news = params;
+            generations.current.news += 1;
+        }
+        const generation = generations.current.news;
+        return withDedupe(
+            `news:${dateKey}:${selectedLevel}#${generation}`,
+            () => fetchNewsInternal(date, selectedLevel, generation)
+        );
     }, [fetchNewsInternal, withDedupe]);
 
     return {

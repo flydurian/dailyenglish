@@ -3,13 +3,14 @@
   "version": "1.0.0",
   "description": "매일 3개의 영어 구동사를 학습하는 React 앱",
   "private": true,
+  "type": "module",
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "libopus-wasm": "^0.4.1",
     "mediabunny": "^1.65.2",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "scripts": {
     "start": "vite",
@@ -20,11 +21,21 @@
     "key:verify": "node scripts/set-gemini-key.js --verify",
     "key:check": "node scripts/check-secrets.js",
     "build": "node scripts/updateVersion.js && vite build && node scripts/check-secrets.js",
-    "build:hash": "node scripts/updateVersion.js"
+    "build:hash": "node scripts/updateVersion.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^6.1.2",
-    "vite": "^8.3.5"
+    "@tailwindcss/vite": "^4.3.5",
+    "@testing-library/jest-dom": "^8.0.0",
+    "@testing-library/react": "^16.3.3",
+    "@vitejs/plugin-react": "^6.3.0",
+    "jsdom": "^31.0.1",
+    "tailwindcss": "^4.3.5",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.1"
   },
   "overrides": {
     "yaml": "1.10.3"

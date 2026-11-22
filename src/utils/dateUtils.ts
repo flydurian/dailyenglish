@@ -1,5 +1,5 @@
 // 로컬 시간 기준 날짜 키를 만든다. toISOString()은 UTC 기준이라 사용하지 않는다.
-export function toLocalDateKey(date = new Date()) {
+export function toLocalDateKey(date: Date | string | number = new Date()): string {
   const target = date instanceof Date ? date : new Date(date);
   const d = Number.isNaN(target.getTime()) ? new Date() : target;
 

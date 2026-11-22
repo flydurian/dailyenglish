@@ -1,5 +1,5 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
+import { createPortal } from 'react-dom';
 import styled from '@emotion/styled';
 import { CloseIcon } from './Icons';
 
@@ -59,7 +59,7 @@ const DismissButton = styled.button`
 const AudioNotice = ({ notice, onDismiss }) => {
   if (!notice) return null;
 
-  return ReactDOM.createPortal(
+  return createPortal(
     <Toast key={notice.id} role="status" aria-live="polite" data-audio-notice="">
       <span>{notice.message}</span>
       <DismissButton type="button" onClick={onDismiss} aria-label="알림 닫기">

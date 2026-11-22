@@ -363,17 +363,19 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
     const [translatingText, setTranslatingText] = useState('');
 
     useEffect(() => {
+        let cancelled = false;
         if (isOpen && word && meaning && typeof onGenerateExamples === 'function') {
             const generateWordExamples = async () => {
                 setIsGeneratingExamples(true);
                 try {
                     const generatedExamples = await onGenerateExamples(word, meaning);
-                    setExamples(generatedExamples);
+                    if (!cancelled) setExamples(generatedExamples);
                 } catch (error) {
+                    if (cancelled) return;
                     console.error('예문 생성 실패:', error);
                     setExamples([]);
                 } finally {
-                    setIsGeneratingExamples(false);
+                    if (!cancelled) setIsGeneratingExamples(false);
                 }
             };
             generateWordExamples();
@@ -381,6 +383,7 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
             setExamples([]);
             setIsGeneratingExamples(false);
         }
+        return () => { cancelled = true; };
     }, [isOpen, word, meaning, onGenerateExamples]);
 
     useEffect(() => {
@@ -397,6 +400,15 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
         document.body.style.overflow = 'hidden';
         return () => { document.body.style.overflow = previous; };
     }, [isOpen]);
+
+    useEffect(() => {
+        if (!isOpen) return undefined;
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape') onClose?.();
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, onClose]);
 
     if (!isOpen) return null;
 

@@ -59,9 +59,16 @@ function enhanceResponse(res) {
   return res;
 }
 
+const MAX_BODY_BYTES = 1024 * 1024;
+
 async function readJsonBody(req) {
   const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > MAX_BODY_BYTES) return undefined;
+    chunks.push(chunk);
+  }
   if (chunks.length === 0) return undefined;
   try {
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
@@ -73,21 +80,23 @@ async function readJsonBody(req) {
 const server = createServer(async (req, res) => {
   enhanceResponse(res);
 
-  const url = new URL(req.url, `http://${req.headers.host || `${host}:${port}`}`);
-  const pathname = url.pathname.replace(/\/+$/, '') || '/';
-  const handler = handlers.get(pathname);
-
-  if (!handler) {
-    res.status(404).json({ error: `Not found: ${pathname}` });
-    return;
-  }
-
-  req.query = Object.fromEntries(url.searchParams);
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    req.body = await readJsonBody(req);
-  }
-
+  let pathname = '';
   try {
+    // 잘못된 Host 헤더의 new URL 예외가 async 콜백 밖으로 새면 서버가 종료됩니다.
+    const url = new URL(req.url, `http://${req.headers.host || `${host}:${port}`}`);
+    pathname = url.pathname.replace(/\/+$/, '') || '/';
+    const handler = handlers.get(pathname);
+
+    if (!handler) {
+      res.status(404).json({ error: `Not found: ${pathname}` });
+      return;
+    }
+
+    req.query = Object.fromEntries(url.searchParams);
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      req.body = await readJsonBody(req);
+    }
+
     await handler(req, res);
   } catch (error) {
     console.error(`[dev-api] ${req.method} ${pathname} 실패:`, error);

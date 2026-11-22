@@ -1,4 +1,18 @@
+@import "tailwindcss";
+
 /* 완전히 새로운 디자인 시스템 - 다크 테마 기반 */
+/* 기존 CSS에서 @apply로 쓰던 프로젝트 전용 유틸리티를 Tailwind v4 문법으로 정의합니다. */
+@utility touch-optimized {
+  min-height: 44px;
+  touch-action: manipulation;
+}
+@utility animate-bounce-in {
+  animation: bounceIn 0.6s ease-out;
+}
+@utility animate-slide-up {
+  animation: slideUp 0.4s ease-out;
+}
+
 :root {
   /* 다크 테마 색상 팔레트 */
   --bg-primary: #0a0a0a;
@@ -603,11 +617,10 @@ input:focus {
   @apply font-semibold;
   @apply transition-all;
   @apply duration-300;
-  @apply transform;
   @apply active:scale-95;
   @apply focus:outline-none;
   @apply focus:ring-4;
-  @apply focus:ring-opacity-50;
+  @apply focus:ring-blue-500/50;
 }
 
 .modern-button::before {
@@ -636,7 +649,6 @@ input:focus {
   @apply duration-300;
   @apply hover:shadow-xl;
   @apply hover:border-gray-200;
-  @apply transform;
   @apply hover:-translate-y-1;
 }
 
@@ -686,7 +698,6 @@ input:focus {
   @apply bg-white;
   @apply text-blue-600;
   @apply shadow-md;
-  @apply transform;
   @apply scale-105;
 }
 
@@ -701,17 +712,15 @@ input:focus {
   @apply text-sm;
   @apply transition-all;
   @apply duration-300;
-  @apply transform;
   @apply active:scale-95;
   @apply focus:outline-none;
   @apply focus:ring-4;
-  @apply focus:ring-opacity-50;
+  @apply focus:ring-blue-500/50;
 }
 
 .level-button.active {
   @apply text-white;
   @apply shadow-lg;
-  @apply transform;
   @apply scale-105;
   background: var(--gradient-primary);
 }
@@ -816,7 +825,6 @@ input:focus {
   @apply duration-200;
   @apply hover:shadow-lg;
   @apply hover:border-gray-200;
-  @apply transform;
   @apply hover:-translate-y-1;
 }
 
@@ -829,8 +837,7 @@ input:focus {
   @apply items-center;
   @apply justify-center;
   @apply p-4;
-  @apply bg-black;
-  @apply bg-opacity-50;
+  @apply bg-black/50;
   @apply backdrop-blur-sm;
 }
 
@@ -841,7 +848,6 @@ input:focus {
   @apply max-w-md;
   @apply w-full;
   @apply p-6;
-  @apply transform;
   @apply animate-bounce-in;
 }
 
@@ -857,7 +863,6 @@ input:focus {
   @apply border;
   @apply border-gray-200;
   @apply p-4;
-  @apply transform;
   @apply animate-slide-up;
 }
 
@@ -872,7 +877,7 @@ input:focus {
 
 .modern-progress-bar {
   @apply h-full;
-  @apply bg-gradient-to-r;
+  @apply bg-linear-to-r;
   @apply from-blue-500;
   @apply to-purple-500;
   @apply rounded-full;

@@ -1,15 +1,15 @@
 // 오디오 처리 헬퍼 함수들
-export const base64ToArrayBuffer = (base64) => {
+export const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
     const binaryString = window.atob(base64);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i += 1) {
         bytes[i] = binaryString.charCodeAt(i);
     }
     return bytes.buffer;
 };
 
-export const pcmToWav = (pcmData, sampleRate) => {
+// raw PCM(L16) 데이터에 WAV 헤더를 붙여 재생 가능한 Blob을 만듭니다.
+export const pcmToWav = (pcmData: Int16Array, sampleRate: number): Blob => {
     const numChannels = 1;
     const bitsPerSample = 16;
     const blockAlign = (numChannels * bitsPerSample) / 8;
@@ -17,8 +17,7 @@ export const pcmToWav = (pcmData, sampleRate) => {
     const dataSize = pcmData.length * (bitsPerSample / 8);
     const buffer = new ArrayBuffer(44 + dataSize);
     const view = new DataView(buffer);
-    
-    // WAV 헤더 작성
+
     view.setUint32(0, 0x52494646, false); // "RIFF"
     view.setUint32(4, 36 + dataSize, true);
     view.setUint32(8, 0x57415645, false); // "WAVE"
@@ -32,12 +31,11 @@ export const pcmToWav = (pcmData, sampleRate) => {
     view.setUint16(34, bitsPerSample, true);
     view.setUint32(36, 0x64617461, false); // "data"
     view.setUint32(40, dataSize, true);
-    
-    // PCM 데이터 복사
-    const pcm16 = new Int16Array(pcmData.buffer);
-    for (let i = 0; i < pcm16.length; i++) {
+
+    const pcm16 = new Int16Array(pcmData.buffer, pcmData.byteOffset, pcmData.length);
+    for (let i = 0; i < pcm16.length; i += 1) {
         view.setInt16(44 + i * 2, pcm16[i], true);
     }
-    
+
     return new Blob([view], { type: 'audio/wav' });
 };

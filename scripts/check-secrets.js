@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-'use strict';
 
 // 클라이언트 번들/저장소에 Gemini 키가 노출되지 않았는지 검사합니다.
 // 사용법: npm run key:check  (npm run build 마지막에도 자동 실행)
-const fs = require('fs');
-const path = require('path');
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 const buildDir = path.join(rootDir, 'build');
 const GEMINI_KEY_PATTERNS = [

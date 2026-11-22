@@ -173,8 +173,27 @@ npm run key:set
 - TypeScript 도입 고려
 
 ### 테스트
+Vitest로 전체 테스트를 한 번에 실행합니다.
 ```bash
-node scripts/test-wordbook.mjs && node scripts/test-srs.mjs && node scripts/test-progress.mjs
+npm test
+```
+
+개발 중에는 감시 모드를 사용하세요.
+```bash
+npm run test:watch
+```
+
+타임존 회귀 테스트(`cache-utils`, `daily-verbs`)는 테스트 파일 안에서 각각
+`America/Los_Angeles`, `America/New_York`로 TZ를 설정한 뒤 실행됩니다.
+개별 파일만 실행하려면 아래 명령을 사용할 수 있습니다.
+```bash
+npx vitest run tests/cache-utils.test.js
+npx vitest run tests/daily-verbs.test.js
+```
+
+타입 체크는 별도 명령으로 실행합니다.
+```bash
+npm run typecheck
 ```
 
 ### 빌드 최적화
