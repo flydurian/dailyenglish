@@ -1,9 +1,10 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import {
   makeWordbookId,
   normalizeType,
   createItem,
   sanitizeWordbookItems,
+  type WordbookItem,
 } from '../utils/wordbookUtils';
 import { useProgress } from './ProgressContext';
 
@@ -11,21 +12,36 @@ export { makeWordbookId } from '../utils/wordbookUtils';
 
 const STORAGE_KEY = 'dailyenglish.wordbook.v1';
 
-const WordbookContext = createContext();
+interface WordbookItemInput {
+  type: unknown;
+  term: string;
+  meaning?: string;
+  example?: string;
+}
 
-const loadItems = () => {
+interface WordbookContextValue {
+  items: WordbookItem[];
+  isSaved: (id: string) => boolean;
+  addItem: (input: WordbookItemInput) => void;
+  removeItem: (id: string) => void;
+  toggleItem: (input: WordbookItemInput) => void;
+  updateItem: (id: string, patch: Partial<WordbookItem>) => void;
+}
+
+const WordbookContext = createContext<WordbookContextValue | null>(null);
+
+const loadItems = (): WordbookItem[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
 
-    const parsed = JSON.parse(raw);
-    return sanitizeWordbookItems(parsed);
-  } catch (error) {
+    return sanitizeWordbookItems(JSON.parse(raw));
+  } catch {
     return [];
   }
 };
 
-export const useWordbook = () => {
+export const useWordbook = (): WordbookContextValue => {
   const context = useContext(WordbookContext);
   if (!context) {
     throw new Error('useWordbook must be used within a WordbookProvider');
@@ -33,14 +49,14 @@ export const useWordbook = () => {
   return context;
 };
 
-export const WordbookProvider = ({ children }) => {
-  const [items, setItems] = useState(loadItems);
+export const WordbookProvider = ({ children }: { children: ReactNode }) => {
+  const [items, setItems] = useState<WordbookItem[]>(loadItems);
   const { record } = useProgress();
 
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-    } catch (error) {
+    } catch {
       // 저장 공간 부족/프라이빗 모드 등에서는 조용히 무시한다.
     }
   }, [items]);
@@ -55,9 +71,9 @@ export const WordbookProvider = ({ children }) => {
     added.forEach(() => record('saved'));
   }, [items, record]);
 
-  const isSaved = useCallback((id) => items.some((item) => item.id === id), [items]);
+  const isSaved = useCallback((id: string) => items.some((item) => item.id === id), [items]);
 
-  const addItem = useCallback(({ type, term, meaning, example }) => {
+  const addItem = useCallback(({ type, term, meaning, example }: WordbookItemInput) => {
     if (typeof term !== 'string' || !term.trim()) return;
 
     const id = makeWordbookId(normalizeType(type), term);
@@ -69,11 +85,11 @@ export const WordbookProvider = ({ children }) => {
     });
   }, [items]);
 
-  const removeItem = useCallback((id) => {
+  const removeItem = useCallback((id: string) => {
     setItems((prev) => prev.filter((item) => item.id !== id));
   }, []);
 
-  const toggleItem = useCallback(({ type, term, meaning, example }) => {
+  const toggleItem = useCallback(({ type, term, meaning, example }: WordbookItemInput) => {
     if (typeof term !== 'string' || !term.trim()) return;
 
     const id = makeWordbookId(normalizeType(type), term);
@@ -86,13 +102,13 @@ export const WordbookProvider = ({ children }) => {
     });
   }, [items]);
 
-  const updateItem = useCallback((id, patch) => {
+  const updateItem = useCallback((id: string, patch: Partial<WordbookItem>) => {
     setItems((prev) => prev.map((item) => (
       item.id === id ? { ...item, ...patch } : item
     )));
   }, []);
 
-  const value = useMemo(() => ({
+  const value = useMemo<WordbookContextValue>(() => ({
     items,
     isSaved,
     addItem,

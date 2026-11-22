@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import WordModal from '../src/components/WordModal.jsx';
-import { ProgressProvider } from '../src/contexts/ProgressContext.jsx';
-import { WordbookProvider } from '../src/contexts/WordbookContext.jsx';
+import { ProgressProvider } from '../src/contexts/ProgressContext';
+import { WordbookProvider } from '../src/contexts/WordbookContext';
 
 const deferred = () => {
   let resolve;
