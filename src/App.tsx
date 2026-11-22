@@ -20,6 +20,28 @@ import { detectHotReload } from './utils/versionUtils';
 import { getDueItems } from './utils/srs';
 import { toLocalDateKey } from './utils/dateUtils';
 
+// API/캐시에서 오는 항목은 필드가 일부 없을 수 있어 느슨하게 둡니다.
+interface ExpressionItem {
+  phrasal_verb?: string;
+  [key: string]: any;
+}
+
+interface NewsItemData {
+  title?: string;
+  summary?: string;
+  key_points?: string[];
+  vocabulary_notes?: string[];
+  [key: string]: any;
+}
+
+interface WordModalState {
+  isOpen: boolean;
+  word: string;
+  meaning: string;
+  example: string;
+  detailedInfo: any;
+}
+
 // Editorial Paper 디자인 시스템
 const AppContainer = styled.div`
   min-height: 100dvh;
@@ -133,7 +155,7 @@ const TabNavigation = styled.div`
   }
 `;
 
-const TabButton = styled.button`
+const TabButton = styled.button<{ isActive?: boolean }>`
   position: relative;
   flex: 0 0 auto;
   margin-bottom: -1px;
@@ -181,7 +203,7 @@ const LevelGrid = styled.div`
   }
 `;
 
-const LevelButton = styled.button`
+const LevelButton = styled.button<{ isActive?: boolean }>`
   flex: 0 0 auto;
   min-width: 44px;
   height: 36px;
@@ -377,12 +399,12 @@ export default function App() {
   const wordbookCount = wordbookItems.length;
   const reviewDueCount = getDueItems(wordbookItems, toLocalDateKey()).length;
   const { record } = useProgress();
-  const viewedTodayRef = useRef(new Set());
-  const [expressions, setExpressions] = useState([]);
-  const [news, setNews] = useState([]);
-  const [activeCardIndex, setActiveCardIndex] = useState(null);
-  const [activeNewsIndex, setActiveNewsIndex] = useState(null);
-  const [wordModal, setWordModal] = useState({ isOpen: false, word: '', meaning: '', example: '', detailedInfo: null });
+  const viewedTodayRef = useRef(new Set<string>());
+  const [expressions, setExpressions] = useState<ExpressionItem[]>([]);
+  const [news, setNews] = useState<NewsItemData[]>([]);
+  const [activeCardIndex, setActiveCardIndex] = useState<number | null>(null);
+  const [activeNewsIndex, setActiveNewsIndex] = useState<number | null>(null);
+  const [wordModal, setWordModal] = useState<WordModalState>({ isOpen: false, word: '', meaning: '', example: '', detailedInfo: null });
 
   const openWordModal = useCallback((word, meaning, example, detailedInfo) => {
     setWordModal({ isOpen: true, word, meaning, example, detailedInfo });

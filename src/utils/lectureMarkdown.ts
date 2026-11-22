@@ -26,6 +26,24 @@ const quotedEnglishSentence = (line) => {
   return /[A-Za-z]/.test(sentence) && !HANGUL_RE.test(sentence) ? sentence : '';
 };
 
+// 마크다운 파싱 결과 블록/조각 타입 (화면 렌더러와 공유)
+export interface InlineSegment {
+  text: string;
+  bold: boolean;
+}
+
+export interface SentenceBlock { type: 'sentence'; sentence: string }
+export interface HeadingBlock { type: 'heading'; text: string }
+export interface HrBlock { type: 'hr' }
+export interface QuoteBlock { type: 'quote'; inline: InlineSegment[] }
+export interface BulletBlock { type: 'bullet'; inline: InlineSegment[]; depth: number }
+export interface ParagraphBlock { type: 'paragraph'; inline: InlineSegment[] }
+export interface BlankBlock { type: 'blank' }
+
+export type LectureBlock =
+  | SentenceBlock | HeadingBlock | HrBlock | QuoteBlock
+  | BulletBlock | ParagraphBlock | BlankBlock;
+
 // 굵게(**) 밖의 기호를 지웁니다: `코드`, *기울임*, 짝이 안 맞는 **.
 const stripMarks = (text) => text
   .replace(/`([^`]*)`/g, '$1')
@@ -34,8 +52,8 @@ const stripMarks = (text) => text
   .replace(/`/g, '');
 
 // 한 줄을 [{ text, bold }] 조각으로 나눕니다.
-export const parseInline = (text) => {
-  const segments = [];
+export const parseInline = (text): InlineSegment[] => {
+  const segments: InlineSegment[] = [];
   text.split(/(\*\*[^*]+?\*\*)/).forEach((part) => {
     if (!part) return;
     const bold = /^\*\*[^*]+\*\*$/.test(part);
@@ -59,10 +77,10 @@ const BULLET_RE = /^(\s*)(?:[-*+•])\s+(.*)$/;
  * - { type: 'paragraph', inline }
  * - { type: 'blank' }
  */
-export const parseLectureMarkdown = (markdown) => {
+export const parseLectureMarkdown = (markdown): LectureBlock[] => {
   if (!markdown) return [];
 
-  const blocks = [];
+  const blocks: LectureBlock[] = [];
   let awaitingSentence = false;
 
   markdown.split(/\r?\n/).forEach((rawLine) => {

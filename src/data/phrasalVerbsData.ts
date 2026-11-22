@@ -1,7 +1,14 @@
 // 구동사 데이터 관리 시스템
 import {
   markPhrasalVerbAsUsed
-} from '../utils/usageTracker.js';
+} from '../utils/usageTracker';
+
+// JSON 데이터에서 읽어오는 구동사 항목
+export interface PhrasalVerbData {
+  verb: string;
+  meaning: string;
+  [key: string]: any;
+}
 
 // 셔플 순서는 날짜와 무관하게 고정합니다. 날마다 새 시드로 섞으면 인덱스만 3씩 옮겨도
 // 인접한 날에 같은 구동사가 다시 나와 "매일 다른 3개" 계약이 깨집니다.
@@ -12,7 +19,7 @@ export const loadPhrasalVerbsData = async () => {
   try {
     const response = await fetch('/data/phrasalVerbs.json');
     const data = await response.json();
-    return data.phrasalVerbs;
+    return data.phrasalVerbs as PhrasalVerbData[];
   } catch (error) {
     console.error('구동사 데이터 로드 실패:', error);
     return [];
@@ -62,7 +69,7 @@ export const getDailyPhrasalVerbs = async (date = new Date()) => {
   const totalVerbs = shuffled.length;
   const startIndex = (dayNumber * 3) % totalVerbs;
 
-  const selected = [];
+  const selected: PhrasalVerbData[] = [];
   for (let i = 0; i < 3; i++) {
     selected.push(shuffled[(startIndex + i) % totalVerbs]);
   }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseLectureMarkdown, parseInline, cleanSentence } from '../src/utils/lectureMarkdown.js';
+import { parseLectureMarkdown, parseInline, cleanSentence } from '../src/utils/lectureMarkdown';
 
 const one = (line) => parseLectureMarkdown(line)[0];
 const textOf = (block) => block.text ?? block.sentence ?? block.inline.map((s) => s.text).join('');

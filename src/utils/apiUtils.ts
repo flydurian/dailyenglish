@@ -1,6 +1,13 @@
 // API 호출 유틸리티 함수들
 const GEMINI_ENDPOINT = '/api/gemini';
 
+// 서버/클라이언트에서 attachment하는 커스텀 Error 속성 타입
+export interface ApiError extends Error {
+    status?: number;
+    code?: string;
+    retryAfterSec?: number | null;
+}
+
 // 모든 환경에서 서버리스 함수(/api/gemini)를 통해 Gemini를 호출합니다.
 // model 인자는 용도(tier:generate = 예문·설명, tier:fast = 번역·요약)이며, 실제 모델은 서버 체인이 고릅니다.
 // API 키는 서버의 GEMINI_API_KEY 에만 있으며 클라이언트 번들에 포함되지 않습니다.
@@ -27,7 +34,7 @@ export const callGeminiAPI = async (payload, model, maxRetries = 3) => {
                 const errorText = await response.text();
                 console.error(`[gemini] 오류 응답 ${response.status}:`, errorText);
 
-                const error = new Error(`Gemini API error: ${response.status}`);
+                const error = new Error(`Gemini API error: ${response.status}`) as ApiError;
                 error.status = response.status;
                 throw error;
             }
@@ -86,7 +93,7 @@ export const requestTtsAudio = async (sentence, model, format = 'webm', accent) 
 
     if (!response.ok) {
         if (response.status === 429) {
-            const error = new Error('이용자가 많아 잠시 후 다시 시도해주세요. (API 할당량 초과)');
+            const error = new Error('이용자가 많아 잠시 후 다시 시도해주세요. (API 할당량 초과)') as ApiError;
             error.code = 'RATE_LIMIT';
             error.retryAfterSec = Number(response.headers.get('Retry-After')) || null;
             throw error;
@@ -94,7 +101,7 @@ export const requestTtsAudio = async (sentence, model, format = 'webm', accent) 
 
         const errorText = await response.text().catch(() => '');
         console.error('[tts] 오류 응답:', response.status, errorText);
-        const error = new Error(`TTS 요청 실패: ${response.status}`);
+        const error = new Error(`TTS 요청 실패: ${response.status}`) as ApiError;
         error.status = response.status;
         throw error;
     }

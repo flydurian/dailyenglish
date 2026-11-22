@@ -72,7 +72,7 @@ export const cleanupOldMonthlyData = () => {
     Object.keys(localStorage).forEach(key => {
         if (key.startsWith('expressions_') || key.startsWith('news_')) {
             try {
-                const cached = JSON.parse(localStorage.getItem(key));
+                const cached = JSON.parse(localStorage.getItem(key) || '{}');
                 if (cached && cached.date) {
                     if (key.startsWith('news_')) {
                         // 뉴스: 오늘 이외의 모든 데이터 삭제
@@ -100,7 +100,7 @@ export const getAvailableDates = () => {
     Object.keys(localStorage).forEach(key => {
         if (key.startsWith('expressions_') || key.startsWith('news_')) {
             try {
-                const cached = JSON.parse(localStorage.getItem(key));
+                const cached = JSON.parse(localStorage.getItem(key) || '{}');
                 if (cached && cached.date) {
                     availableDates.add(cached.date);
                 }

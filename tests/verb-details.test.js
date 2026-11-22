@@ -1,6 +1,6 @@
 // AI 구동사 상세 생성 결과 검증(regExp/sanitize) 회귀 테스트.
 import { describe, it, expect } from 'vitest';
-import { verbFormRegex, sanitizeEntry } from '../src/utils/verbDetailService.js';
+import { verbFormRegex, sanitizeEntry } from '../src/utils/verbDetailService';
 
 const validExamples = [
   ['be fed up with', 'I am fed up with the noise.'],

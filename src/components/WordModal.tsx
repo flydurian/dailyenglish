@@ -433,7 +433,7 @@ const WordModal = ({ isOpen, word, meaning, example, detailedInfo, onClose, onPl
         }
     };
 
-    const playAudio = (text, accent) => {
+    const playAudio = (text, accent?) => {
         if (typeof onPlayAudio === 'function') onPlayAudio(text, accent);
     };
 

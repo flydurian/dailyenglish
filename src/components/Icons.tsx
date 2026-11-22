@@ -26,14 +26,14 @@ export const ChevronRightIcon = () => (
     </svg>
 );
 
-export const Volume2Icon = () => (
+export const Volume2Icon = ({ className }: { className?: string } = {}) => (
     <svg {...iconProps} strokeWidth="1.6" className="h-5 w-5 sm:h-6 sm:w-6">
         <path d="M11 5 6 9H3v6h3l5 4V5Z" />
         <path d="M15.5 8.5a5 5 0 0 1 0 7" />
     </svg>
 );
 
-export const TranslateIcon = () => (
+export const TranslateIcon = ({ className }: { className?: string } = {}) => (
     <svg {...iconProps} strokeWidth="1.6" className="h-5 w-5 sm:h-6 sm:w-6">
         <path d="M4 6h8M8 4v2c0 4-2 6-5 7" />
         <path d="M4 10c1.5 2 4 3.5 6.5 4.5" />
@@ -70,7 +70,7 @@ export const CloseIcon = () => (
     </svg>
 );
 
-export const ArrowUpIcon = () => (
+export const ArrowUpIcon = ({ className }: { className?: string } = {}) => (
     <svg {...iconProps} strokeWidth="1.7" width="20" height="20" className="h-6 w-6">
         <path d="M12 19V5M6 11l6-6 6 6" />
     </svg>

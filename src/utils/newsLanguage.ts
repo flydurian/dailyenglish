@@ -24,6 +24,17 @@ export function needsEnglishRewrite(item) {
 // 기존 summaryPrompt 를 옮긴 프롬프트 빌더.
 // sourceLanguage === 'ko' 일 때만 한국어 원문 전용 지시와 "title" 출력 필드를 추가합니다.
 // world 뉴스('en' 또는 생략)의 프롬프트 내용·출력 형식은 기존과 동일하게 유지합니다.
+export interface NewsRewritePromptInput {
+    title?: unknown;
+    text?: unknown;
+    level?: unknown;
+    verbsList?: unknown;
+    sourceLanguage?: unknown;
+    source?: unknown;
+    date?: unknown;
+    [key: string]: unknown;
+}
+
 export function buildNewsRewritePrompt({
     title,
     text,
@@ -32,7 +43,7 @@ export function buildNewsRewritePrompt({
     sourceLanguage,
     source,
     date,
-} = {}) {
+}: NewsRewritePromptInput = {}) {
     const isKoreanSource = sourceLanguage === 'ko';
     const safeLevel = typeof level === 'string' && level.trim() ? level : 'B1';
     const safeTitle = typeof title === 'string' ? title : '';

@@ -19,7 +19,7 @@ describe('getDailyPhrasalVerbs', () => {
     // 이 파일의 날짜 계산을 DST가 있는 타임존에서 수행합니다.
     process.env.TZ = 'America/New_York';
     vi.stubGlobal('fetch', async () => ({ json: async () => data }));
-    ({ getDailyPhrasalVerbs } = await import('../src/data/phrasalVerbsData.js'));
+    ({ getDailyPhrasalVerbs } = await import('../src/data/phrasalVerbsData'));
   });
 
   afterAll(() => {

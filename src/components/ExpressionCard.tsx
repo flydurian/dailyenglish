@@ -5,7 +5,7 @@ import { markPhrasalVerbUsage } from '../data/phrasalVerbsData';
 import { useFontSize } from '../contexts/FontSizeContext';
 import { useWordbook, makeWordbookId } from '../contexts/WordbookContext';
 import { phrasalVerbDetails } from '../data/phrasalVerbDetails';
-import { getPhrasalVerbDetail, getCachedVerbDetail } from '../utils/verbDetailService';
+import { getPhrasalVerbDetail, getCachedVerbDetail, type AiDetailState } from '../utils/verbDetailService';
 import { css } from '@emotion/react';
 import TranslationStatus from './TranslationStatus';
 import AccentFlags from './AccentFlags';
@@ -237,7 +237,7 @@ const ActionButton = styled.button`
   }
 `;
 
-const ExpandedSection = styled.div`
+const ExpandedSection = styled.div<{ isActive?: boolean }>`
   overflow: hidden;
   transition: max-height 450ms ease, opacity 300ms ease, padding 300ms ease;
 
@@ -455,7 +455,7 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
   // 예문 번역: { [기호 없는 문장]: { translation, shown, loading } }
   const [exampleTranslations, setExampleTranslations] = useState({});
   // 사전/일일 데이터에 없는 구동사의 상세 정보: AI 생성 상태(loading/ready/error)
-  const [aiDetail, setAiDetail] = useState({ verb: null, status: 'idle', data: null });
+  const [aiDetail, setAiDetail] = useState<AiDetailState>({ verb: null, status: 'idle', data: null });
 
   // expression이 변경될 때 번역 상태 초기화
   useEffect(() => {
@@ -679,7 +679,7 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
   }, [toggleItem, phrasalVerbName, phrasalVerbMeaning, expression.sentence]);
 
   return (
-    <CardContainer style={{ '--i': index }}>
+    <CardContainer style={{ '--i': index } as React.CSSProperties}>
       <CardTop>
         <CardNumber>{String(index + 1).padStart(2, '0')}</CardNumber>
         <CardLabel>Phrasal verb</CardLabel>

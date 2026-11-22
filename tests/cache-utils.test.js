@@ -1,7 +1,7 @@
 // 날짜 캐시 정리가 UTC 기반 캐시 키와 같은 기준으로 비교하는지 검증합니다.
 // UTC 서쪽 타임존(America/Los_Angeles)에서 실행하면 기존 toDateString() 비교의 회귀를 잡을 수 있습니다.
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { cleanupOldMonthlyData } from '../src/utils/cacheUtils.js';
+import { cleanupOldMonthlyData } from '../src/utils/cacheUtils';
 
 const ORIGINAL_TZ = process.env.TZ;
 

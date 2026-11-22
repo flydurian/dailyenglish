@@ -4,7 +4,7 @@ import { Volume2Icon, TranslateIcon, LoaderIcon, BookOpenIcon, CloseIcon } from 
 import { useFontSize } from '../contexts/FontSizeContext';
 import ExplanationModal from './ExplanationModal';
 import { phrasalVerbDetails } from '../data/phrasalVerbDetails';
-import { getPhrasalVerbDetail, getCachedVerbDetail } from '../utils/verbDetailService';
+import { getPhrasalVerbDetail, getCachedVerbDetail, type AiDetailState } from '../utils/verbDetailService';
 import TranslationStatus from './TranslationStatus';
 import AccentFlags from './AccentFlags';
 
@@ -134,7 +134,7 @@ const ActionButton = styled.button`
   }
 `;
 
-const ExpandedSection = styled.div`
+const ExpandedSection = styled.div<{ isActive?: boolean }>`
   max-height: ${props => props.isActive ? 'none' : '0'};
   opacity: ${props => props.isActive ? '1' : '0'};
   overflow: hidden;
@@ -170,7 +170,7 @@ const SummaryText = styled.p`
   text-align: left;
 `;
 
-const KeyPointCard = styled.div`
+const KeyPointCard = styled.div<{ type?: string }>`
   margin-bottom: 4px;
   padding: 10px;
   border: 1px solid var(--line);
@@ -398,7 +398,7 @@ const parseVocabularyNote = (note) => {
     };
 };
 
-const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudio, onWordClick, onTranslate, onSummarize, onExplain, translations, handleTranslationClick }) => {
+const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudio, onWordClick, onTranslate, onSummarize, onGenerateExamples, onExplain, translations, handleTranslationClick }) => {
     const { fontSize } = useFontSize();
     const [showTitleTranslation, setShowTitleTranslation] = useState(false);
     const [showArticleTranslation, setShowArticleTranslation] = useState(false);
@@ -406,9 +406,9 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
     const [articleTranslation, setArticleTranslation] = useState('');
     const [isTranslatingTitle, setIsTranslatingTitle] = useState(false);
     const [isTranslatingArticle, setIsTranslatingArticle] = useState(false);
-    const [selectedPhrasalVerb, setSelectedPhrasalVerb] = useState(null);
+    const [selectedPhrasalVerb, setSelectedPhrasalVerb] = useState<string | null>(null);
     // 사전에 없는 구동사의 상세 정보: AI 생성 상태(loading/ready/error)
-    const [aiDetail, setAiDetail] = useState({ verb: null, status: 'idle', data: null });
+    const [aiDetail, setAiDetail] = useState<AiDetailState>({ verb: null, status: 'idle', data: null });
     const [exampleTranslations, setExampleTranslations] = useState({});
     const [showExplanation, setShowExplanation] = useState(false);
     const [explanation, setExplanation] = useState('');

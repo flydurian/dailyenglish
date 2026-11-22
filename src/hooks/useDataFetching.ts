@@ -76,11 +76,11 @@ Return ONLY the English translation, nothing else. Make it suitable for ${target
 
 export const useDataFetching = () => {
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
+    const [error, setError] = useState<string | null>(null);
     const inFlight = useRef(new Map());
     // 인자가 같은 중복 호출(StrictMode 이중 effect)은 같은 세대로 두고, 값이 바뀌면 세대를 올립니다.
     // 오래된 세대의 응답은 상태와 소비자에게 반영하지 않습니다.
-    const lastRequest = useRef({ expressions: null, news: null });
+    const lastRequest = useRef<{ expressions: string | null; news: string | null }>({ expressions: null, news: null });
     const generations = useRef({ expressions: 0, news: 0 });
 
     // 최소한의 폴백 뉴스 데이터 (Gemini API 실패 시에만 사용)
@@ -167,7 +167,7 @@ export const useDataFetching = () => {
                     }
                 ];
 
-                let xmlText = null;
+                let xmlText: string | null = null;
                 for (const proxy of proxies) {
                     try {
                         const proxyUrl = proxy.getUrl(rssUrl);
@@ -190,7 +190,13 @@ export const useDataFetching = () => {
                 }
 
                 // XML 파싱
-                const items = [];
+                const items: {
+                    title: string;
+                    description: string;
+                    url: string;
+                    publishedAt: string;
+                    source: { name: string };
+                }[] = [];
                 const itemRegex = /<item>(.*?)<\/item>/gs;
                 let match;
 

@@ -246,7 +246,7 @@ const SpeakButton = styled.button`
 `;
 
 const ExplanationModal = ({ isOpen, onClose, explanation, isLoading, audioStates = {}, onPlayAudio }) => {
-  const modalRef = useRef(null);
+  const modalRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const handleEscape = (e) => {

@@ -3,7 +3,7 @@ import {
   containsHangul,
   needsEnglishRewrite,
   buildNewsRewritePrompt,
-} from '../src/utils/newsLanguage.js';
+} from '../src/utils/newsLanguage';
 
 describe('containsHangul', () => {
   it('한글 음절/자모를 감지하고 영어·숫자·기호·비문자열은 감지하지 않는다', () => {

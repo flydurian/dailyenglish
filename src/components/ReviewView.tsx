@@ -6,6 +6,7 @@ import { useWordbook } from '../contexts/WordbookContext';
 import { useProgress } from '../contexts/ProgressContext';
 import { toLocalDateKey } from '../utils/dateUtils';
 import { getDueItems, getNextDueDate, gradeItem } from '../utils/srs';
+import type { WordbookItem } from '../utils/wordbookUtils';
 
 const shuffle = (list) => {
   const shuffled = [...list];
@@ -24,7 +25,7 @@ const isTypingTarget = (target) => {
     || target.isContentEditable;
 };
 
-const getDueItemIds = (items, todayKey) => (
+const getDueItemIds = (items: WordbookItem[], todayKey: string): string[] => (
   getDueItems(items, todayKey).map((item) => item.id)
 );
 
@@ -481,7 +482,7 @@ const ReviewView = ({ onPlayAudio, audioStates = {} }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentItem, finished, revealed, handleGrade]);
 
-  const play = (text, accent) => {
+  const play = (text, accent?) => {
     if (canPlay) onPlayAudio(text, accent);
   };
 

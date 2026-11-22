@@ -1,7 +1,7 @@
 // 구동사 상세 정보(뉘앙스/용법/예문)를 모달을 열 때 Gemini로 그때그때 생성합니다.
 // 사전 데이터(phrasalVerbDetails)에 없는 구동사만 여기서 생성하고, 결과는
 // localStorage에 캐시해 같은 구동사는 두 번 요청하지 않습니다.
-import { callGeminiAPI } from './apiUtils.js';
+import { callGeminiAPI } from './apiUtils';
 
 // 예문·설명 생성 체인(좋은 모델 먼저, lib/modelChains.js)을 씁니다.
 const DETAIL_MODEL = 'tier:generate';
@@ -9,7 +9,13 @@ const CACHE_KEY = 'dailyenglish.verbDetails.v1';
 const CACHE_MAX_ENTRIES = 200;
 
 // --- localStorage 캐시 ---
-let cacheMap = null;
+export interface VerbDetail { nuance: string; usage: string; situations: string[] }
+export interface AiDetailState {
+  verb: string | null;
+  status: 'idle' | 'loading' | 'ready' | 'error';
+  data: VerbDetail | null;
+}
+let cacheMap: Map<string, VerbDetail> | null = null;
 
 const loadCache = () => {
     if (cacheMap) return cacheMap;
@@ -19,15 +25,15 @@ const loadCache = () => {
     } catch {
         cacheMap = new Map();
     }
-    return cacheMap;
+    return cacheMap!;
 };
 
 const persistCache = () => {
     try {
-        while (cacheMap.size > CACHE_MAX_ENTRIES) {
-            cacheMap.delete(cacheMap.keys().next().value);
+        while (cacheMap!.size > CACHE_MAX_ENTRIES) {
+            cacheMap!.delete(cacheMap!.keys().next().value as string);
         }
-        localStorage.setItem(CACHE_KEY, JSON.stringify(Object.fromEntries(cacheMap)));
+        localStorage.setItem(CACHE_KEY, JSON.stringify(Object.fromEntries(cacheMap!)));
     } catch (error) {
         console.warn('[verbDetail] 캐시 저장 실패:', error);
     }
@@ -167,8 +173,8 @@ export const sanitizeEntry = (raw, verbName) => {
     if (nuance === usage) return null;
 
     const formRegex = verbFormRegex(verbName);
-    const seen = new Set();
-    const situations = [];
+    const seen = new Set<string>();
+    const situations: string[] = [];
     for (const example of Array.isArray(raw.examples) ? raw.examples : []) {
         const text = cleanText(example);
         if (!text || /[가-힣]/.test(text)) continue;

@@ -34,6 +34,7 @@ export interface WordbookItem {
   example: string;
   addedAt: string;
   srs: SrsState;
+  [key: string]: unknown;
 }
 
 export const createItem = ({ type, term, meaning, example }: {

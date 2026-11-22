@@ -35,7 +35,7 @@ const FilterChips = styled.div`
   padding: 2px 0 4px;
 `;
 
-const FilterChip = styled.button`
+const FilterChip = styled.button<{ isActive?: boolean }>`
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -59,7 +59,7 @@ const FilterChip = styled.button`
   }
 `;
 
-const ChipCount = styled.span`
+const ChipCount = styled.span<{ isActive?: boolean }>`
   font-size: 9px;
   letter-spacing: 0.02em;
   opacity: ${props => props.isActive ? 0.72 : 1};
@@ -240,7 +240,7 @@ const WordbookView = ({ onPlayAudio, audioStates = {} }) => {
 
   const canPlay = typeof onPlayAudio === 'function';
 
-  const handlePlay = (term, accent) => {
+  const handlePlay = (term, accent?) => {
     if (canPlay) onPlayAudio(term, accent);
   };
 

@@ -45,7 +45,7 @@ export const useTranslation = () => {
         try {
             // 텍스트를 문장 단위로 나누기
             const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
-            const chunks = [];
+            const chunks: string[] = [];
             let currentChunk = '';
 
             // 청크 생성 (각 청크는 최대 1000자)
@@ -64,7 +64,7 @@ export const useTranslation = () => {
             console.log(`긴 텍스트를 ${chunks.length}개 청크로 나누어 번역`);
 
             // 각 청크를 순차적으로 번역
-            const translatedChunks = [];
+            const translatedChunks: string[] = [];
             for (let i = 0; i < chunks.length; i++) {
                 const chunk = chunks[i];
                 const chunkKey = `chunk_${i}_${chunk.substring(0, 50)}`;
