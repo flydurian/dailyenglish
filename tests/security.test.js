@@ -3,7 +3,7 @@ import {
   isAllowedOrigin,
   isTrustedRequest,
   setCorsHeaders,
-} from '../lib/security';
+} from '../lib/security.js';
 
 describe('isAllowedOrigin', () => {
   // 허용: 공개 프로덕션 도메인, Vercel 프로덕션 도메인, 프리뷰, 로컬 개발
@@ -65,7 +65,7 @@ describe('VERCEL_PROJECT_PRODUCTION_URL 환경 변수', () => {
   // 쿼리스트링 동적 import 로 새 모듈 인스턴스를 로드합니다.
   it('호스트명 값을 https origin으로 정규화한다', async () => {
     process.env.VERCEL_PROJECT_PRODUCTION_URL = 'custom-domain.example';
-    const envModule = await import('../lib/security?env=1');
+    const envModule = await import('../lib/security.js?env=1');
     expect(envModule.isAllowedOrigin('https://custom-domain.example')).toBe(true);
     expect(envModule.isAllowedOrigin('http://custom-domain.example')).toBe(false);
     expect(envModule.isAllowedOrigin('https://custom-domain.example.evil.com')).toBe(false);
@@ -74,13 +74,13 @@ describe('VERCEL_PROJECT_PRODUCTION_URL 환경 변수', () => {
 
   it('이미 https:// 로 시작하는 값은 그대로 사용한다', async () => {
     process.env.VERCEL_PROJECT_PRODUCTION_URL = 'https://already-https.example';
-    const httpsModule = await import('../lib/security?env=2');
+    const httpsModule = await import('../lib/security.js?env=2');
     expect(httpsModule.isAllowedOrigin('https://already-https.example')).toBe(true);
   });
 
   it('값이 없으면 추가 허용 없음', async () => {
     delete process.env.VERCEL_PROJECT_PRODUCTION_URL;
-    const emptyModule = await import('../lib/security?env=3');
+    const emptyModule = await import('../lib/security.js?env=3');
     expect(emptyModule.isAllowedOrigin('https://custom-domain.example')).toBe(false);
   });
 });

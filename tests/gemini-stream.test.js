@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { parseSseEvents, createStreamAccumulator, fetchGeminiStream } from '../lib/geminiStream';
-import { MODEL_CHAINS, STREAM_IDLE_MS } from '../lib/modelChains';
+import { parseSseEvents, createStreamAccumulator, fetchGeminiStream } from '../lib/geminiStream.js';
+import { MODEL_CHAINS, STREAM_IDLE_MS } from '../lib/modelChains.js';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const sse = (obj) => `data: ${JSON.stringify(obj)}\r\n\r\n`;
