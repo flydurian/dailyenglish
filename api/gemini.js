@@ -22,6 +22,7 @@ import {
     STREAM_IDLE_MS,
 } from '../lib/modelChains.js';
 import { fetchGeminiStream } from '../lib/geminiStream.js';
+import { tryGoogleTts } from '../lib/googleTts.js';
 // API 키는 서버 환경변수(GEMINI_API_KEY)에만 존재하며 클라이언트로 전달되지 않습니다.
 
 // 클라이언트는 모델 대신 용도(tier:generate | tier:fast | tier:tts)를 보내고, 실제 모델은
@@ -392,6 +393,20 @@ export default async function handler(req, res) {
 
         if (!outcome.ok) {
             console.error(`Gemini ${tier} chain failed (${outcome.status}); tried: ${outcome.tried.join(', ') || 'none (all cooling down)'}`);
+
+            // 영국 발음 요청이면 Gemini 후보가 모두 막혔을 때 구글 클라우드 TTS를 서브로 씁니다.
+            // 구글 쪽도 무료 한도(전역 카운터)를 넘으면 null이 되어 클라이언트의 브라우저 TTS 폴백으로 이어집니다.
+            if (isTts && wantsRoyal) {
+                const text = sanitizedPayload.contents?.[0]?.parts?.[0]?.text;
+                const googleAudio = await tryGoogleTts(text);
+                if (googleAudio) {
+                    res.setHeader('Cache-Control', 'no-store');
+                    res.setHeader('X-TTS-Provider', 'google-cloud');
+                    res.setHeader('Content-Type', googleAudio.mimeType);
+                    return res.status(200).end(Buffer.from(googleAudio.bytes));
+                }
+            }
+
             if (outcome.status === 429) return tooManyRequests(res, outcome.retryAfterSec);
             if (outcome.status === 400) return res.status(400).json({ error: 'Invalid request payload' });
             // 업스트림 오류 내용은 클라이언트에 노출하지 않습니다.

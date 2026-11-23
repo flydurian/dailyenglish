@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { requestTtsAudio, supportsOpusWebm } from '../utils/apiUtils';
-import { pcmToWav } from '../utils/audioUtils';
+import { isDirectPlayableAudio, pcmToWav } from '../utils/audioUtils';
 import { getCachedAudio, setCachedAudio, clearAudioCache } from '../utils/audioCache';
 
 // TTS 전용 모델 체인(3.8 Flash TTS → 예비 TTS 모델들, lib/modelChains.js)을 씁니다.
@@ -173,7 +173,8 @@ export const useAudio = (): UseAudioResult => {
 
                 const audioBlob = await requestTtsAudio(ttsText, TTS_MODEL, supportsOpusWebm ? 'webm' : 'wav', accent);
 
-                if (/audio\/(wav|wave|x-wav|webm)/i.test(audioBlob.type)) {
+                // 구글 TTS의 audio/mpeg(mp3)도 그대로 재생해야 합니다. PCM 변환 대상은 아닙니다.
+                if (isDirectPlayableAudio(audioBlob.type)) {
                     blob = audioBlob;
                 } else {
                     const sampleRate = parseInt(audioBlob.type.match(/rate=(\d+)/)?.[1] || '24000', 10);

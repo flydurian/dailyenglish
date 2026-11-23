@@ -1,4 +1,10 @@
 // 오디오 처리 헬퍼 함수들
+
+// 이미 재생 가능한 포맷인지 확인합니다. audio/l16(raw PCM)만 WAV 변환이 필요합니다.
+export const isDirectPlayableAudio = (mimeType: string): boolean => (
+  /audio\/(wav|wave|x-wav|webm|mpeg|mp3)/i.test(mimeType || '')
+);
+
 export const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
     const binaryString = window.atob(base64);
     const bytes = new Uint8Array(binaryString.length);
