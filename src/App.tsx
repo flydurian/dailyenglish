@@ -3,6 +3,7 @@ import styled from '@emotion/styled';
 import { ArrowUpIcon } from './components/Icons';
 import WordModal from './components/WordModal';
 import WordbookView from './components/WordbookView';
+import TodayWordsView from './components/TodayWordsView';
 import ReviewView from './components/ReviewView';
 import ExpressionCard from './components/ExpressionCard';
 import NewsCard from './components/NewsCard';
@@ -19,6 +20,7 @@ import { levelDescriptions } from './utils/apiUtils';
 import { detectHotReload } from './utils/versionUtils';
 import { getDueItems } from './utils/srs';
 import { toLocalDateKey } from './utils/dateUtils';
+import { collectTodayWords } from './utils/todayWords';
 import type { ExpressionItem, NewsItemData, WordDetailInfo } from './types';
 
 interface WordModalState {
@@ -389,6 +391,7 @@ export default function App() {
   const viewedTodayRef = useRef(new Set<string>());
   const [expressions, setExpressions] = useState<ExpressionItem[]>([]);
   const [news, setNews] = useState<NewsItemData[]>([]);
+  const [wordsLoading, setWordsLoading] = useState({ expressions: false, news: false });
   const [activeCardIndex, setActiveCardIndex] = useState<number | null>(null);
   const [activeNewsIndex, setActiveNewsIndex] = useState<number | null>(null);
   const [wordModal, setWordModal] = useState<WordModalState>({ isOpen: false, word: '', meaning: '', example: '', detailedInfo: null });
@@ -410,6 +413,9 @@ export default function App() {
     return `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, '0')}. ${String(d.getDate()).padStart(2, '0')}`;
   }, [currentDate]);
 
+  const todayWords = useMemo(() => collectTodayWords(expressions, news), [expressions, news]);
+  const todayWordCount = todayWords.phrasal.length + todayWords.words.length;
+
 
   // 데이터 가져오기
   const loadData = useCallback(async () => {
@@ -426,6 +432,20 @@ export default function App() {
         if (data === undefined) return;
         setNews(data);
         setActiveNewsIndex(null);
+      } else if (activeTab === 'words') {
+        // 오늘의 단어: 두 자료를 모두 확보해 준비된 것부터 바로 보여줍니다.
+        const today = new Date();
+        setWordsLoading({ expressions: true, news: true });
+        try {
+          const [expressionData, newsData] = await Promise.all([
+            fetchExpressions(today, level),
+            fetchNews(today, level),
+          ]);
+          if (expressionData !== undefined) setExpressions(expressionData);
+          if (newsData !== undefined) setNews(newsData);
+        } finally {
+          setWordsLoading({ expressions: false, news: false });
+        }
       }
     } catch (err) {
       console.error('데이터 로딩 실패:', err);
@@ -546,6 +566,14 @@ export default function App() {
                   뉴스 학습
                 </TabButton>
                 <TabButton
+                  isActive={activeTab === 'words'}
+                  role="tab"
+                  aria-selected={activeTab === 'words'}
+                  onClick={() => setActiveTab('words')}
+                >
+                  오늘의 단어
+                </TabButton>
+                <TabButton
                   isActive={activeTab === 'wordbook'}
                   role="tab"
                   aria-selected={activeTab === 'wordbook'}
@@ -591,14 +619,18 @@ export default function App() {
                   ? "Today's selection"
                   : activeTab === 'news'
                     ? 'News briefing'
-                    : activeTab === 'wordbook' ? 'My wordbook' : 'Spaced review'}
+                    : activeTab === 'words'
+                      ? 'Daily word list'
+                      : activeTab === 'wordbook' ? 'My wordbook' : 'Spaced review'}
               </Eyebrow>
               <SectionTitle>
                 {activeTab === 'expressions'
                   ? <>오늘의 표현 <span>· 3</span></>
                   : activeTab === 'news'
                     ? '뉴스로 배우기'
-                    : activeTab === 'wordbook' ? '내 단어장' : '오늘의 복습'}
+                    : activeTab === 'words'
+                      ? <>오늘의 단어 <span>· {todayWordCount}</span></>
+                      : activeTab === 'wordbook' ? '내 단어장' : '오늘의 복습'}
               </SectionTitle>
             </div>
             <SectionMeta>
@@ -606,7 +638,9 @@ export default function App() {
                 ? '3 MIN READ'
                 : activeTab === 'news'
                   ? 'AI SUMMARY'
-                  : activeTab === 'wordbook' ? `${wordbookCount} SAVED` : `${reviewDueCount} DUE`}
+                  : activeTab === 'words'
+                    ? `${todayWordCount} WORDS`
+                    : activeTab === 'wordbook' ? `${wordbookCount} SAVED` : `${reviewDueCount} DUE`}
             </SectionMeta>
           </SectionHead>
 
@@ -616,6 +650,12 @@ export default function App() {
               <ReviewView onPlayAudio={playAudio} audioStates={audioStates} />
             ) : activeTab === 'wordbook' ? (
               <WordbookView onPlayAudio={playAudio} audioStates={audioStates} />
+            ) : activeTab === 'words' ? (
+              <TodayWordsView
+                groups={todayWords}
+                expressionsLoading={wordsLoading.expressions}
+                newsLoading={wordsLoading.news}
+              />
             ) : loading ? (
               <LoadingContainer>
                 <div>
