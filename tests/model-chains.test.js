@@ -113,13 +113,26 @@ describe('buildModelPayload', () => {
   });
 
   it('왕실 발음 체인은 목소리를 지정할 수 있는 모델만 포함한다', () => {
-    const chain = getVoiceCapableTtsChain();
+    const chain = getVoiceCapableTtsChain('voice_1tyhpy1vdpts');
     expect(chain.length).toBeGreaterThan(0);
     expect(chain.every((entry) => VOICE_CAPABLE_TTS_MODELS.has(entry.model))).toBe(true);
     expect(chain.some((entry) => entry.model === 'gemini-3.8-flash-tts')).toBe(true);
     expect(chain.some((entry) => entry.model === 'gemini-3.8-flash-lite-tts')).toBe(true);
     // 구형 모델로 폴백하면 미국식 목소리로 읽히므로 후보에 없어야 합니다.
     expect(chain.some((entry) => entry.model === 'gemini-2.5-flash-preview-tts')).toBe(false);
+  });
+
+  it('왕실 발음 체인은 커스텀 RP 보이스와 en-gb 라이브러리 보이스를 모두 후보로 둔다', () => {
+    const chain = getVoiceCapableTtsChain('voice_1tyhpy1vdpts');
+    expect(chain.map((entry) => entry.voice)).toStrictEqual([
+      'voice_1tyhpy1vdpts', 'voice_1tyhpy1vdpts', 'en-gb-advisor-1', 'en-gb-advisor-1',
+    ]);
+    // 커스텀 보이스는 voiceConfig.voice로, 라이브러리 보이스는 prebuiltVoiceConfig로 들어갑니다.
+    const payload = { contents: [], generationConfig: {} };
+    const custom = buildModelPayload(chain[0], payload, 'tts', chain[0].voice);
+    expect(custom.generationConfig.speechConfig.voiceConfig.voice).toBe('voice_1tyhpy1vdpts');
+    const library = buildModelPayload(chain[2], payload, 'tts', chain[2].voice);
+    expect(library.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe('en-gb-advisor-1');
   });
 });
 

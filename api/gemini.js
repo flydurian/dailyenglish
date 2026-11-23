@@ -305,12 +305,14 @@ export default async function handler(req, res) {
     if (isTts && requestedAccent !== undefined && !Object.hasOwn(TTS_ACCENT_VOICES, requestedAccent)) {
         return res.status(400).json({ error: 'Invalid accent' });
     }
-    // accent가 없으면(기본 듣기) 왕실 영국 발음으로 읽습니다. 미국 국기를 누를 때만 미국 목소리를 씁니다.
-    const wantsRoyal = isTts && requestedAccent !== 'us';
-    const accentVoice = isTts ? (TTS_ACCENT_VOICES[requestedAccent] || ROYAL_TTS_VOICE) : undefined;
+    // 기본 스피커(accent 없음)는 미국 발음입니다. 🇬🇧를 누를 때만 왕실 영국 발음을 씁니다.
+    const wantsRoyal = isTts && requestedAccent === 'gb';
+    const accentVoice = isTts
+        ? (wantsRoyal ? ROYAL_TTS_VOICE : TTS_ACCENT_VOICES.us)
+        : undefined;
     // 왕실 발음은 목소리를 지정할 수 있는 3.8 모델에서만 나옵니다. 구형 모델로 폴백하면
     // 목소리 지정이 무시되어 미국식으로 읽히므로 후보에서 아예 제외합니다.
-    const ttsChain = wantsRoyal ? getVoiceCapableTtsChain() : MODEL_CHAINS.tts;
+    const ttsChain = wantsRoyal ? getVoiceCapableTtsChain(ROYAL_TTS_VOICE) : MODEL_CHAINS.tts;
 
     // TTS 출력 포맷 옵션: 'webm'(기본, Opus/WebM) | 'wav'(WebM 미지원 브라우저 폴백).
     // 포맷이 없는 구형 클라이언트 요청도 기본값 webm으로 트랜스코딩합니다.
@@ -369,7 +371,10 @@ export default async function handler(req, res) {
             cooldowns: modelCooldowns,
             attempt: async (entry, timeoutMs) => {
                 // 구형 TTS 모델에 커스텀 Voice ID를 보내면 400이 나 체인 전체가 실패합니다.
-                const voice = VOICE_CAPABLE_TTS_MODELS.has(entry.model) ? accentVoice : undefined;
+                // 영국 발음 체인은 후보별로 voice를 지정해 둡니다.
+                const voice = VOICE_CAPABLE_TTS_MODELS.has(entry.model)
+                    ? (entry.voice || accentVoice)
+                    : undefined;
                 const modelPayload = buildModelPayload(entry, sanitizedPayload, tier, voice);
                 const result = isTts
                     ? await requestGemini(entry.model, modelPayload, apiKey, timeoutMs)

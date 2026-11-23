@@ -13,6 +13,42 @@ const TTS_MAX_CHARS = 1600;
 // 캐시 키에 버전을 넣습니다. 버전을 올리면 이전 캐시는 자연스럽게 TTL로 정리됩니다.
 const CACHE_VERSION = 'v3';
 
+// 마지막 후보: 서버 TTS가 모두 실패(한도·오류)하면 브라우저 내장 음성 합성으로 읽습니다.
+// API 할당량과 무관하고 en-GB 음성을 지원하므로 영국 발음이 완전히 끊기지 않습니다.
+const playWithBrowserTts = (text: string, accent?: Accent): Promise<boolean> => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return Promise.resolve(false);
+
+    return new Promise((resolve) => {
+        try {
+            const synth = window.speechSynthesis;
+            synth.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            const lang = accent === 'gb' ? 'en-GB' : 'en-US';
+
+            const voices = synth.getVoices();
+            const preferred = voices.find((voice) => voice.lang.toLowerCase().replace('_', '-') === lang.toLowerCase())
+                || voices.find((voice) => voice.lang.toLowerCase().startsWith(lang.slice(0, 2).toLowerCase()));
+            if (preferred) utterance.voice = preferred;
+            utterance.lang = lang;
+            utterance.rate = 0.95;
+
+            let settled = false;
+            const finish = (ok: boolean) => {
+                if (settled) return;
+                settled = true;
+                resolve(ok);
+            };
+            utterance.onend = () => finish(true);
+            utterance.onerror = () => finish(false);
+            synth.speak(utterance);
+            // 일부 브라우저는 ended 이벤트를 놓치므로 문장 길이에 맞춰 안전 타임아웃을 둡니다.
+            setTimeout(() => finish(false), Math.max(6000, text.length * 120));
+        } catch {
+            resolve(false);
+        }
+    });
+};
+
 type AudioState = 'loading' | 'playing' | 'idle';
 type AudioStates = Record<string, AudioState>;
 type Accent = 'us' | 'gb';
@@ -161,7 +197,12 @@ export const useAudio = (): UseAudioResult => {
             return true;
         } catch (error) {
             console.error('음성을 재생하는 데 실패했습니다:', error);
+            // 서버 TTS 후보가 모두 막히면 브라우저 음성(en-GB / en-US)으로 대신 읽습니다.
+            updateState(sentence, 'playing');
+            const playedLocally = await playWithBrowserTts(trimForTts(sentence), accent);
             updateState(sentence, 'idle');
+            if (playedLocally) return true;
+
             showAudioNotice(describeAudioError(error as { name?: string }));
             return false;
         }
