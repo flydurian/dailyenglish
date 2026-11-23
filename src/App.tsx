@@ -8,6 +8,7 @@ import ReviewView from './components/ReviewView';
 import ExpressionCard from './components/ExpressionCard';
 import NewsCard from './components/NewsCard';
 import FontSizeControl from './components/FontSizeControl';
+import StayAwakeButton from './components/StayAwakeButton';
 import ProgressStrip from './components/ProgressStrip';
 import AudioNotice from './components/AudioNotice';
 import { useAudio } from './hooks/useAudio';
@@ -120,7 +121,10 @@ const Subtitle = styled.p`
   letter-spacing: -0.01em;
 `;
 
-const FontControlWrapper = styled.div`
+const HeaderControls = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex: 0 0 auto;
   padding-bottom: 2px;
 `;
@@ -541,9 +545,10 @@ export default function App() {
                     매일 세 개의 표현으로<br />영어의 결을 익히세요.
                   </Subtitle>
                 </TitleBlock>
-                <FontControlWrapper>
+                <HeaderControls>
+                  <StayAwakeButton />
                   <FontSizeControl />
-                </FontControlWrapper>
+                </HeaderControls>
               </TitleRow>
 
               <ProgressStrip />

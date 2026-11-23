@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import styled from '@emotion/styled';
-import { Volume2Icon, TranslateIcon, LoaderIcon, ChevronDownIcon, BookmarkIcon } from './Icons';
+import { Volume2Icon, TranslateIcon, LoaderIcon, ChevronDownIcon, BookmarkIcon, MicIcon } from './Icons';
 import { markPhrasalVerbUsage } from '../data/phrasalVerbsData';
 import { useFontSize } from '../contexts/FontSizeContext';
 import { useWordbook, makeWordbookId } from '../contexts/WordbookContext';
@@ -9,6 +9,7 @@ import { getPhrasalVerbDetail, getCachedVerbDetail, type AiDetailState } from '.
 import { css } from '@emotion/react';
 import TranslationStatus from './TranslationStatus';
 import AccentFlags from './AccentFlags';
+import ReadAlongPractice from './ReadAlongPractice';
 import type { AudioStates, ExpressionItem, OnToggle, PlayAudio, Translations, Translate, WordClickHandler, WordDetailInfo } from '../types';
 
 interface ExpressionCardProps {
@@ -477,6 +478,9 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
   const [exampleTranslations, setExampleTranslations] = useState<Record<string, ExampleTranslationEntry>>({});
   // 사전/일일 데이터에 없는 구동사의 상세 정보: AI 생성 상태(loading/ready/error)
   const [aiDetail, setAiDetail] = useState<AiDetailState>({ verb: null, status: 'idle', data: null });
+  // 따라 읽기 연습 패널: 본문 문장과 예문 각각 독립적으로 열립니다.
+  const [showReadAlong, setShowReadAlong] = useState(false);
+  const [activeExampleReadAlong, setActiveExampleReadAlong] = useState<string | null>(null);
 
   // expression이 변경될 때 번역 상태 초기화
   useEffect(() => {
@@ -484,6 +488,8 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
     setTranslation('');
     setIsTranslating(false);
     setExampleTranslations({});
+    setShowReadAlong(false);
+    setActiveExampleReadAlong(null);
   }, [expression.sentence]);
 
   const handleCardClick = useCallback(() => {
@@ -501,6 +507,11 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
     }
     onPlayAudio(expression.sentence);
   }, [onPlayAudio, expression.sentence]);
+
+  const handleReadAlongClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowReadAlong((prev) => !prev);
+  }, []);
 
   const handleExampleAudioClick = useCallback((e: React.MouseEvent, text: string) => {
     if (e && e.stopPropagation) {
@@ -747,6 +758,16 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
                 <span>듣기</span>
               </ActionButton>
 
+              <ActionButton
+                onClick={handleReadAlongClick}
+                className={showReadAlong ? 'on' : ''}
+                aria-label="따라 읽기"
+                aria-expanded={showReadAlong}
+              >
+                <MicIcon />
+                <span>따라 읽기</span>
+              </ActionButton>
+
               <AccentFlags
                 text={expression.sentence}
                 onPlayAudio={onPlayAudio}
@@ -790,6 +811,14 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
             </ActionButtons>
           </CardFooter>
         </ExampleCard>
+
+        {showReadAlong && (
+          <ReadAlongPractice
+            text={expression.sentence}
+            autoStart
+            onClose={() => setShowReadAlong(false)}
+          />
+        )}
       </ExampleSection>
 
       <ExpandedSection isActive={isActive}>
@@ -822,6 +851,8 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
                     const isExampleTranslating = Boolean(exampleState?.loading);
                     const shownTranslation = exampleState?.shown ? exampleState.translation : '';
                     const isAudioLoading = audioStates[exampleText] === 'loading';
+                    const exampleReadAlongKey = `${idx}:${exampleText}`;
+                    const isExampleReadAlong = activeExampleReadAlong === exampleReadAlongKey;
 
                     return (
                       <UsageExample key={idx}>
@@ -862,6 +893,17 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
                             />
                             <SmallActionButton
                               onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveExampleReadAlong((prev) => (prev === exampleReadAlongKey ? null : exampleReadAlongKey));
+                              }}
+                              className={isExampleReadAlong ? 'on' : ''}
+                              aria-label="예문 따라 읽기"
+                              aria-expanded={isExampleReadAlong}
+                            >
+                              <MicIcon />
+                            </SmallActionButton>
+                            <SmallActionButton
+                              onClick={(e) => {
                                 handleExampleTranslateClick(e, situation);
                               }}
                               disabled={isExampleTranslating}
@@ -877,6 +919,14 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
                             </SmallActionButton>
                           </UsageExampleActions>
                         </div>
+                        {isExampleReadAlong && (
+                          <ReadAlongPractice
+                            text={situation}
+                            compact
+                            autoStart
+                            onClose={() => setActiveExampleReadAlong(null)}
+                          />
+                        )}
                       </UsageExample>
                     );
                   })}

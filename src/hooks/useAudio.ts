@@ -9,6 +9,10 @@ const TTS_MODEL = 'tier:tts';
 // 서버(api/gemini.js)의 MAX_TTS_TEXT_CHARS 와 일치시킵니다.
 const TTS_MAX_CHARS = 1600;
 
+// 왕실 영국 발음 목소리로 바꾸면서 예전에 캐시된(미국식일 수 있는) 오디오를 다시 만들도록
+// 캐시 키에 버전을 넣습니다. 버전을 올리면 이전 캐시는 자연스럽게 TTL로 정리됩니다.
+const CACHE_VERSION = 'v3';
+
 type AudioState = 'loading' | 'playing' | 'idle';
 type AudioStates = Record<string, AudioState>;
 type Accent = 'us' | 'gb';
@@ -104,7 +108,7 @@ export const useAudio = (): UseAudioResult => {
         if (!sentence) return false;
         if (audioStates[sentence] === 'loading') return false;
 
-        const cacheKey = accent ? `${accent}:${sentence}` : sentence;
+        const cacheKey = `${CACHE_VERSION}:${accent ?? 'default'}:${sentence}`;
         const existing = audioElements.current.get(cacheKey);
         if (existing) {
             try {
@@ -175,6 +179,7 @@ export const useAudio = (): UseAudioResult => {
         // 이전 버전의 localStorage 오디오 캐시와 구 모델 IndexedDB 캐시를 정리합니다.
         try { localStorage.removeItem('tts_audio_cache'); } catch { /* ignore */ }
         try { indexedDB.deleteDatabase('dailyenglish-audio'); } catch { /* ignore */ }
+        try { indexedDB.deleteDatabase('dailyenglish-audio-v2'); } catch { /* ignore */ }
 
         const urls = objectUrls.current;
         const timer = noticeTimer;

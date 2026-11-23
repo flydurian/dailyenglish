@@ -99,3 +99,40 @@ export const BookmarkIcon = ({ filled = false }) => (
         <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z" />
     </svg>
 );
+
+// 따라 읽기(음성 인식) 버튼
+export const MicIcon = () => (
+    <svg {...iconProps} strokeWidth="1.6">
+        <rect x="9" y="2" width="6" height="12" rx="3" />
+        <path d="M5 11a7 7 0 0 0 14 0" />
+        <path d="M12 18v4M8 22h8" />
+    </svg>
+);
+
+export const StopIcon = () => (
+    <svg {...iconProps} strokeWidth="1.6">
+        <rect x="6" y="6" width="12" height="12" rx="2" />
+    </svg>
+);
+
+export const RetryIcon = () => (
+    <svg {...iconProps} strokeWidth="1.6">
+        <path d="M20 11a8 8 0 1 0-2.3 5.7" />
+        <path d="M20 4v7h-7" />
+    </svg>
+);
+
+// 화면 잠금 방지: 꺼짐 방지(달에 슬래시) / 켜짐(해)
+export const MoonOffIcon = () => (
+    <svg {...iconProps} strokeWidth="1.6">
+        <path d="M20.5 14.3A8.5 8.5 0 0 1 9.7 3.5" />
+        <path d="M4 4l16 16" />
+    </svg>
+);
+
+export const SunIcon = () => (
+    <svg {...iconProps} strokeWidth="1.6">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    </svg>
+);

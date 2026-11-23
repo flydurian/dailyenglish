@@ -10,12 +10,15 @@ import {
 } from '../lib/security.js';
 import { transcodeWavToOpusWebm } from '../lib/audioTranscode.js';
 import {
+    MODEL_CHAINS,
     resolveTier,
     buildModelPayload,
     createCooldownTracker,
     normalizeTextResponse,
     extractAudio,
     runModelChain,
+    getVoiceCapableTtsChain,
+    VOICE_CAPABLE_TTS_MODELS,
     STREAM_IDLE_MS,
 } from '../lib/modelChains.js';
 import { fetchGeminiStream } from '../lib/geminiStream.js';
@@ -36,14 +39,19 @@ const TEXT_REQUESTS_PER_MINUTE = 20;
 // 한 요청이 실패 시 여러 모델을 순차 호출할 수 있어 절반인 6회로 제한합니다.
 const TTS_REQUESTS_PER_MINUTE = 6;
 
+// TTS 기본 목소리: Voice Design으로 만든 영국 왕실 발음(RP) 커스텀 보이스입니다.
+// "A refined, educated British woman ... Received Pronunciation (the King's English) ...
+//  ... poise and cadence of a royal announcer or BBC newsreader."
+// 같은 프로젝트의 API 키로 생성했으며, env var로 교체할 수 있습니다.
+const ROYAL_TTS_VOICE = process.env.TTS_GB_VOICE || 'voice_1tyhpy1vdpts';
+
 // 국기 버튼으로 고르는 영어 억양 → Gemini TTS 목소리 ID (서버에서만 매핑).
 const TTS_ACCENT_VOICES = {
-    us: 'en-us-advisor-9', // Midwest, female — 중립적인 미국 발음
-    gb: 'en-gb-advisor-1', // Winchester, female — 중립적인 영국 발음
+    us: process.env.TTS_US_VOICE || 'en-us-advisor-9', // Midwest, female — 중립적인 미국 발음
+    gb: ROYAL_TTS_VOICE, // 영국 정통 왕실 발음(Received Pronunciation)
 };
-// 위 ID는 Gemini 3.8 TTS의 Extended Voice Library 목소리입니다. 구형 모델은
+// 위 ID는 Gemini 3.8 TTS의 커스텀/Extended Voice Library 목소리입니다. 구형 모델은
 // prebuilt voice만 지원하므로 폴백 모델에는 억양 ID를 넘기지 않습니다.
-const EXTENDED_VOICE_MODELS = new Set(['gemini-3.8-flash-tts', 'gemini-3.8-flash-lite-tts']);
 
 const ALLOWED_GEN_CONFIG_KEYS = new Set([
     'temperature', 'topP', 'topK', 'maxOutputTokens', 'responseMimeType',
@@ -297,7 +305,12 @@ export default async function handler(req, res) {
     if (isTts && requestedAccent !== undefined && !Object.hasOwn(TTS_ACCENT_VOICES, requestedAccent)) {
         return res.status(400).json({ error: 'Invalid accent' });
     }
-    const accentVoice = isTts ? TTS_ACCENT_VOICES[requestedAccent] : undefined;
+    // accent가 없으면(기본 듣기) 왕실 영국 발음으로 읽습니다. 미국 국기를 누를 때만 미국 목소리를 씁니다.
+    const wantsRoyal = isTts && requestedAccent !== 'us';
+    const accentVoice = isTts ? (TTS_ACCENT_VOICES[requestedAccent] || ROYAL_TTS_VOICE) : undefined;
+    // 왕실 발음은 목소리를 지정할 수 있는 3.8 모델에서만 나옵니다. 구형 모델로 폴백하면
+    // 목소리 지정이 무시되어 미국식으로 읽히므로 후보에서 아예 제외합니다.
+    const ttsChain = wantsRoyal ? getVoiceCapableTtsChain() : MODEL_CHAINS.tts;
 
     // TTS 출력 포맷 옵션: 'webm'(기본, Opus/WebM) | 'wav'(WebM 미지원 브라우저 폴백).
     // 포맷이 없는 구형 클라이언트 요청도 기본값 webm으로 트랜스코딩합니다.
@@ -350,10 +363,13 @@ export default async function handler(req, res) {
         // 체인 순서대로 시도: 성공하면 바로 반환, 한도 초과·과부하·지연·빈 응답이면 다음 모델.
         const outcome = await runModelChain({
             tier,
+            // 텍스트 요청은 기존 체인을 써야 합니다. TTS 체인을 넘기면 JSON 모드가
+            // 없는 TTS 모델로 생성 요청이 나가 400이 납니다.
+            chain: isTts ? ttsChain : undefined,
             cooldowns: modelCooldowns,
             attempt: async (entry, timeoutMs) => {
-                // 구형 TTS 모델에 Extended Voice ID를 보내면 400이 나 체인 전체가 실패합니다.
-                const voice = EXTENDED_VOICE_MODELS.has(entry.model) ? accentVoice : undefined;
+                // 구형 TTS 모델에 커스텀 Voice ID를 보내면 400이 나 체인 전체가 실패합니다.
+                const voice = VOICE_CAPABLE_TTS_MODELS.has(entry.model) ? accentVoice : undefined;
                 const modelPayload = buildModelPayload(entry, sanitizedPayload, tier, voice);
                 const result = isTts
                     ? await requestGemini(entry.model, modelPayload, apiKey, timeoutMs)

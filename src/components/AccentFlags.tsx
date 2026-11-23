@@ -74,7 +74,7 @@ const AccentFlags = ({ text, onPlayAudio, audioState, size = 26 }: AccentFlagsPr
         onClick={(event) => play(event, 'gb')}
         disabled={disabled}
         aria-label="영국 발음으로 듣기"
-        title="영국 발음"
+        title="영국 왕실 발음 (RP)"
       >
         🇬🇧
       </FlagButton>

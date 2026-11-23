@@ -5,6 +5,8 @@ import {
   CHAIN_BUDGET_MS,
   resolveTier,
   buildModelPayload,
+  getVoiceCapableTtsChain,
+  VOICE_CAPABLE_TTS_MODELS,
   classifyFailure,
   msUntilPacificMidnight,
   createCooldownTracker,
@@ -101,6 +103,24 @@ describe('buildModelPayload', () => {
     expect(buildModelPayload(MODEL_CHAINS.tts.find((e) => e.model === 'gemini-3.1-flash-tts-preview'), ttsPayload, 'tts', undefined)
       .generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe('Kore');
   });
+
+  it('Voice Design 커스텀 보이스(voice_...)는 voiceConfig.voice로 지정한다', () => {
+    const accented = buildModelPayload(MODEL_CHAINS.tts[0], ttsPayload, 'tts', 'voice_1tyhpy1vdpts');
+    expect(accented.generationConfig.speechConfig).toStrictEqual({
+      voiceConfig: { voice: 'voice_1tyhpy1vdpts' },
+    });
+    expect(accented.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig).toBeUndefined();
+  });
+
+  it('왕실 발음 체인은 목소리를 지정할 수 있는 모델만 포함한다', () => {
+    const chain = getVoiceCapableTtsChain();
+    expect(chain.length).toBeGreaterThan(0);
+    expect(chain.every((entry) => VOICE_CAPABLE_TTS_MODELS.has(entry.model))).toBe(true);
+    expect(chain.some((entry) => entry.model === 'gemini-3.8-flash-tts')).toBe(true);
+    expect(chain.some((entry) => entry.model === 'gemini-3.8-flash-lite-tts')).toBe(true);
+    // 구형 모델로 폴백하면 미국식 목소리로 읽히므로 후보에 없어야 합니다.
+    expect(chain.some((entry) => entry.model === 'gemini-2.5-flash-preview-tts')).toBe(false);
+  });
 });
 
 describe('msUntilPacificMidnight', () => {
@@ -144,6 +164,15 @@ describe('runModelChain', () => {
     expect(out.ok).toBe(true);
     expect(out.model).toBe(G[0]);
     expect(calls).toHaveLength(1);
+  });
+
+  it('chain이 undefined면 해당 티어의 기본 체인을 쓴다', async () => {
+    // 텍스트 요청에 TTS 체인이 잘못 넘어가지 않도록, 핸들러는 TTS가 아니면 undefined를 보냅니다.
+    const c = clock(); const cd = createCooldownTracker();
+    const { attempt, calls } = scripted({}, c);
+    await runModelChain({ tier: 'generate', chain: undefined, attempt, cooldowns: cd, now: c.now });
+    expect(calls[0].model).toBe(MODEL_CHAINS.generate[0].model);
+    expect(calls.every((call) => MODEL_CHAINS.generate.some((e) => e.model === call.model))).toBe(true);
   });
 
   it('429 → 503 → 성공, 쉬는 모델 건너뛰고 시간이 지나면 복귀', async () => {
