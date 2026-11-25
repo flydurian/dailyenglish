@@ -3,6 +3,7 @@ import {
   isGoogleTtsConfigured,
   getUsageKey,
   reserveGoogleQuota,
+  releaseGoogleQuota,
   getGoogleUsage,
   tryGoogleTts,
 } from '../lib/googleTts.js';
@@ -56,9 +57,11 @@ describe('googleTts', () => {
     expect(await tryGoogleTts('Take off')).toBeNull();
   });
 
-  it('월 키는 UTC 기준 YYYY-MM 형식이다', () => {
+  it('월 키는 결제 기준과 같은 태평양 시간의 YYYY-MM 형식이다', () => {
     expect(getUsageKey(new Date('2026-11-23T19:00:00Z'))).toBe('tts:google:2026-11');
-    expect(getUsageKey(new Date('2026-12-01T00:30:00Z'))).toBe('tts:google:2026-12');
+    // UTC로는 12월 1일이지만 태평양 시간으로는 아직 11월 30일입니다 (GCP 청구 월과 일치).
+    expect(getUsageKey(new Date('2026-12-01T00:30:00Z'))).toBe('tts:google:2026-11');
+    expect(getUsageKey(new Date('2026-12-01T08:30:00Z'))).toBe('tts:google:2026-12');
   });
 
   it('카운터가 한도 이내면 예약하고 원자적 EVAL을 호출한다', async () => {
@@ -75,7 +78,9 @@ describe('googleTts', () => {
     expect(command[4]).toBe('900000'); // 앱 캡
     expect(command[5]).toBe('25');
     expect(command[1]).toContain('INCRBY');
-    expect(command[1]).toContain('EXPIREAT');
+    expect(command[1]).toContain('EXPIRE');
+    // 만료는 달마다 새 키를 쓰므로 30일 이상이면 충분합니다.
+    expect(Number(command[6])).toBeGreaterThan(30 * 24 * 60 * 60);
   });
 
   it('카운터가 -1(한도 초과)을 반환하면 예약하지 않는다', async () => {
@@ -111,10 +116,28 @@ describe('googleTts', () => {
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('texttospeech'))).toBe(false);
   });
 
-  it('구글 API 오류 시 null을 반환한다', async () => {
+  it('구글 API 오류 시 null을 반환하고 예약한 한도를 되돌린다', async () => {
     configure();
-    stubFetch(10, false);
+    const fetchMock = stubFetch(10, false);
     expect(await tryGoogleTts('Take off')).toBeNull();
+
+    // 예약(EVAL) 1회 + 반환(EVAL) 1회 = Upstash 호출 2회, 반환 스크립트는 DECRBY를 씁니다.
+    const upstashCalls = fetchMock.mock.calls.filter(([url]) => url === 'https://upstash.test');
+    expect(upstashCalls).toHaveLength(2);
+    const releaseCommand = JSON.parse(upstashCalls[1][1].body);
+    expect(releaseCommand[0]).toBe('EVAL');
+    expect(releaseCommand[1]).toContain('DECRBY');
+    expect(releaseCommand[4]).toBe(String('Take off'.length));
+  });
+
+  it('반환은 예약한 문자 수만큼 빼고 0 밑으로 내려가지 않는다', async () => {
+    configure();
+    const fetchMock = stubFetch(0);
+    await releaseGoogleQuota(120);
+    const command = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(command[1]).toContain('DECRBY');
+    expect(command[1]).toContain('SET');
+    expect(command[4]).toBe('120');
   });
 
   it('사용량 조회는 현재 값을 정수로 반환한다', async () => {

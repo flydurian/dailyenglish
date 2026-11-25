@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { requestTtsAudio, supportsOpusWebm } from '../utils/apiUtils';
 import { isDirectPlayableAudio, pcmToWav } from '../utils/audioUtils';
-import { getCachedAudio, setCachedAudio, clearAudioCache } from '../utils/audioCache';
+import { LEGACY_AUDIO_CACHE_DB_NAMES, getCachedAudio, setCachedAudio, clearAudioCache } from '../utils/audioCache';
 
 // TTS 전용 모델 체인(3.8 Flash TTS → 예비 TTS 모델들, lib/modelChains.js)을 씁니다.
 const TTS_MODEL = 'tier:tts';
@@ -33,16 +33,21 @@ const playWithBrowserTts = (text: string, accent?: Accent): Promise<boolean> => 
             utterance.rate = 0.95;
 
             let settled = false;
+            let started = false;
+            let safetyTimer: ReturnType<typeof setTimeout> | null = null;
             const finish = (ok: boolean) => {
                 if (settled) return;
                 settled = true;
+                if (safetyTimer) clearTimeout(safetyTimer);
                 resolve(ok);
             };
+            utterance.onstart = () => { started = true; };
             utterance.onend = () => finish(true);
             utterance.onerror = () => finish(false);
             synth.speak(utterance);
             // 일부 브라우저는 ended 이벤트를 놓치므로 문장 길이에 맞춰 안전 타임아웃을 둡니다.
-            setTimeout(() => finish(false), Math.max(6000, text.length * 120));
+            // 이미 재생이 시작됐다면 실패로 처리하지 않습니다 (재생 중에 오류 안내가 뜨는 것 방지).
+            safetyTimer = setTimeout(() => finish(started), Math.max(6000, text.length * 120));
         } catch {
             resolve(false);
         }
@@ -219,9 +224,12 @@ export const useAudio = (): UseAudioResult => {
 
     useEffect(() => {
         // 이전 버전의 localStorage 오디오 캐시와 구 모델 IndexedDB 캐시를 정리합니다.
+        // 주의: 지금 쓰는 DB는 여기서 지우지 않습니다. 지우면 방문할 때마다 캐시가 비어
+        // 매번 TTS를 다시 생성해 무료 한도를 낭비합니다. (캐시 무효화는 CACHE_VERSION이 담당)
         try { localStorage.removeItem('tts_audio_cache'); } catch { /* ignore */ }
-        try { indexedDB.deleteDatabase('dailyenglish-audio'); } catch { /* ignore */ }
-        try { indexedDB.deleteDatabase('dailyenglish-audio-v2'); } catch { /* ignore */ }
+        for (const dbName of LEGACY_AUDIO_CACHE_DB_NAMES) {
+            try { indexedDB.deleteDatabase(dbName); } catch { /* ignore */ }
+        }
 
         const urls = objectUrls.current;
         const timer = noticeTimer;

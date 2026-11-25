@@ -396,7 +396,7 @@ export default async function handler(req, res) {
 
             // 영국 발음 요청이면 Gemini 후보가 모두 막혔을 때 구글 클라우드 TTS를 서브로 씁니다.
             // 구글 쪽도 무료 한도(전역 카운터)를 넘으면 null이 되어 클라이언트의 브라우저 TTS 폴백으로 이어집니다.
-            if (isTts && wantsRoyal) {
+            if (wantsRoyal) {
                 const text = sanitizedPayload.contents?.[0]?.parts?.[0]?.text;
                 const googleAudio = await tryGoogleTts(text);
                 if (googleAudio) {
@@ -421,6 +421,7 @@ export default async function handler(req, res) {
         res.setHeader('Cache-Control', 'no-store');
         res.setHeader('X-Gemini-Cache', cacheKey ? 'MISS' : 'BYPASS');
         res.setHeader('X-Gemini-Model', outcome.model);
+        if (isTts) res.setHeader('X-TTS-Provider', 'gemini');
         if (outcome.tried.length > 1) res.setHeader('X-Gemini-Fallback', String(outcome.tried.length - 1));
 
         // TTS는 후보 JSON 대신 오디오를 바이너리로 내려줍니다. WAV(24kHz s16 mono)를
