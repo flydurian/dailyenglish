@@ -394,14 +394,17 @@ export default async function handler(req, res) {
         if (!outcome.ok) {
             console.error(`Gemini ${tier} chain failed (${outcome.status}); tried: ${outcome.tried.join(', ') || 'none (all cooling down)'}`);
 
-            // 영국 발음 요청이면 Gemini 후보가 모두 막혔을 때 구글 클라우드 TTS를 서브로 씁니다.
-            // 구글 쪽도 무료 한도(전역 카운터)를 넘으면 null이 되어 클라이언트의 브라우저 TTS 폴백으로 이어집니다.
-            if (wantsRoyal) {
+            // TTS 후보가 모두 막혔을 때(한도·과부하) 구글 클라우드 TTS를 서브로 씁니다.
+            // 미국/영국 발음 모두 해당 발음의 en-US/en-GB 보이스로 이어집니다.
+            // 구글 쪽도 무료 한도(전역·IP별 카운터)를 넘으면 null이 되어 클라이언트의 브라우저 TTS 폴백으로 이어집니다.
+            if (isTts) {
                 const text = sanitizedPayload.contents?.[0]?.parts?.[0]?.text;
-                const googleAudio = await tryGoogleTts(text);
+                const googleAccent = wantsRoyal ? 'gb' : 'us';
+                const googleAudio = await tryGoogleTts(text, { accent: googleAccent, clientIp });
                 if (googleAudio) {
                     res.setHeader('Cache-Control', 'no-store');
                     res.setHeader('X-TTS-Provider', 'google-cloud');
+                    res.setHeader('X-TTS-Accent', googleAccent);
                     res.setHeader('Content-Type', googleAudio.mimeType);
                     return res.status(200).end(Buffer.from(googleAudio.bytes));
                 }

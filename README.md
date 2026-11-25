@@ -92,26 +92,29 @@ GEMINI_API_KEY=your_api_key_here
 #### 🔊 Google Cloud TTS 서브 (선택)
 
 기본 TTS는 Gemini입니다. Gemini 무료 한도(모델별 하루 10회)가 소진되면 **Google Cloud TTS**가
-영국 발음 서브로 자동 이어받습니다. 아래 **필수 3개**가 모두 있을 때만 켜지고, 하나라도 없거나
-사용량 저장소(Upstash)에 문제가 있으면 과금 사고를 막기 위해 구글 호출을 건너뜁니다.
+**미국·영국 발음 모두** 서브로 이어받습니다(각 발음의 en-US/en-GB 보이스). 아래 **필수 3개**가
+모두 있을 때만 켜지고, 하나라도 없거나 사용량 저장소(Upstash)에 문제가 있으면 과금 사고를
+막기 위해 구글 호출을 건너뜁니다.
 
 | 변수 | 필수 | 설명 |
 | --- | --- | --- |
 | `GOOGLE_TTS_API_KEY` | ✅ | GCP에서 발급한 API 키. **Cloud Text-to-Speech API만 허용**하도록 제한하세요. |
-| `UPSTASH_REDIS_REST_URL` | ✅ | 전역 월 사용량 카운터 저장소 (무료 티어로 충분) |
+| `UPSTASH_REDIS_REST_URL` | ✅ | 전역·IP별 월 사용량 카운터 저장소 (무료 티어로 충분) |
 | `UPSTASH_REDIS_REST_TOKEN` | ✅ | 위 저장소의 토큰 |
-| `GOOGLE_TTS_MONTHLY_LIMIT` | — | 앱이 스스로 멈추는 월 문자 수. 기본 `900000` (무료 100만 자 − 안전 마진 10만 자) |
-| `GOOGLE_TTS_VOICE` | — | 기본 `en-GB-Chirp3-HD-Charon` |
+| `GOOGLE_TTS_MONTHLY_LIMIT` | — | 앱이 스스로 멈추는 월 문자 수. 기본 `900000` (무료 100만 자 − 안전 마진 10만 자). 100만 자를 넘게 설정해도 100만 자로 제한됩니다. |
+| `GOOGLE_TTS_IP_MONTHLY_LIMIT` | — | IP당 월 문자 수. 기본 `100000`, `0`이면 IP 제한 없음 |
+| `GOOGLE_TTS_VOICE` | — | 영국 발음 보이스. 기본 `en-GB-Chirp3-HD-Achernar` (여성) |
+| `GOOGLE_TTS_VOICE_US` | — | 미국 발음 보이스. 기본 `en-US-Chirp3-HD-Kore` (여성) |
 
 1. GCP 콘솔에서 **결제 사용 설정** + Cloud Text-to-Speech API 사용 설정 (무료 한도만 써도 카드 등록 필요)
 2. **예산 알림/상한**을 반드시 설정 (앱 카운터는 실수 방지용, 최후의 보루는 GCP 예산)
 3. Vercel → Settings → Environment Variables에 위 값을 추가하고 **Redeploy**
-4. 확인: 🇬🇧 재생 응답 헤더에 `X-TTS-Provider: google-cloud`가 있으면 동작 중입니다.
-   Upstash에서 `tts:google:YYYY-MM` 키로 이번 달 사용 문자 수를 볼 수 있습니다.
+4. 확인: 🇬🇧/🇺🇸 재생 응답 헤더에 `X-TTS-Provider: google-cloud`가 있으면 동작 중입니다.
+   Upstash에서 `tts:google:YYYY-MM`(전역), `tts:google:ip:<해시>:YYYY-MM`(IP별) 키로 사용량을 볼 수 있습니다.
 
 > 카운터는 사용자별이 아니라 **앱 전체(프로젝트) 기준**입니다. 로그인·계정 없이 서버에서
-> 전역 키 1개만 원자적으로 갱신하며, 월 경계는 GCP 청구와 같은 태평양 시간 기준입니다.
-> 무료 한도를 넘길 수 있는 설정(예: `GOOGLE_TTS_MONTHLY_LIMIT` > 1000000)은 권장하지 않습니다.
+> 전역 키 + IP 키를 Lua로 **원자적으로** 갱신하며, 월 경계는 GCP 청구와 같은 태평양 시간 기준입니다.
+> IP는 원본을 저장하지 않고 서버 비밀로 HMAC 해시한 값만 씁니다.
 
 4. **개발 서버 실행**
 ```bash
