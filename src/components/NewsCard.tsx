@@ -1,9 +1,15 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef, Suspense } from 'react';
 import styled from '@emotion/styled';
 import { Volume2Icon, TranslateIcon, LoaderIcon, BookOpenIcon, CloseIcon } from './Icons';
 import { useFontSize } from '../contexts/FontSizeContext';
-import ExplanationModal from './ExplanationModal';
-import type { AudioStates, NewsItemData, OnToggle, PlayAudio, Translations, Translate, WordClickHandler } from '../types';
+import { getLoadedPhrasalVerbDetails, loadPhrasalVerbDetails } from '../data/phrasalVerbDetailsLoader';
+import type { PhrasalVerbDetail } from '../data/phrasalVerbDetails';
+import { getPhrasalVerbDetail, getCachedVerbDetail, type AiDetailState } from '../utils/verbDetailService';
+import TranslationStatus from './TranslationStatus';
+import AccentFlags from './AccentFlags';
+import type { AudioStates, NewsItemData, OnToggle, PlayAudio, Translate, WordClickHandler } from '../types';
+
+const ExplanationModal = React.lazy(() => import('./ExplanationModal'));
 
 interface NewsCardProps {
   newsItem: NewsItemData;
@@ -14,18 +20,11 @@ interface NewsCardProps {
   onPlayAudio: PlayAudio;
   onWordClick: WordClickHandler;
   onTranslate: Translate;
-  onSummarize: Translate;
-  onGenerateExamples: (word: string, meaning: string) => Promise<string[]>;
-  onExplain: Translate;
-  translations: Translations;
-  handleTranslationClick: Translate;
+  onExplain: (text: string, level?: string, onProgress?: (partial: string) => void) => Promise<string>;
+  level: string;
 }
 
 type ExampleTranslationEntry = { loading?: boolean } | string;
-import { phrasalVerbDetails } from '../data/phrasalVerbDetails';
-import { getPhrasalVerbDetail, getCachedVerbDetail, type AiDetailState } from '../utils/verbDetailService';
-import TranslationStatus from './TranslationStatus';
-import AccentFlags from './AccentFlags';
 
 // 최신 CSS Grid와 Flexbox를 활용한 스타일드 컴포넌트들
 const CardContainer = styled.div`
@@ -156,11 +155,12 @@ const ActionButton = styled.button`
 const ExpandedSection = styled.div<{ isActive?: boolean }>`
   max-height: ${props => props.isActive ? 'none' : '0'};
   opacity: ${props => props.isActive ? '1' : '0'};
+  visibility: ${props => props.isActive ? 'visible' : 'hidden'};
   overflow: hidden;
   margin-top: ${props => props.isActive ? '16px' : '0'};
   padding-top: ${props => props.isActive ? '14px' : '0'};
   border-top: ${props => props.isActive ? '1px solid var(--line)' : '0 solid transparent'};
-  transition: opacity 300ms ease;
+  transition: opacity 300ms ease, visibility 0s linear ${props => props.isActive ? '0s' : '300ms'};
 `;
 
 const SummarySection = styled.div`
@@ -417,7 +417,27 @@ const parseVocabularyNote = (note: unknown) => {
     };
 };
 
-const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudio, onWordClick, onTranslate, onSummarize, onGenerateExamples, onExplain, translations, handleTranslationClick }: NewsCardProps) => {
+const formatNewsDate = (raw?: string): string => {
+    const options: Intl.DateTimeFormatOptions = {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    };
+    if (raw && typeof raw === 'string') {
+        const ymdMatch = raw.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (ymdMatch) {
+            const localDate = new Date(Number(ymdMatch[1]), Number(ymdMatch[2]) - 1, Number(ymdMatch[3]));
+            return localDate.toLocaleDateString('ko-KR', options);
+        }
+        const parsed = new Date(raw);
+        if (!Number.isNaN(parsed.getTime())) {
+            return parsed.toLocaleDateString('ko-KR', options);
+        }
+    }
+    return new Date().toLocaleDateString('ko-KR', options);
+};
+
+const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudio, onWordClick, onTranslate, onExplain, level }: NewsCardProps) => {
     const { fontSize } = useFontSize();
     const [showTitleTranslation, setShowTitleTranslation] = useState(false);
     const [showArticleTranslation, setShowArticleTranslation] = useState(false);
@@ -427,6 +447,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
     const [isTranslatingArticle, setIsTranslatingArticle] = useState(false);
     const [selectedPhrasalVerb, setSelectedPhrasalVerb] = useState<string | null>(null);
     // 사전에 없는 구동사의 상세 정보: AI 생성 상태(loading/ready/error)
+    const [verbDict, setVerbDict] = useState<Record<string, PhrasalVerbDetail> | null>(() => getLoadedPhrasalVerbDetails());
     const [aiDetail, setAiDetail] = useState<AiDetailState>({ verb: null, status: 'idle', data: null });
     const [exampleTranslations, setExampleTranslations] = useState<Record<string, ExampleTranslationEntry>>({});
     const [showExplanation, setShowExplanation] = useState(false);
@@ -525,6 +546,8 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
         setShowArticleTranslation(true);
     }, [showArticleTranslation, articleTranslation, onTranslate, textToRead]);
 
+    const explainRequestIdRef = useRef(0);
+
     const handleExplainClick = useCallback(async (e: React.MouseEvent) => {
         e.stopPropagation();
 
@@ -535,24 +558,48 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
 
         setShowExplanation(true);
 
-        if (!explanation) {
+        if (!explanation && !isExplaining) {
+            const reqId = ++explainRequestIdRef.current;
             setIsExplaining(true);
-            const result = await onExplain(textToRead);
-            setExplanation(result);
-            setIsExplaining(false);
+            try {
+                const result = await onExplain(textToRead, level, (partial) => {
+                    if (explainRequestIdRef.current === reqId) {
+                        setExplanation(partial);
+                    }
+                });
+                if (explainRequestIdRef.current === reqId) {
+                    setExplanation(result);
+                }
+            } catch (error) {
+                console.error('강의 설명 생성 실패:', error);
+                if (explainRequestIdRef.current === reqId) {
+                    setExplanation('선생님이 설명을 준비하는 도중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.');
+                }
+            } finally {
+                if (explainRequestIdRef.current === reqId) {
+                    setIsExplaining(false);
+                }
+            }
         }
-    }, [showExplanation, explanation, onExplain, textToRead]);
+    }, [showExplanation, explanation, isExplaining, onExplain, textToRead, level]);
 
 
-    // news가 변경될 때 번역 상태 초기화
+    // newsItem 또는 level이 변경될 때 모든 로컬 상태 초기화
     useEffect(() => {
+        explainRequestIdRef.current += 1;
         setShowTitleTranslation(false);
         setShowArticleTranslation(false);
         setTitleTranslation('');
         setArticleTranslation('');
         setIsTranslatingTitle(false);
         setIsTranslatingArticle(false);
-    }, [newsItem?.title, newsItem?.full_text]);
+        setShowExplanation(false);
+        setExplanation('');
+        setIsExplaining(false);
+        setSelectedPhrasalVerb(null);
+        setAiDetail({ verb: null, status: 'idle', data: null });
+        setExampleTranslations({});
+    }, [newsItem?.title, newsItem?.summary, newsItem?.full_text, level]);
 
 
 
@@ -590,12 +637,19 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
     }, [onWordClick, findVocabularyExample]);
 
     // 구동사 클릭 핸들러
-    const handlePhrasalVerbClick = useCallback((phrasalVerb: string) => {
+    const handlePhrasalVerbClick = useCallback(async (phrasalVerb: string) => {
         const verbName = phrasalVerb.split(':')[0].trim().toLowerCase();
         setSelectedPhrasalVerb(phrasalVerb);
 
+        let dict = verbDict;
+        if (!dict) {
+            setAiDetail({ verb: verbName, status: 'loading', data: null });
+            dict = await loadPhrasalVerbDetails();
+            setVerbDict(dict);
+        }
+
         // 사전 데이터가 있으면 그대로 사용하고, 없으면 캐시 → AI 생성 순서로 확인합니다.
-        if (phrasalVerbDetails[verbName]) {
+        if (dict[verbName]) {
             setAiDetail({ verb: verbName, status: 'idle', data: null });
             return;
         }
@@ -614,7 +668,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                 ? { verb: verbName, status: data ? 'ready' : 'error', data }
                 : prev));
         });
-    }, [newsItem]);
+    }, [newsItem, verbDict]);
 
     const handleExampleTranslation = useCallback(async (exampleText: string) => {
         if (exampleTranslations[exampleText]) {
@@ -628,7 +682,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
         }));
 
         try {
-            const translation = await handleTranslationClick(exampleText);
+            const translation = await onTranslate(exampleText);
             if (translation) {
                 setExampleTranslations(prev => ({
                     ...prev,
@@ -644,7 +698,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                 return newState;
             });
         }
-    }, [exampleTranslations, handleTranslationClick]);
+    }, [exampleTranslations, onTranslate]);
 
     // 구동사 상세 정보 가져오기
     // 사전 데이터(phrasalVerbDetails)에 등록된 구동사만 반환합니다. 없는 구동사는
@@ -653,8 +707,8 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
     const getPhrasalVerbDetails = useCallback((phrasalVerb: string) => {
         // 구동사 이름만 추출하여 매칭 (예: "come up with: 생각해내다" -> "come up with")
         const phrasalVerbName = phrasalVerb.split(':')[0].trim().toLowerCase();
-        return phrasalVerbDetails[phrasalVerbName] || null;
-    }, []);
+        return verbDict?.[phrasalVerbName] || null;
+    }, [verbDict]);
 
     // newsItem이 없으면 빈 객체 반환
     if (!newsItem) {
@@ -668,19 +722,11 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                     {newsItem?.source || 'News Source'}
                 </SourceBadge>
                 <NewsDate>
-                    {newsItem?.date ? new Date(newsItem.date).toLocaleDateString('ko-KR', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                    }) : new Date().toLocaleDateString('ko-KR', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                    })}
+                    {formatNewsDate(newsItem?.date)}
                 </NewsDate>
             </NewsSource>
             <TitleContainer>
-                <NewsTitle onClick={handleCardClick}>
+                <NewsTitle>
                     {newsItem?.title?.replace(/\*\*(.*?)\*\*/g, '$1') || ''}
                 </NewsTitle>
                 <TitleActionButtons>
@@ -733,7 +779,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                 </TranslationText>
             )}
 
-            <ExpandedSection isActive={isActive}>
+            <ExpandedSection isActive={isActive} aria-hidden={!isActive}>
                 <SummarySection>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', position: 'relative' }}>
                         <SectionTitle style={{ margin: 0, textAlign: 'left' }}>
@@ -753,7 +799,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                                 {audioStates[textToRead] === 'loading' ? (
                                     <LoaderIcon size="h-2 w-2" />
                                 ) : (
-                                    <Volume2Icon className="h-2 w-2" />
+                                    <Volume2Icon />
                                 )}
                             </ActionButton>
                             <ActionButton
@@ -768,7 +814,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                                 {isTranslatingArticle ? (
                                     <LoaderIcon size="h-2 w-2" />
                                 ) : (
-                                    <TranslateIcon className="h-2 w-2" />
+                                    <TranslateIcon />
                                 )}
                             </ActionButton>
                             <AccentFlags
@@ -908,7 +954,7 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                                         AI가 이 구동사에 맞는 설명과 예문을 생성하고 있습니다...
                                     </span>
                                 </div>
-                            ) : isError ? (
+                            ) : isError || !shown ? (
                                 <div style={{ color: '#888', fontSize: '13px', textAlign: 'center', padding: '36px 0' }}>
                                     설명을 생성하지 못했습니다. 모달을 닫았다가 다시 눌러주세요.
                                 </div>
@@ -976,14 +1022,18 @@ const NewsCard = ({ newsItem, index, isActive, onToggle, audioStates, onPlayAudi
                     </PvOverlay>
                 );
             })()}
-            <ExplanationModal
-                isOpen={showExplanation}
-                onClose={() => setShowExplanation(false)}
-                explanation={explanation}
-                isLoading={isExplaining}
-                audioStates={audioStates}
-                onPlayAudio={onPlayAudio}
-            />
+            {showExplanation && (
+                <Suspense fallback={null}>
+                    <ExplanationModal
+                        isOpen={showExplanation}
+                        onClose={() => setShowExplanation(false)}
+                        explanation={explanation}
+                        isLoading={isExplaining}
+                        audioStates={audioStates}
+                        onPlayAudio={onPlayAudio}
+                    />
+                </Suspense>
+            )}
         </CardContainer>
     );
 };

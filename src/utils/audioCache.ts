@@ -100,36 +100,45 @@ export const deleteCachedAudio = async (text: string): Promise<void> => {
 };
 
 const pruneCache = async (): Promise<void> => {
-    const entries = await new Promise<AudioEntry[]>((resolve) => {
-        void openDb().then((db) => {
-            if (!db) {
-                resolve([]);
-                return;
-            }
-            try {
-                const request = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).getAll();
-                request.onsuccess = () => resolve((request.result || []) as AudioEntry[]);
-                request.onerror = () => resolve([]);
-            } catch {
-                resolve([]);
-            }
-        });
+    const db = await openDb();
+    if (!db) return;
+
+    // timestamp 인덱스의 key cursor만 순회하면 오디오 Blob 본문을 RAM으로 읽지 않고 정리할 수 있습니다.
+    const toDelete = await new Promise<IDBValidKey[]>((resolve) => {
+        try {
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const store = tx.objectStore(STORE_NAME);
+            const index = store.index('timestamp');
+            const now = Date.now();
+            const expiredKeys: IDBValidKey[] = [];
+            const aliveKeys: IDBValidKey[] = [];
+
+            const request = index.openKeyCursor();
+            request.onsuccess = () => {
+                const cursor = request.result;
+                if (!cursor) {
+                    const excessCount = Math.max(0, aliveKeys.length - MAX_ENTRIES);
+                    resolve([...expiredKeys, ...aliveKeys.slice(0, excessCount)]);
+                    return;
+                }
+                const ts = typeof cursor.key === 'number' ? cursor.key : 0;
+                if (!ts || now - ts > TTL_MS) {
+                    expiredKeys.push(cursor.primaryKey);
+                } else {
+                    aliveKeys.push(cursor.primaryKey);
+                }
+                cursor.continue();
+            };
+            request.onerror = () => resolve([]);
+        } catch {
+            resolve([]);
+        }
     });
-
-    if (entries.length === 0) return;
-
-    const now = Date.now();
-    const expired = entries.filter((entry) => !entry.timestamp || now - entry.timestamp > TTL_MS);
-    const alive = entries
-        .filter((entry) => !expired.includes(entry))
-        .sort((a, b) => a.timestamp - b.timestamp);
-    const excess = alive.slice(0, Math.max(0, alive.length - MAX_ENTRIES));
-    const toDelete = [...expired, ...excess];
 
     if (toDelete.length === 0) return;
 
     await runTransaction('readwrite', (store) => {
-        toDelete.forEach((entry) => store.delete(entry.text));
+        toDelete.forEach((key) => store.delete(key));
     });
 };
 

@@ -36,8 +36,8 @@ export const checkForUpdates = async (): Promise<boolean> => {
                 console.log(`새 빌드 발견: ${currentHash?.substring(0, 8) || '없음'} → ${latestHash.substring(0, 8)}`);
                 console.log('새로운 버전이 있습니다. 업데이트를 적용합니다...');
 
-                localStorage.setItem(CACHE_KEY, latestHash);
                 clearAllCaches();
+                localStorage.setItem(CACHE_KEY, latestHash);
 
                 // 약간의 지연 후 새로고침 (무한 루프 방지)
                 setTimeout(() => {

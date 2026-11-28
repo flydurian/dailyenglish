@@ -1,16 +1,18 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, Suspense } from 'react';
 import styled from '@emotion/styled';
 import { Volume2Icon, TranslateIcon, LoaderIcon, ChevronDownIcon, BookmarkIcon, MicIcon } from './Icons';
 import { markPhrasalVerbUsage } from '../data/phrasalVerbsData';
 import { useFontSize } from '../contexts/FontSizeContext';
 import { useWordbook, makeWordbookId } from '../contexts/WordbookContext';
-import { phrasalVerbDetails } from '../data/phrasalVerbDetails';
+import { getLoadedPhrasalVerbDetails, loadPhrasalVerbDetails } from '../data/phrasalVerbDetailsLoader';
+import type { PhrasalVerbDetail } from '../data/phrasalVerbDetails';
 import { getPhrasalVerbDetail, getCachedVerbDetail, type AiDetailState } from '../utils/verbDetailService';
 import { css } from '@emotion/react';
 import TranslationStatus from './TranslationStatus';
 import AccentFlags from './AccentFlags';
-import ReadAlongPractice from './ReadAlongPractice';
-import type { AudioStates, ExpressionItem, OnToggle, PlayAudio, Translations, Translate, WordClickHandler, WordDetailInfo } from '../types';
+import type { AudioStates, ExpressionItem, OnToggle, PlayAudio, Translate, WordClickHandler, WordDetailInfo } from '../types';
+
+const ReadAlongPractice = React.lazy(() => import('./ReadAlongPractice'));
 
 interface ExpressionCardProps {
   expression: ExpressionItem;
@@ -22,8 +24,6 @@ interface ExpressionCardProps {
   onWordClick: WordClickHandler;
   onTranslate: Translate;
   level: string;
-  translations: Translations;
-  handleTranslationClick: Translate;
 }
 
 interface ExampleTranslationEntry {
@@ -261,17 +261,19 @@ const ActionButton = styled.button`
 
 const ExpandedSection = styled.div<{ isActive?: boolean }>`
   overflow: hidden;
-  transition: max-height 450ms ease, opacity 300ms ease, padding 300ms ease;
+  transition: max-height 450ms ease, opacity 300ms ease, padding 300ms ease, visibility 0s linear ${props => props.isActive ? '0s' : '300ms'};
 
   ${props => props.isActive ? css`
     max-height: 2400px;
     opacity: 1;
+    visibility: visible;
     margin-top: 12px;
     padding-top: 12px;
     border-top: 1px dashed var(--line);
   ` : css`
     max-height: 0;
     opacity: 0;
+    visibility: hidden;
     margin-top: 0;
     padding-top: 0;
     border-top: 1px dashed transparent;
@@ -468,7 +470,7 @@ const stripExampleMarkdown = (sentence: string) => (
   typeof sentence === 'string' ? sentence.replace(/\*\*(.*?)\*\*/g, '$1').trim() : ''
 );
 
-const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, onPlayAudio, onWordClick, onTranslate, level, translations, handleTranslationClick }: ExpressionCardProps) => {
+const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, onPlayAudio, onWordClick, onTranslate, level }: ExpressionCardProps) => {
   const { fontSize } = useFontSize();
   const { isSaved, toggleItem } = useWordbook();
   const [showTranslation, setShowTranslation] = useState(false);
@@ -477,6 +479,7 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
   // 예문 번역: { [기호 없는 문장]: { translation, shown, loading } }
   const [exampleTranslations, setExampleTranslations] = useState<Record<string, ExampleTranslationEntry>>({});
   // 사전/일일 데이터에 없는 구동사의 상세 정보: AI 생성 상태(loading/ready/error)
+  const [verbDict, setVerbDict] = useState<Record<string, PhrasalVerbDetail> | null>(() => getLoadedPhrasalVerbDetails());
   const [aiDetail, setAiDetail] = useState<AiDetailState>({ verb: null, status: 'idle', data: null });
   // 따라 읽기 연습 패널: 본문 문장과 예문 각각 독립적으로 열립니다.
   const [showReadAlong, setShowReadAlong] = useState(false);
@@ -529,14 +532,11 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
     if (!cleanText) return;
 
     const entry = exampleTranslations[cleanText];
-    // 이전에 받아 둔 번역(로컬 또는 localStorage 캐시)이 있으면 보이기/숨기기만 합니다.
-    const savedTranslation = entry?.translation || translations?.[cleanText]?.translation;
-
-    if (savedTranslation) {
+    if (entry?.translation) {
       setExampleTranslations((prev) => ({
         ...prev,
         [cleanText]: {
-          translation: savedTranslation,
+          translation: entry.translation,
           shown: !prev[cleanText]?.shown,
         },
       }));
@@ -551,7 +551,7 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
     }));
 
     try {
-      const result = await handleTranslationClick(cleanText);
+      const result = await onTranslate(cleanText);
       setExampleTranslations((prev) => ({
         ...prev,
         [cleanText]: { translation: result, shown: true },
@@ -564,7 +564,7 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
         return next;
       });
     }
-  }, [exampleTranslations, handleTranslationClick, translations]);
+  }, [exampleTranslations, onTranslate]);
 
   const handleTranslateClick = useCallback(async (e: React.MouseEvent) => {
     if (e && e.stopPropagation) {
@@ -629,11 +629,11 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
 
   // 구동사 상세 정보: 일일 생성 데이터(situation/nuance/examples) 또는 사전 데이터를 사용합니다.
   // 둘 다 없으면 템플릿 폴백 대신 null을 반환하고, aiDetail(AI 생성)로 처리합니다.
-  const getPhrasalVerbDetails = useCallback(() => {
+  const staticDetails = React.useMemo(() => {
     const phrasalVerb = expression.phrasal_verb;
     const currentSentence = expression.sentence.replace(/\*\*(.*?)\*\*/g, '$1');
     const phrasalVerbName = phrasalVerb.split(':')[0].trim().toLowerCase();
-    const defaultDetails = phrasalVerbDetails[phrasalVerbName];
+    const defaultDetails = verbDict?.[phrasalVerbName];
 
     const getUniqueExamples = (examples: string[] | undefined) => {
       if (!examples) return [];
@@ -661,15 +661,23 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
     }
 
     return null;
-  }, [expression.phrasal_verb, expression.meaning, expression.sentence, expression.examples, expression.nuance, expression.situation]);
+  }, [expression.phrasal_verb, expression.sentence, expression.examples, expression.nuance, expression.situation, verbDict]);
 
-  // 사전 데이터에도 일일 생성 데이터에도 없는 구동사: 카드를 펼칠 때 AI 생성 → 캐시
+  // 카드가 펼쳐졌고 인라인 상세 데이터가 부족할 때 구동사 사전을 지연 로드합니다.
   useEffect(() => {
-    if (!isActive) return;
+    if (!isActive || staticDetails || verbDict) return;
+    let cancelled = false;
+    loadPhrasalVerbDetails().then((dict) => {
+      if (!cancelled) setVerbDict(dict);
+    });
+    return () => { cancelled = true; };
+  }, [isActive, staticDetails, verbDict]);
+
+  // staticDetails가 없는 구동사(부분 데이터 포함): 사전 로드 완료 후 AI 생성 → 캐시
+  useEffect(() => {
+    if (!isActive || staticDetails || !verbDict) return;
     const verbName = expression.phrasal_verb?.split(':')[0]?.trim().toLowerCase();
     if (!verbName) return;
-    if (phrasalVerbDetails[verbName]) return;
-    if (expression.situation || expression.nuance) return;
 
     const cached = getCachedVerbDetail(verbName);
     if (cached) {
@@ -688,12 +696,11 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
         ? { verb: verbName, status: data ? 'ready' : 'error', data }
         : prev));
     });
-  }, [isActive, expression.phrasal_verb, expression.meaning, expression.sentence, expression.situation, expression.nuance]);
+  }, [isActive, staticDetails, verbDict, expression.phrasal_verb, expression.meaning, expression.sentence]);
 
-  const staticDetails = getPhrasalVerbDetails();
   const detailVerbName = expression.phrasal_verb.split(':')[0].trim().toLowerCase();
   const aiReady = aiDetail.verb === detailVerbName && aiDetail.status === 'ready' && aiDetail.data;
-  const detailLoading = !staticDetails && aiDetail.verb === detailVerbName && aiDetail.status === 'loading';
+  const detailLoading = !staticDetails && (!verbDict || (aiDetail.verb === detailVerbName && aiDetail.status === 'loading'));
   const detailError = !staticDetails && !aiReady && !detailLoading;
   const details = (staticDetails || (aiReady ? aiDetail.data : null))!;
   const phrasalVerbName = expression.phrasal_verb.split(':')[0].trim();
@@ -813,15 +820,17 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
         </ExampleCard>
 
         {showReadAlong && (
-          <ReadAlongPractice
-            text={expression.sentence}
-            autoStart
-            onClose={() => setShowReadAlong(false)}
-          />
+          <Suspense fallback={null}>
+            <ReadAlongPractice
+              text={expression.sentence}
+              autoStart
+              onClose={() => setShowReadAlong(false)}
+            />
+          </Suspense>
         )}
       </ExampleSection>
 
-      <ExpandedSection isActive={isActive}>
+      <ExpandedSection isActive={isActive} aria-hidden={!isActive}>
         <PhrasalVerbDetailSection>
           {detailLoading ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '20px 0' }}>
@@ -920,12 +929,14 @@ const ExpressionCard = ({ expression, index, isActive, onToggle, audioStates, on
                           </UsageExampleActions>
                         </div>
                         {isExampleReadAlong && (
-                          <ReadAlongPractice
-                            text={situation}
-                            compact
-                            autoStart
-                            onClose={() => setActiveExampleReadAlong(null)}
-                          />
+                          <Suspense fallback={null}>
+                            <ReadAlongPractice
+                              text={situation}
+                              compact
+                              autoStart
+                              onClose={() => setActiveExampleReadAlong(null)}
+                            />
+                          </Suspense>
                         )}
                       </UsageExample>
                     );

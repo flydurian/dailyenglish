@@ -52,8 +52,13 @@ export const useWordbook = (): WordbookContextValue => {
 export const WordbookProvider = ({ children }: { children: ReactNode }) => {
   const [items, setItems] = useState<WordbookItem[]>(loadItems);
   const { record } = useProgress();
+  const didMountRef = useRef(false);
 
   useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
     } catch {
@@ -71,19 +76,19 @@ export const WordbookProvider = ({ children }: { children: ReactNode }) => {
     added.forEach(() => record('saved'));
   }, [items, record]);
 
-  const isSaved = useCallback((id: string) => items.some((item) => item.id === id), [items]);
+  const savedIdSet = useMemo(() => new Set(items.map((item) => item.id)), [items]);
+  const isSaved = useCallback((id: string) => savedIdSet.has(id), [savedIdSet]);
 
   const addItem = useCallback(({ type, term, meaning, example }: WordbookItemInput) => {
     if (typeof term !== 'string' || !term.trim()) return;
 
     const id = makeWordbookId(normalizeType(type), term);
-    if (items.some((item) => item.id === id)) return;
 
     setItems((prev) => {
       if (prev.some((item) => item.id === id)) return prev;
       return [createItem({ type, term, meaning, example }), ...prev];
     });
-  }, [items]);
+  }, []);
 
   const removeItem = useCallback((id: string) => {
     setItems((prev) => prev.filter((item) => item.id !== id));
@@ -100,7 +105,7 @@ export const WordbookProvider = ({ children }: { children: ReactNode }) => {
       }
       return [createItem({ type, term, meaning, example }), ...prev];
     });
-  }, [items]);
+  }, []);
 
   const updateItem = useCallback((id: string, patch: Partial<WordbookItem>) => {
     setItems((prev) => prev.map((item) => (

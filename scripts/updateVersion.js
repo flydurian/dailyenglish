@@ -19,7 +19,7 @@ let hashSource = '';
 // src 디렉토리의 모든 파일 해시 생성
 function generateDirHash(dirPath, relativePath = '') {
     try {
-        const files = fs.readdirSync(dirPath);
+        const files = fs.readdirSync(dirPath).sort();
         
         files.forEach(file => {
             const filePath = path.join(dirPath, file);
@@ -28,7 +28,14 @@ function generateDirHash(dirPath, relativePath = '') {
             
             if (stat.isDirectory()) {
                 generateDirHash(filePath, relativeFilePath);
-            } else if (file.endsWith('.js') || file.endsWith('.jsx') || file.endsWith('.css') || file.endsWith('.json')) {
+            } else if (
+                file.endsWith('.ts')
+                || file.endsWith('.tsx')
+                || file.endsWith('.js')
+                || file.endsWith('.jsx')
+                || file.endsWith('.css')
+                || file.endsWith('.json')
+            ) {
                 const content = fs.readFileSync(filePath, 'utf8');
                 const fileHash = crypto.createHash('md5').update(content).digest('hex');
                 hashSource += `${relativeFilePath}:${fileHash};`;

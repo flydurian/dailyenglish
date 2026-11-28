@@ -259,20 +259,22 @@ const ExplanationModal = ({ isOpen, onClose, explanation, isLoading, audioStates
   const modalRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    if (!isOpen) return undefined;
+
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
-
-    if (isOpen) {
-      window.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
-    }
+    const previousOverflow = document.body.style.overflow;
+    window.addEventListener('keydown', handleEscape);
+    document.body.style.overflow = 'hidden';
 
     return () => {
       window.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = previousOverflow;
     };
   }, [isOpen, onClose]);
+
+  const parsedBlocks = React.useMemo(() => parseLectureMarkdown(explanation || ''), [explanation]);
 
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
     // 포털이라도 React 이벤트는 CardContainer까지 버블되므로 여기서 막습니다.
@@ -324,29 +326,57 @@ const ExplanationModal = ({ isOpen, onClose, explanation, isLoading, audioStates
     segment.bold ? <strong key={i}>{segment.text}</strong> : <React.Fragment key={i}>{segment.text}</React.Fragment>
   );
 
-  const renderMarkdown = (text: string) => parseLectureMarkdown(text).map((block, index) => {
-    switch (block.type) {
-      case 'sentence':
-        return renderSentence(block.sentence, index);
-      case 'heading':
-        return <h3 key={index}>{block.text}</h3>;
-      case 'hr':
-        return <hr key={index} style={{ border: 0, borderTop: '1px solid var(--line)', margin: '18px 0' }} />;
-      case 'quote':
-        return <blockquote key={index}>{renderInline(block.inline)}</blockquote>;
-      case 'bullet':
-        return (
+  const renderMarkdown = () => {
+    const elements: React.ReactNode[] = [];
+    let bulletBuffer: React.ReactNode[] = [];
+
+    const flushBullets = (key: string) => {
+      if (bulletBuffer.length === 0) return;
+      elements.push(
+        <ul key={key} style={{ listStyle: 'none', paddingLeft: 0, margin: '6px 0' }}>
+          {bulletBuffer}
+        </ul>
+      );
+      bulletBuffer = [];
+    };
+
+    parsedBlocks.forEach((block, index) => {
+      if (block.type === 'bullet') {
+        bulletBuffer.push(
           <li key={index} style={{ listStyle: 'none', position: 'relative', paddingLeft: '16px', marginLeft: block.depth ? '16px' : 0 }}>
             <span style={{ position: 'absolute', left: 0, color: 'var(--coral)' }}>{block.depth ? '◦' : '•'}</span>
             {renderInline(block.inline)}
           </li>
         );
-      case 'blank':
-        return <p key={index} />;
-      default:
-        return <p key={index}>{renderInline(block.inline)}</p>;
-    }
-  });
+        return;
+      }
+
+      flushBullets(`ul-${index}`);
+      switch (block.type) {
+        case 'sentence':
+          elements.push(renderSentence(block.sentence, index));
+          break;
+        case 'heading':
+          elements.push(<h3 key={index}>{block.text}</h3>);
+          break;
+        case 'hr':
+          elements.push(<hr key={index} style={{ border: 0, borderTop: '1px solid var(--line)', margin: '18px 0' }} />);
+          break;
+        case 'quote':
+          elements.push(<blockquote key={index}>{renderInline(block.inline)}</blockquote>);
+          break;
+        case 'blank':
+          elements.push(<p key={index} />);
+          break;
+        default:
+          elements.push(<p key={index}>{renderInline(block.inline)}</p>);
+          break;
+      }
+    });
+
+    flushBullets('ul-end');
+    return elements;
+  };
 
   if (!isOpen) return null;
 
@@ -366,7 +396,7 @@ const ExplanationModal = ({ isOpen, onClose, explanation, isLoading, audioStates
         </Header>
 
         <ScrollArea>
-          {isLoading ? (
+          {isLoading && !explanation ? (
             <LoadingContainer>
               <LoaderIcon size="h-10 w-10" />
               <p>선생님이 문장을 분석하고 있어요...</p>
@@ -374,7 +404,24 @@ const ExplanationModal = ({ isOpen, onClose, explanation, isLoading, audioStates
             </LoadingContainer>
           ) : (
             <MarkdownContent>
-              {renderMarkdown(explanation)}
+              {renderMarkdown()}
+              {isLoading && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginTop: '14px',
+                    fontSize: '12px',
+                    color: 'var(--muted)',
+                  }}
+                >
+                  <LoaderIcon size="h-3 w-3" />
+                  <span>선생님이 계속 설명을 적고 있어요...</span>
+                </div>
+              )}
             </MarkdownContent>
           )}
         </ScrollArea>

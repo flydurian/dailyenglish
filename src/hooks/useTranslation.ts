@@ -1,55 +1,90 @@
-import { useState, useCallback, useEffect } from 'react';
-import { callGeminiAPI } from '../utils/apiUtils';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { callGeminiAPI, callGeminiStreamAPI } from '../utils/apiUtils';
 import type { TranslationEntry, Translations } from '../types';
+
+const CACHE_STORAGE_KEY = 'translation_cache';
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const MAX_CACHE_ENTRIES = 150;
+
+const pruneTranslations = (entries: Translations, limit = MAX_CACHE_ENTRIES): Translations => {
+    const now = Date.now();
+    const valid = Object.entries(entries).filter(
+        ([, value]) => value && typeof value.timestamp === 'number' && (now - value.timestamp) < CACHE_TTL_MS
+    );
+    valid.sort((a, b) => (b[1].timestamp || 0) - (a[1].timestamp || 0));
+    const trimmed = valid.slice(0, limit);
+    const result: Translations = {};
+    for (const [k, v] of trimmed) {
+        result[k] = v;
+    }
+    return result;
+};
+
+const persistTranslations = (entries: Translations) => {
+    try {
+        localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(entries));
+    } catch {
+        // 용량 초과 시 캐시 크기를 절반으로 줄여 한 번 더 저장 시도합니다.
+        try {
+            const half = pruneTranslations(entries, Math.max(20, Math.floor(MAX_CACHE_ENTRIES / 2)));
+            localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(half));
+        } catch (retryError) {
+            console.warn('번역 캐시 저장 실패:', retryError);
+        }
+    }
+};
 
 export const useTranslation = () => {
     const [translations, setTranslations] = useState<Translations>({});
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const translationsRef = useRef<Translations>(translations);
+    const inFlightRef = useRef(new Map<string, Promise<unknown>>());
+
+    translationsRef.current = translations;
 
     // 로컬 스토리지에서 번역 캐시 로드
     useEffect(() => {
         try {
-            const cachedTranslations = localStorage.getItem('translation_cache');
+            const cachedTranslations = localStorage.getItem(CACHE_STORAGE_KEY);
             if (cachedTranslations) {
-                const parsed = JSON.parse(cachedTranslations);
-                // 7일 이상 된 캐시는 제거
-                const now = Date.now();
-                const filtered: Translations = {};
-                Object.keys(parsed).forEach((key: string) => {
-                    if (parsed[key].timestamp && (now - parsed[key].timestamp) < 7 * 24 * 60 * 60 * 1000) {
-                        filtered[key] = parsed[key];
-                    }
-                });
+                const parsed = JSON.parse(cachedTranslations) as Translations;
+                const filtered = pruneTranslations(parsed);
+                translationsRef.current = filtered;
                 setTranslations(filtered);
             }
-        } catch (error) {
-            console.error('번역 캐시 로드 실패:', error);
+        } catch (err) {
+            console.error('번역 캐시 로드 실패:', err);
         }
     }, []);
 
-    // 번역 캐시를 로컬 스토리지에 저장
+    // 번역 캐시를 로컬 스토리지에 저장 (최대 MAX_CACHE_ENTRIES 유지)
     const saveToCache = useCallback((key: string, data: TranslationEntry) => {
         setTranslations((prev) => {
-            const updated = { ...prev, [key]: data };
-            try {
-                localStorage.setItem('translation_cache', JSON.stringify(updated));
-            } catch (error) {
-                console.error('번역 캐시 저장 실패:', error);
-            }
+            const updated = pruneTranslations({ ...prev, [key]: data });
+            translationsRef.current = updated;
+            persistTranslations(updated);
             return updated;
         });
+    }, []);
+
+    const runDeduped = useCallback(<T,>(key: string, task: () => Promise<T>): Promise<T> => {
+        const existing = inFlightRef.current.get(key);
+        if (existing) return existing as Promise<T>;
+        const promise = task().finally(() => {
+            inFlightRef.current.delete(key);
+        });
+        inFlightRef.current.set(key, promise);
+        return promise;
     }, []);
 
     // 긴 텍스트를 청크로 나누어 번역하는 함수
     const translateLongText = useCallback(async (text: string) => {
         try {
-            // 텍스트를 문장 단위로 나누기
             const sentences = text.split(/[.!?]+/).filter((s: string) => s.trim().length > 0);
             const chunks: string[] = [];
             let currentChunk = '';
 
-            // 청크 생성 (각 청크는 최대 1000자)
             for (const sentence of sentences) {
                 if ((currentChunk + sentence).length > 1000 && currentChunk.length > 0) {
                     chunks.push(currentChunk.trim());
@@ -62,17 +97,14 @@ export const useTranslation = () => {
                 chunks.push(currentChunk.trim());
             }
 
-            console.log(`긴 텍스트를 ${chunks.length}개 청크로 나누어 번역`);
-
-            // 각 청크를 순차적으로 번역
             const translatedChunks: string[] = [];
             for (let i = 0; i < chunks.length; i++) {
                 const chunk = chunks[i];
                 const chunkKey = `chunk_${i}_${chunk.substring(0, 50)}`;
 
-                // 청크별 캐시 확인
-                if (translations[chunkKey] && translations[chunkKey].translation) {
-                    translatedChunks.push(translations[chunkKey].translation);
+                const cachedChunk = translationsRef.current[chunkKey]?.translation;
+                if (cachedChunk) {
+                    translatedChunks.push(cachedChunk);
                     continue;
                 }
 
@@ -82,7 +114,7 @@ export const useTranslation = () => {
                     contents: [{ role: "user", parts: [{ text: prompt }] }],
                     generationConfig: {
                         responseMimeType: "text/plain",
-                        maxOutputTokens: 1200, // 청크 번역 토큰 상한
+                        maxOutputTokens: 1200,
                         temperature: 0.1
                     }
                 };
@@ -92,39 +124,24 @@ export const useTranslation = () => {
                 if (result?.candidates?.[0]?.content?.parts?.[0]?.text) {
                     const translation = result.candidates[0].content.parts[0].text.trim();
                     translatedChunks.push(translation);
-
-                    // 청크별 캐시 저장
-                    const cacheData = {
-                        translation: translation,
-                        timestamp: Date.now()
-                    };
-                    saveToCache(chunkKey, cacheData);
+                    saveToCache(chunkKey, { translation, timestamp: Date.now() });
                 } else {
-                    translatedChunks.push(chunk); // 번역 실패 시 원문 사용
+                    translatedChunks.push(chunk);
                 }
 
-                // API 호출 간격 조절
                 if (i < chunks.length - 1) {
                     await new Promise(resolve => setTimeout(resolve, 500));
                 }
             }
 
             const finalTranslation = translatedChunks.join(' ');
-
-            // 전체 번역 결과 캐시 저장
-            const cacheData = {
-                translation: finalTranslation,
-                timestamp: Date.now()
-            };
-            saveToCache(text, cacheData);
-
+            saveToCache(text, { translation: finalTranslation, timestamp: Date.now() });
             return finalTranslation;
-
-        } catch (error) {
-            console.error('청크 번역 실패:', error);
-            return text; // 실패 시 원문 반환
+        } catch (err) {
+            console.error('청크 번역 실패:', err);
+            return text;
         }
-    }, [translations, saveToCache]);
+    }, [saveToCache]);
 
     const translateText = useCallback(async (text: string) => {
         if (!text || text.trim().length === 0) {
@@ -132,92 +149,76 @@ export const useTranslation = () => {
         }
 
         const cleanText = text.replace(/\*\*(.*?)\*\*/g, '$1').trim();
-
-        // 이미 번역된 텍스트가 있으면 캐시에서 반환
-        if (translations[cleanText] && translations[cleanText].translation) {
-            return translations[cleanText].translation;
+        const cached = translationsRef.current[cleanText]?.translation;
+        if (cached) {
+            return cached;
         }
 
-        // 로딩 상태 설정
-        setIsLoading(true);
-        setError(null);
+        return runDeduped(`translate:${cleanText}`, async () => {
+            setIsLoading(true);
+            setError(null);
 
-        try {
-            console.log('번역 요청:', cleanText);
-
-            // 긴 텍스트의 경우 청크로 나누어 번역
-            if (cleanText.length > 2000) {
-                return await translateLongText(cleanText);
-            }
-
-            const prompt = `Translate this English text to Korean. Return only the Korean translation, nothing else: "${cleanText}"`;
-
-            const payload = {
-                contents: [{ role: "user", parts: [{ text: prompt }] }],
-                generationConfig: {
-                    responseMimeType: "text/plain",
-                    maxOutputTokens: 2000,
-                    temperature: 0.1
-                }
-            };
-
-            const result = await callGeminiAPI(payload, 'tier:fast');
-
-            if (!result?.candidates || result.candidates.length === 0) {
-                throw new Error("API 응답에 candidates가 없습니다.");
-            }
-
-            const firstCandidate = result.candidates[0];
-
-            if (firstCandidate.finishReason && firstCandidate.finishReason !== "STOP") {
-                if (firstCandidate.finishReason === "MAX_TOKENS") {
-                    // MAX_TOKENS 오류 시 청크 번역으로 재시도
+            try {
+                if (cleanText.length > 2000) {
                     return await translateLongText(cleanText);
                 }
-                throw new Error(`API 응답 오류: ${firstCandidate.finishReason}`);
+
+                const prompt = `Translate this English text to Korean. Return only the Korean translation, nothing else: "${cleanText}"`;
+
+                const payload = {
+                    contents: [{ role: "user", parts: [{ text: prompt }] }],
+                    generationConfig: {
+                        responseMimeType: "text/plain",
+                        maxOutputTokens: 2000,
+                        temperature: 0.1
+                    }
+                };
+
+                const result = await callGeminiAPI(payload, 'tier:fast');
+
+                if (!result?.candidates || result.candidates.length === 0) {
+                    throw new Error("API 응답에 candidates가 없습니다.");
+                }
+
+                const firstCandidate = result.candidates[0];
+
+                if (firstCandidate.finishReason && firstCandidate.finishReason !== "STOP") {
+                    if (firstCandidate.finishReason === "MAX_TOKENS") {
+                        return await translateLongText(cleanText);
+                    }
+                    throw new Error(`API 응답 오류: ${firstCandidate.finishReason}`);
+                }
+
+                const translation = firstCandidate.content?.parts?.[0]?.text?.trim();
+
+                if (!translation) {
+                    throw new Error("번역 결과를 받지 못했습니다.");
+                }
+
+                const cleanTranslation = translation
+                    .replace(/^["""]/, '')
+                    .replace(/["""]$/, '')
+                    .replace(/^번역:/, '')
+                    .replace(/^Translation:/, '')
+                    .trim();
+
+                saveToCache(cleanText, { translation: cleanTranslation, timestamp: Date.now() });
+                return cleanTranslation;
+            } catch (e) {
+                console.error("번역 실패:", e);
+                const err = e as Error;
+                setError(err.message);
+
+                if (err.message && err.message.includes('API_KEY')) {
+                    return "API 키가 설정되지 않았습니다.";
+                }
+
+                return "번역을 불러오는 데 실패했습니다.";
+            } finally {
+                setIsLoading(false);
             }
-
-            const translation = firstCandidate.content?.parts?.[0]?.text?.trim();
-
-            if (!translation) {
-                throw new Error("번역 결과를 받지 못했습니다.");
-            }
-
-            // 번역 결과 정리
-            const cleanTranslation = translation
-                .replace(/^["""]/, '')
-                .replace(/["""]$/, '')
-                .replace(/^번역:/, '')
-                .replace(/^Translation:/, '')
-                .trim();
-
-            console.log('번역 성공:', cleanTranslation);
-
-            // 캐시에 저장
-            const cacheData = {
-                translation: cleanTranslation,
-                timestamp: Date.now()
-            };
-            saveToCache(cleanText, cacheData);
-
-            return cleanTranslation;
-
-        } catch (e) {
-            console.error("번역 실패:", e);
-            const err = e as Error;
-            setError(err.message);
-
-            // API 키가 없는 경우 안내 메시지
-            if (err.message && err.message.includes('API_KEY')) {
-                return "API 키가 설정되지 않았습니다.";
-            }
-
-            return "번역을 불러오는 데 실패했습니다.";
-        } finally {
-            setIsLoading(false);
-        }
-    }, [translations, saveToCache, translateLongText]);
-
+        });
+    }, [runDeduped, saveToCache, translateLongText]);
 
     const summarizeText = useCallback(async (text: string) => {
         if (!text || text.trim().length === 0) {
@@ -226,68 +227,62 @@ export const useTranslation = () => {
 
         const cleanText = text.replace(/\*\*(.*?)\*\*/g, '$1').trim();
 
-        // 600자 이하면 요약하지 않음
         if (cleanText.length <= 600) {
             return cleanText;
         }
 
         const summaryKey = `summary_${cleanText}`;
-
-        // 이미 요약된 텍스트가 있으면 캐시에서 반환
-        if (translations[summaryKey] && translations[summaryKey].summary) {
-            return translations[summaryKey].summary;
+        const cached = translationsRef.current[summaryKey]?.summary;
+        if (cached) {
+            return cached;
         }
 
-        try {
-            const prompt = `Summarize this English news article to be 600 characters or less while maintaining the key information and readability. Focus on the main points and important details. Return ONLY the summarized text, nothing else:
+        return runDeduped(summaryKey, async () => {
+            try {
+                const prompt = `Summarize this English news article to be 600 characters or less while maintaining the key information and readability. Focus on the main points and important details. Return ONLY the summarized text, nothing else:
 
 "${cleanText}"`;
 
-            const payload = {
-                contents: [{ role: "user", parts: [{ text: prompt }] }],
-                generationConfig: {
-                    responseMimeType: "text/plain",
-                    maxOutputTokens: 800,
-                    temperature: 0.1
+                const payload = {
+                    contents: [{ role: "user", parts: [{ text: prompt }] }],
+                    generationConfig: {
+                        responseMimeType: "text/plain",
+                        maxOutputTokens: 800,
+                        temperature: 0.1
+                    }
+                };
+
+                const result = await callGeminiAPI(payload, 'tier:fast');
+
+                if (!result?.candidates || result.candidates.length === 0) {
+                    throw new Error("API 응답에 candidates가 없습니다.");
                 }
-            };
 
-            const result = await callGeminiAPI(payload, 'tier:fast');
+                const firstCandidate = result.candidates[0];
 
-            if (!result?.candidates || result.candidates.length === 0) {
-                throw new Error("API 응답에 candidates가 없습니다.");
+                if (firstCandidate.finishReason && firstCandidate.finishReason !== "STOP") {
+                    throw new Error(`API 응답 오류: ${firstCandidate.finishReason}`);
+                }
+
+                const summary = firstCandidate.content?.parts?.[0]?.text?.trim();
+
+                if (!summary) {
+                    throw new Error("요약 결과를 받지 못했습니다.");
+                }
+
+                const cleanSummary = summary
+                    .replace(/^["""]/, '')
+                    .replace(/["""]$/, '')
+                    .trim();
+
+                saveToCache(summaryKey, { summary: cleanSummary, timestamp: Date.now() });
+                return cleanSummary;
+            } catch (e) {
+                console.error("요약 실패:", e);
+                return cleanText.substring(0, 600) + "...";
             }
-
-            const firstCandidate = result.candidates[0];
-
-            if (firstCandidate.finishReason && firstCandidate.finishReason !== "STOP") {
-                throw new Error(`API 응답 오류: ${firstCandidate.finishReason}`);
-            }
-
-            const summary = firstCandidate.content?.parts?.[0]?.text?.trim();
-
-            if (!summary) {
-                throw new Error("요약 결과를 받지 못했습니다.");
-            }
-
-            const cleanSummary = summary
-                .replace(/^["""]/, '')
-                .replace(/["""]$/, '')
-                .trim();
-
-            // 캐시에 저장
-            const cacheData = {
-                summary: cleanSummary,
-                timestamp: Date.now()
-            };
-            saveToCache(summaryKey, cacheData);
-
-            return cleanSummary;
-        } catch (e) {
-            console.error("요약 실패:", e);
-            return cleanText.substring(0, 600) + "...";
-        }
-    }, [translations, saveToCache]);
+        });
+    }, [runDeduped, saveToCache]);
 
     const generateExamples = useCallback(async (word: string, meaning: string) => {
         if (!word || !meaning) {
@@ -295,14 +290,14 @@ export const useTranslation = () => {
         }
 
         const examplesKey = `examples_${word}`;
-
-        // 이미 생성된 예문이 있으면 캐시에서 반환
-        if (translations[examplesKey] && translations[examplesKey].examples) {
-            return translations[examplesKey].examples;
+        const cached = translationsRef.current[examplesKey]?.examples;
+        if (cached) {
+            return cached;
         }
 
-        try {
-            const prompt = `Create exactly 2 short, simple example sentences using the word "${word}" (meaning: ${meaning}). Each sentence should be:
+        return runDeduped(examplesKey, async () => {
+            try {
+                const prompt = `Create exactly 2 short, simple example sentences using the word "${word}" (meaning: ${meaning}). Each sentence should be:
 - Maximum 10 words
 - Easy to understand
 - Show different uses of the word
@@ -310,71 +305,71 @@ export const useTranslation = () => {
 
 Return ONLY the 2 sentences, each on a separate line, nothing else:`;
 
-            const payload = {
-                contents: [{ role: "user", parts: [{ text: prompt }] }],
-                generationConfig: {
-                    responseMimeType: "text/plain",
-                    maxOutputTokens: 1000,
-                    temperature: 0.1
+                const payload = {
+                    contents: [{ role: "user", parts: [{ text: prompt }] }],
+                    generationConfig: {
+                        responseMimeType: "text/plain",
+                        maxOutputTokens: 1000,
+                        temperature: 0.1
+                    }
+                };
+
+                const result = await callGeminiAPI(payload, 'tier:generate');
+
+                if (!result?.candidates || result.candidates.length === 0) {
+                    throw new Error("API 응답에 candidates가 없습니다.");
                 }
-            };
 
-            const result = await callGeminiAPI(payload, 'tier:generate');
+                const firstCandidate = result.candidates[0];
 
-            if (!result?.candidates || result.candidates.length === 0) {
-                throw new Error("API 응답에 candidates가 없습니다.");
+                if (firstCandidate.finishReason && firstCandidate.finishReason !== "STOP") {
+                    throw new Error(`API 응답 오류: ${firstCandidate.finishReason}`);
+                }
+
+                const response = firstCandidate.content?.parts?.[0]?.text?.trim();
+
+                if (!response) {
+                    throw new Error("예문 생성 결과를 받지 못했습니다.");
+                }
+
+                const examples = response.split('\n')
+                    .map((line: string) => line.trim())
+                    .filter((line: string) => line.length > 0)
+                    .slice(0, 2);
+
+                saveToCache(examplesKey, { examples, timestamp: Date.now() });
+                return examples;
+            } catch (e) {
+                console.error("예문 생성 실패:", e);
+                return [`I need to ${word.toLowerCase()} this problem.`, `Let's ${word.toLowerCase()} it together.`];
             }
+        });
+    }, [runDeduped, saveToCache]);
 
-            const firstCandidate = result.candidates[0];
-
-            if (firstCandidate.finishReason && firstCandidate.finishReason !== "STOP") {
-                throw new Error(`API 응답 오류: ${firstCandidate.finishReason}`);
-            }
-
-            const response = firstCandidate.content?.parts?.[0]?.text?.trim();
-
-            if (!response) {
-                throw new Error("예문 생성 결과를 받지 못했습니다.");
-            }
-
-            const examples = response.split('\n')
-                .map((line: string) => line.trim())
-                .filter((line: string) => line.length > 0)
-                .slice(0, 2); // 정확히 2개만 가져오기
-
-            // 캐시에 저장
-            const cacheData = {
-                examples: examples,
-                timestamp: Date.now()
-            };
-            saveToCache(examplesKey, cacheData);
-
-            return examples;
-        } catch (e) {
-            console.error("예문 생성 실패:", e);
-            return [`I need to ${word.toLowerCase()} this problem.`, `Let's ${word.toLowerCase()} it together.`];
-        }
-    }, [translations, saveToCache]);
-
-    const explainArticle = useCallback(async (text: string, level = 'B1') => {
+    const explainArticle = useCallback(async (
+        text: string,
+        level = 'B1',
+        onProgress?: (partial: string) => void,
+    ) => {
         if (!text || text.trim().length === 0) {
             return '';
         }
 
         const cleanText = text.replace(/\*\*(.*?)\*\*/g, '$1').trim();
-        const explainKey = `explain_${cleanText}`;
+        const explainKey = `explain_${level}_${cleanText}`;
 
-        // 이미 생성된 설명이 있으면 캐시에서 반환
-        if (translations[explainKey] && translations[explainKey].explanation) {
-            return translations[explainKey].explanation;
+        const cached = translationsRef.current[explainKey]?.explanation;
+        if (cached) {
+            onProgress?.(cached);
+            return cached;
         }
 
-        // 로딩 상태 설정
-        setIsLoading(true);
-        setError(null);
+        return runDeduped(explainKey, async () => {
+            setIsLoading(true);
+            setError(null);
 
-        try {
-            const prompt = `You are a friendly and enthusiastic English teacher at a top academy in Korea. Your student is learning English at a ${level} level.
+            try {
+                const prompt = `You are a friendly and enthusiastic English teacher at a top academy in Korea. Your student is learning English at a ${level} level.
             
 TASK: Analyze the following news article text and provide a detailed study guide. Focus on explaining the English sentences themselves so the student can learn grammar and structure.
 
@@ -409,49 +404,34 @@ Tone: Friendly, encouraging, professional but accessible (like a favorite tutor)
 Use Markdown for formatting (bolding, bullet points).
 `;
 
-            const payload = {
-                contents: [{ role: "user", parts: [{ text: prompt }] }],
-                generationConfig: {
-                    responseMimeType: "text/plain",
-                    maxOutputTokens: 3000,
-                    temperature: 0.2
-                }
-            };
+                const payload = {
+                    contents: [{ role: "user", parts: [{ text: prompt }] }],
+                    generationConfig: {
+                        responseMimeType: "text/plain",
+                        maxOutputTokens: 3000,
+                        temperature: 0.2
+                    }
+                };
 
-            const result = await callGeminiAPI(payload, 'tier:generate');
+                const explanation = await callGeminiStreamAPI(payload, 'tier:generate', onProgress);
 
-            if (!result?.candidates || result.candidates.length === 0) {
-                throw new Error("API 응답에 candidates가 없습니다.");
+                saveToCache(explainKey, { explanation, timestamp: Date.now() });
+                return explanation;
+            } catch (e) {
+                console.error("설명 생성 실패:", e);
+                setError((e as Error).message);
+                return "선생님이 설명을 준비하는 도중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.";
+            } finally {
+                setIsLoading(false);
             }
-
-            const explanation = result.candidates[0].content?.parts?.[0]?.text?.trim();
-
-            if (!explanation) {
-                throw new Error("설명 결과를 받지 못했습니다.");
-            }
-
-            // 캐시에 저장
-            const cacheData = {
-                explanation: explanation,
-                timestamp: Date.now()
-            };
-            saveToCache(explainKey, cacheData);
-
-            return explanation;
-
-        } catch (e) {
-            console.error("설명 생성 실패:", e);
-            setError((e as Error).message);
-            return "선생님이 설명을 준비하는 도중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.";
-        } finally {
-            setIsLoading(false);
-        }
-    }, [translations, saveToCache]);
+        });
+    }, [runDeduped, saveToCache]);
 
     // 캐시 정리 함수
     const clearCache = useCallback(() => {
+        translationsRef.current = {};
         setTranslations({});
-        localStorage.removeItem('translation_cache');
+        try { localStorage.removeItem(CACHE_STORAGE_KEY); } catch { /* ignore */ }
     }, []);
 
     return {

@@ -127,18 +127,19 @@ export const useSpeechRecognition = (): UseSpeechRecognitionResult => {
     recognition.maxAlternatives = 1;
 
     recognition.onresult = (event) => {
-      let finalText = '';
-      let interimText = '';
+      const finalParts: string[] = [];
+      const interimParts: string[] = [];
       for (let i = 0; i < event.results.length; i += 1) {
         const result = event.results[i];
-        const text = result[0]?.transcript || '';
-        if (result.isFinal) finalText += text;
-        else interimText += text;
+        const text = (result[0]?.transcript || '').trim();
+        if (!text) continue;
+        if (result.isFinal) finalParts.push(text);
+        else interimParts.push(text);
       }
-      if (finalText.trim()) {
-        setTranscript((prev) => (prev ? `${prev} ${finalText.trim()}` : finalText.trim()));
+      if (finalParts.length > 0) {
+        setTranscript(finalParts.join(' '));
       }
-      setInterim(interimText.trim());
+      setInterim(interimParts.join(' '));
     };
 
     recognition.onerror = (event) => {

@@ -64,6 +64,102 @@ export const callGeminiAPI = async (payload: unknown, model: string, maxRetries 
     }
 };
 
+// AI 강의 등 긴 텍스트 응답을 SSE 스트림으로 실시간 수신합니다.
+// 서버 캐시 HIT 시에는 application/json 응답이 내려오며 자동으로 처리됩니다.
+export const callGeminiStreamAPI = async (
+    payload: unknown,
+    model: string,
+    onChunk?: (accumulatedText: string) => void,
+): Promise<string> => {
+    if (!payload || !model) {
+        throw new Error('Gemini API requires payload and model');
+    }
+
+    const response = await fetch(GEMINI_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payload, model, stream: true }),
+    });
+
+    if (!response.ok) {
+        if (response.status === 429) {
+            throw new Error('이용자가 많아 잠시 후 다시 시도해주세요. (API 할당량 초과)');
+        }
+        const errorText = await response.text().catch(() => '');
+        console.error(`[gemini-stream] 오류 응답 ${response.status}:`, errorText);
+        const error = new Error(`Gemini API error: ${response.status}`) as ApiError;
+        error.status = response.status;
+        throw error;
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    // 서버 메모리/Redis 캐시 히트 시 JSON으로 즉시 응답됩니다.
+    if (!contentType.includes('text/event-stream') || !response.body) {
+        const result = await response.json();
+        const text = result?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+        if (!text) throw new Error('응답 텍스트를 받지 못했습니다.');
+        onChunk?.(text);
+        return text;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let accumulated = '';
+    let streamError: string | null = null;
+
+    const processEvents = (eventsText: string) => {
+        const blocks = eventsText.split('\n\n');
+        const rest = blocks.pop() ?? '';
+        for (const block of blocks) {
+            const data = block
+                .split('\n')
+                .filter((line) => line.startsWith('data:'))
+                .map((line) => line.slice(5).replace(/^ /, ''))
+                .join('\n')
+                .trim();
+            if (!data || data === '[DONE]') continue;
+            try {
+                const parsed = JSON.parse(data) as { text?: string; error?: string };
+                if (parsed.error) {
+                    streamError = parsed.error;
+                    continue;
+                }
+                if (typeof parsed.text === 'string' && parsed.text) {
+                    accumulated += parsed.text;
+                    onChunk?.(accumulated);
+                }
+            } catch {
+                // 손상된 조각 무시
+            }
+        }
+        return rest;
+    };
+
+    try {
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+            buffer = processEvents(buffer);
+        }
+        buffer += decoder.decode().replace(/\r\n/g, '\n');
+        processEvents(`${buffer}\n\n`);
+    } finally {
+        reader.releaseLock();
+    }
+
+    if (streamError && !accumulated.trim()) {
+        throw new Error(streamError);
+    }
+
+    const trimmed = accumulated.trim();
+    if (!trimmed) {
+        throw new Error('설명 결과를 받지 못했습니다.');
+    }
+    return trimmed;
+};
+
 // 서버가 기본으로 내려주는 Opus/WebM을 재생할 수 있는지 확인합니다.
 // WebM/Opus는 Chrome·Firefox는 물론 iOS Safari 17.4+에서도 재생됩니다.
 // 미지원 브라우저(iOS 17.3 이하 등)는 서버에 format:'wav'를 요청합니다.

@@ -1,17 +1,28 @@
 // 캐시 관리 유틸리티 함수들
-export const getCacheKey = (type: string, date: Date | string) => {
-    // Date 객체 유효성 검사
+import { toLocalDateKey } from './dateUtils';
+
+const toValidDate = (date: Date | string): Date | null => {
     const dateObj = date instanceof Date ? date : new Date(date);
-    if (isNaN(dateObj.getTime())) {
+    return Number.isNaN(dateObj.getTime()) ? null : dateObj;
+};
+
+export const getCacheKey = (type: string, date: Date | string) => {
+    const dateObj = toValidDate(date);
+    if (!dateObj) {
         console.error('Invalid date provided to getCacheKey:', date);
-        return `${type}_${new Date().toISOString().split('T')[0]}`;
+        return `${type}_${toLocalDateKey()}`;
     }
-    return `${type}_${dateObj.toISOString().split('T')[0]}`;
+    return `${type}_${toLocalDateKey(dateObj)}`;
 };
 
 export const getCachedData = (type: string, date: Date | string) => {
     const cacheKey = getCacheKey(type, date);
-    const cached = localStorage.getItem(cacheKey);
+    let cached: string | null = null;
+    try {
+        cached = localStorage.getItem(cacheKey);
+    } catch {
+        return null;
+    }
     if (cached) {
         try {
             return JSON.parse(cached);
@@ -24,52 +35,61 @@ export const getCachedData = (type: string, date: Date | string) => {
 };
 
 export const setCachedData = (type: string, date: Date | string, data: unknown) => {
-    const cacheKey = getCacheKey(type, date);
-    // Date 객체 유효성 검사
-    const dateObj = date instanceof Date ? date : new Date(date);
-    if (isNaN(dateObj.getTime())) {
+    const dateObj = toValidDate(date);
+    if (!dateObj) {
         console.error('Invalid date provided to setCachedData:', date);
         return;
     }
-    localStorage.setItem(cacheKey, JSON.stringify({
-        data: data,
+    const cacheKey = `${type}_${toLocalDateKey(dateObj)}`;
+    const payload = JSON.stringify({
+        data,
         timestamp: Date.now(),
-        date: dateObj.toISOString().split('T')[0]
-    }));
+        date: toLocalDateKey(dateObj)
+    });
+
+    try {
+        localStorage.setItem(cacheKey, payload);
+    } catch (error) {
+        // 용량 초과(QuotaExceededError) 시 오래된 캐시를 정리하고 한 번만 재시도합니다.
+        try {
+            cleanupOldMonthlyData();
+            localStorage.setItem(cacheKey, payload);
+        } catch (retryError) {
+            console.warn(`캐시 저장 실패(${cacheKey}):`, retryError || error);
+        }
+    }
 };
 
 export const isCacheValid = (type: string, date: Date | string) => {
     const cached = getCachedData(type, date);
     if (!cached) return false;
-    
-    // Date 객체 유효성 검사
-    const dateObj = date instanceof Date ? date : new Date(date);
-    if (isNaN(dateObj.getTime())) {
+
+    const dateObj = toValidDate(date);
+    if (!dateObj) {
         console.error('Invalid date provided to isCacheValid:', date);
         return false;
     }
-    
-    const requestedDate = dateObj.toISOString().split('T')[0];
+
+    const requestedDate = toLocalDateKey(dateObj);
     const cacheDate = cached.date;
-    
+
     if (type === 'news') {
-        // 뉴스는 오늘 날짜의 캐시만 유효
-        const today = new Date().toISOString().split('T')[0];
-        return cacheDate === today;
-    } else {
-        // 표현은 요청한 날짜와 캐시 날짜가 같으면 유효
-        return cacheDate === requestedDate;
+        // 뉴스는 로컬 기준 오늘 날짜의 캐시만 유효
+        return cacheDate === toLocalDateKey();
     }
+    // 표현은 요청한 날짜와 캐시 날짜가 같으면 유효
+    return cacheDate === requestedDate;
 };
 
 export const cleanupOldMonthlyData = () => {
-    // 캐시 키와 cached.date는 getCacheKey/setCachedData와 같은 UTC 기반 YYYY-MM-DD 입니다.
-    // new Date(문자열).toDateString()으로 비교하면 UTC 서쪽 타임존에서 하루 전으로 밀려
-    // 오늘 캐시까지 삭제되므로 문자열 키끼리 비교합니다.
-    const todayKey = new Date().toISOString().split('T')[0];
-    const oneWeekAgoKey = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    // 캐시 키와 cached.date는 모두 로컬 기준 YYYY-MM-DD (toLocalDateKey) 문자열입니다.
+    // YYYY-MM-DD 문자열 사전순 비교는 날짜순과 동일하므로 타임존 오차가 발생하지 않습니다.
+    const todayKey = toLocalDateKey();
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    const oneWeekAgoKey = toLocalDateKey(oneWeekAgo);
 
-    Object.keys(localStorage).forEach(key => {
+    Object.keys(localStorage).forEach((key) => {
         if (key.startsWith('expressions_') || key.startsWith('news_')) {
             try {
                 const cached = JSON.parse(localStorage.getItem(key) || '{}');
@@ -80,35 +100,16 @@ export const cleanupOldMonthlyData = () => {
                             localStorage.removeItem(key);
                         }
                     } else if (key.startsWith('expressions_')) {
-                        // 표현: 일주일 이전 데이터 삭제 (ISO 문자열은 사전순 비교가 날짜순과 같음)
+                        // 표현: 일주일 이전 데이터 삭제
                         if (cached.date < oneWeekAgoKey) {
                             localStorage.removeItem(key);
                         }
                     }
                 }
-            } catch (e) {
+            } catch {
                 // 파싱 실패한 데이터 삭제
                 localStorage.removeItem(key);
             }
         }
     });
-};
-
-export const getAvailableDates = () => {
-    const availableDates = new Set();
-    
-    Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('expressions_') || key.startsWith('news_')) {
-            try {
-                const cached = JSON.parse(localStorage.getItem(key) || '{}');
-                if (cached && cached.date) {
-                    availableDates.add(cached.date);
-                }
-            } catch (e) {
-                // 파싱 실패한 데이터 무시
-            }
-        }
-    });
-    
-    return Array.from(availableDates);
 };

@@ -13,6 +13,18 @@ const GEMINI_KEY_PATTERNS = [
   /AIza[0-9A-Za-z_-]{30,}/,
   /AQ\.[0-9A-Za-z_.-]{20,}/,
 ];
+const SERVER_SECRET_ENV_NAMES = [
+  'GEMINI_API_KEY',
+  'GOOGLE_TTS_API_KEY',
+  'UPSTASH_REDIS_REST_TOKEN',
+];
+const CLIENT_EXPOSED_SECRET_RE = /^\s*(?:VITE|REACT_APP)_[A-Z0-9_]*(?:API_KEY|SECRET|TOKEN|PASSWORD|PRIVATE_KEY)\s*=/m;
+const SRC_FORBIDDEN_REFS = [
+  'REACT_APP_GEMINI_API_KEY',
+  'VITE_GEMINI_API_KEY',
+  'VITE_GOOGLE_TTS_API_KEY',
+  'VITE_UPSTASH_REDIS_REST_TOKEN',
+];
 const problems = [];
 const checks = [];
 
@@ -20,13 +32,14 @@ function readFile(file) {
   return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
 }
 
-function loadEnvKey() {
+function loadEnvValue(varName) {
+  const regex = new RegExp(`^\\s*${varName}\\s*=`);
   const line = readFile(path.join(rootDir, '.env'))
     .split('\n')
     .reverse()
-    .find(item => /^\s*GEMINI_API_KEY\s*=/.test(item));
+    .find(item => regex.test(item));
   if (!line) return null;
-  return line.replace(/^\s*GEMINI_API_KEY\s*=\s*/, '').trim().replace(/^['"]|['"]$/g, '') || null;
+  return line.replace(regex, '').trim().replace(/^['"]|['"]$/g, '') || null;
 }
 
 function walkFiles(dir) {
@@ -37,34 +50,43 @@ function walkFiles(dir) {
   });
 }
 
-// 1. .env* 파일에 예전 클라이언트 노출 변수가 남아 있는지
+// 1. .env* 파일에 브라우저 번들에 노출되는 시크릿 변수(VITE_*, REACT_APP_*)가 남아 있는지
 for (const name of fs.readdirSync(rootDir).filter(file => /^\.env/.test(file))) {
   const content = readFile(path.join(rootDir, name));
-  if (/^\s*REACT_APP_GEMINI_API_KEY\s*=/m.test(content)) {
-    problems.push(`${name}: REACT_APP_GEMINI_API_KEY 는 브라우저 번들에 노출됩니다. GEMINI_API_KEY 로 바꾸세요.`);
+  const match = content.match(CLIENT_EXPOSED_SECRET_RE);
+  if (match) {
+    const exposedName = match[0].replace(/=.*/, '').trim();
+    problems.push(`${name}: ${exposedName} 은(는) 브라우저 번들에 노출됩니다. 서버 전용 변수로 바꾸세요.`);
   }
 }
-checks.push('.env* 파일의 클라이언트 노출 변수');
+checks.push('.env* 파일의 클라이언트 노출 변수(VITE_*/REACT_APP_*)');
 
-// 2. 소스 코드에서 예전 변수 참조가 남아 있는지
+// 2. 소스 코드에서 클라이언트 키 참조가 남아 있는지
 for (const file of walkFiles(path.join(rootDir, 'src'))) {
   if (!/\.(js|jsx|ts|tsx)$/.test(file)) continue;
-  if (readFile(file).includes('REACT_APP_GEMINI_API_KEY')) {
-    problems.push(`${path.relative(rootDir, file)}: REACT_APP_GEMINI_API_KEY 참조가 남아 있습니다.`);
+  const content = readFile(file);
+  for (const forbidden of SRC_FORBIDDEN_REFS) {
+    if (content.includes(forbidden)) {
+      problems.push(`${path.relative(rootDir, file)}: ${forbidden} 참조가 남아 있습니다.`);
+    }
   }
 }
 checks.push('src/ 의 클라이언트 키 참조');
 
-// 3. 빌드 결과물에 키가 들어갔는지
-const apiKey = process.env.GEMINI_API_KEY || loadEnvKey();
+// 3. 빌드 결과물에 서버 시크릿이 들어갔는지
+const serverSecrets = SERVER_SECRET_ENV_NAMES
+  .map((name) => ({ name, value: process.env[name] || loadEnvValue(name) }))
+  .filter((entry) => entry.value && entry.value.length >= 8);
 const buildFiles = walkFiles(buildDir).filter(file => /\.(js|mjs|css|html|json|map|txt)$/.test(file));
 
 for (const file of buildFiles) {
   const content = readFile(file);
   const relative = path.relative(rootDir, file);
 
-  if (apiKey && content.includes(apiKey)) {
-    problems.push(`${relative}: 실제 Gemini API 키가 포함되어 있습니다.`);
+  for (const secret of serverSecrets) {
+    if (content.includes(secret.value)) {
+      problems.push(`${relative}: 실제 ${secret.name} 값이 포함되어 있습니다.`);
+    }
   }
 
   const hasKeyShape = GEMINI_KEY_PATTERNS.some(pattern => pattern.test(content));
@@ -72,7 +94,7 @@ for (const file of buildFiles) {
     problems.push(`${relative}: Google API 키 형식 문자열이 발견되었습니다.`);
   }
 }
-checks.push(`빌드 결과물 ${buildFiles.length}개 파일의 키 포함 여부`);
+checks.push(`빌드 결과물 ${buildFiles.length}개 파일의 시크릿 포함 여부`);
 
 // 4. .env 가 gitignore 대상인지 (Vercel CLI 업로드에는 .gitignore 가 포함되지 않으므로 Vercel 빌드에서는 건너뛴다)
 if (process.env.VERCEL) {
@@ -93,4 +115,5 @@ if (problems.length > 0) {
   process.exit(1);
 }
 
-console.log(`\n✓ Gemini 키 노출 검사 통과${apiKey ? '' : ' (GEMINI_API_KEY 는 아직 설정되지 않음)'}\n`);
+const configuredNames = serverSecrets.map((s) => s.name).join(', ');
+console.log(`\n✓ 시크릿 노출 검사 통과${configuredNames ? ` (${configuredNames} 검사됨)` : ' (서버 시크릿 미설정 상태)'}\n`);

@@ -1,16 +1,17 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react';
 import styled from '@emotion/styled';
 import { ArrowUpIcon } from './components/Icons';
-import WordModal from './components/WordModal';
-import WordbookView from './components/WordbookView';
-import TodayWordsView from './components/TodayWordsView';
-import ReviewView from './components/ReviewView';
 import ExpressionCard from './components/ExpressionCard';
-import NewsCard from './components/NewsCard';
 import FontSizeControl from './components/FontSizeControl';
 import StayAwakeButton from './components/StayAwakeButton';
 import ProgressStrip from './components/ProgressStrip';
 import AudioNotice from './components/AudioNotice';
+
+const WordModal = React.lazy(() => import('./components/WordModal'));
+const WordbookView = React.lazy(() => import('./components/WordbookView'));
+const TodayWordsView = React.lazy(() => import('./components/TodayWordsView'));
+const ReviewView = React.lazy(() => import('./components/ReviewView'));
+const NewsCard = React.lazy(() => import('./components/NewsCard'));
 import { useAudio } from './hooks/useAudio';
 import { useTranslation } from './hooks/useTranslation';
 import { useDataFetching } from './hooks/useDataFetching';
@@ -385,12 +386,16 @@ const Footer = styled.footer`
 `;
 
 export default function App() {
-  const [currentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(() => new Date());
   const [level, setLevel] = useState('B1');
   const [activeTab, setActiveTab] = useState('expressions');
   const { items: wordbookItems } = useWordbook();
   const wordbookCount = wordbookItems.length;
-  const reviewDueCount = getDueItems(wordbookItems, toLocalDateKey()).length;
+  const currentDateKey = toLocalDateKey(currentDate);
+  const reviewDueCount = useMemo(
+    () => getDueItems(wordbookItems, currentDateKey).length,
+    [wordbookItems, currentDateKey]
+  );
   const { record } = useProgress();
   const viewedTodayRef = useRef(new Set<string>());
   const [expressions, setExpressions] = useState<ExpressionItem[]>([]);
@@ -403,12 +408,23 @@ export default function App() {
   const openWordModal = useCallback((word: string, meaning: string, example: string, detailedInfo: WordDetailInfo) => {
     setWordModal({ isOpen: true, word, meaning, example, detailedInfo });
   }, []);
+  const closeWordModal = useCallback(() => {
+    setWordModal((prev) => ({ ...prev, isOpen: false }));
+  }, []);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
 
   // 커스텀 훅 사용
   const { audioStates, playAudio, audioNotice, dismissAudioNotice } = useAudio();
-  const { translateText, summarizeText, generateExamples, explainArticle, translations } = useTranslation();
-  const { loading, error, fetchExpressions, fetchNews, initializeData } = useDataFetching();
+  const { translateText, generateExamples, explainArticle } = useTranslation();
+  const {
+    expressionsLoading,
+    expressionsError,
+    newsLoading,
+    newsError,
+    fetchExpressions,
+    fetchNews,
+    initializeData
+  } = useDataFetching();
 
   const levels = useMemo(() => ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'], []);
 
@@ -420,6 +436,34 @@ export default function App() {
   const todayWords = useMemo(() => collectTodayWords(expressions, news), [expressions, news]);
   const todayWordCount = todayWords.phrasal.length + todayWords.words.length;
 
+  // 자정이 지나거나 탭으로 복귀했을 때 날짜가 바뀌었으면 currentDate를 자동 갱신합니다.
+  useEffect(() => {
+    const syncDateIfChanged = () => {
+      const now = new Date();
+      if (toLocalDateKey(now) !== currentDateKey) {
+        setCurrentDate(now);
+      }
+    };
+
+    const nextMidnight = new Date(currentDate);
+    nextMidnight.setHours(24, 0, 1, 0);
+    const msUntilMidnight = Math.max(1000, nextMidnight.getTime() - Date.now());
+    const midnightTimer = setTimeout(syncDateIfChanged, msUntilMidnight);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        syncDateIfChanged();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', syncDateIfChanged);
+
+    return () => {
+      clearTimeout(midnightTimer);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', syncDateIfChanged);
+    };
+  }, [currentDate, currentDateKey]);
 
   // 데이터 가져오기
   const loadData = useCallback(async () => {
@@ -430,61 +474,79 @@ export default function App() {
         setExpressions(data);
         setActiveCardIndex(null);
       } else if (activeTab === 'news') {
-        // 뉴스학습은 항상 오늘 날짜 사용
         const today = new Date();
         const data = await fetchNews(today, level);
         if (data === undefined) return;
         setNews(data);
         setActiveNewsIndex(null);
       } else if (activeTab === 'words') {
-        // 오늘의 단어: 두 자료를 모두 확보해 준비된 것부터 바로 보여줍니다.
+        // 오늘의 단어: 표현과 뉴스를 독립적으로 병렬 로딩해 먼저 준비된 쪽을 즉시 보여줍니다.
         const today = new Date();
         setWordsLoading({ expressions: true, news: true });
-        try {
-          const [expressionData, newsData] = await Promise.all([
-            fetchExpressions(today, level),
-            fetchNews(today, level),
-          ]);
-          if (expressionData !== undefined) setExpressions(expressionData);
-          if (newsData !== undefined) setNews(newsData);
-        } finally {
-          setWordsLoading({ expressions: false, news: false });
-        }
+
+        fetchExpressions(today, level)
+          .then((expressionData) => {
+            if (expressionData !== undefined) setExpressions(expressionData);
+          })
+          .catch((err) => console.error('표현 로딩 실패:', err))
+          .finally(() => {
+            setWordsLoading((prev) => ({ ...prev, expressions: false }));
+          });
+
+        fetchNews(today, level)
+          .then((newsData) => {
+            if (newsData !== undefined) setNews(newsData);
+          })
+          .catch((err) => console.error('뉴스 로딩 실패:', err))
+          .finally(() => {
+            setWordsLoading((prev) => ({ ...prev, news: false }));
+          });
       }
     } catch (err) {
       console.error('데이터 로딩 실패:', err);
     }
   }, [activeTab, currentDate, level, fetchExpressions, fetchNews]);
 
-  // 스크롤 이벤트 처리
+  // 스크롤 이벤트 처리 (전체 DOM 리계산을 유발하던 body 클래스 토글 제거)
   useEffect(() => {
-    let scrollTimeout: ReturnType<typeof setTimeout> | undefined;
-
     const handleScroll = () => {
-      setShowScrollToTop(window.scrollY > 300);
-
-      // 스크롤 중일 때 클래스 추가
-      document.body.classList.add('scrolling');
-      document.documentElement.classList.add('scrolling');
-
-      // 스크롤이 멈춘 후 클래스 제거
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => {
-        document.body.classList.remove('scrolling');
-        document.documentElement.classList.remove('scrolling');
-      }, 150);
+      const next = window.scrollY > 300;
+      setShowScrollToTop((prev) => (prev === next ? prev : next));
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
       window.removeEventListener('scroll', handleScroll);
-      clearTimeout(scrollTimeout);
     };
   }, []);
 
   // 스크롤 to top
   const scrollToTop = useCallback(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  // 안정적인 카드 토글 핸들러 (React.memo 무효화 방지)
+  const expressionsRef = useRef(expressions);
+  expressionsRef.current = expressions;
+
+  const handleExpressionToggle = useCallback((index: number) => {
+    setActiveCardIndex((prev) => {
+      const isOpening = prev !== index;
+      if (isOpening) {
+        const expression = expressionsRef.current[index];
+        const dateKey = toLocalDateKey();
+        const key = `${dateKey}:${expression?.phrasal_verb || index}`;
+        if (!viewedTodayRef.current.has(key)) {
+          viewedTodayRef.current.add(key);
+          record('viewed');
+        }
+      }
+      return isOpening ? index : null;
+    });
+  }, [record]);
+
+  const handleNewsToggle = useCallback((index: number) => {
+    setActiveNewsIndex((prev) => (prev === index ? null : index));
   }, []);
 
   // 초기 데이터 로딩
@@ -502,29 +564,35 @@ export default function App() {
     loadData();
   }, [loadData]);
 
+  const activeTabLoading = activeTab === 'expressions' ? expressionsLoading : activeTab === 'news' ? newsLoading : false;
+  const activeTabError = activeTab === 'expressions' ? expressionsError : activeTab === 'news' ? newsError : null;
 
   return (
     <FontSizeProvider>
       <AppContainer>
-        <WordModal
-          isOpen={wordModal.isOpen}
-          word={wordModal.word}
-          meaning={wordModal.meaning}
-          example={wordModal.example}
-          detailedInfo={wordModal.detailedInfo}
-          onPlayAudio={playAudio}
-          audioStates={audioStates}
-          onGenerateExamples={generateExamples}
-          onTranslate={translateText}
-          onClose={() => setWordModal({ ...wordModal, isOpen: false })}
-        />
+        {wordModal.isOpen && (
+          <Suspense fallback={null}>
+            <WordModal
+              isOpen={wordModal.isOpen}
+              word={wordModal.word}
+              meaning={wordModal.meaning}
+              example={wordModal.example}
+              detailedInfo={wordModal.detailedInfo}
+              onPlayAudio={playAudio}
+              audioStates={audioStates}
+              onGenerateExamples={generateExamples}
+              onTranslate={translateText}
+              onClose={closeWordModal}
+            />
+          </Suspense>
+        )}
 
         {showScrollToTop && (
           <ScrollToTopButton
             onClick={scrollToTop}
             aria-label="맨 위로 스크롤"
           >
-            <ArrowUpIcon className="h-6 w-6" />
+            <ArrowUpIcon />
           </ScrollToTopButton>
         )}
 
@@ -651,110 +719,90 @@ export default function App() {
 
           {/* 메인 컨텐츠 */}
           <MainContent>
-            {activeTab === 'review' ? (
-              <ReviewView onPlayAudio={playAudio} audioStates={audioStates} />
-            ) : activeTab === 'wordbook' ? (
-              <WordbookView onPlayAudio={playAudio} audioStates={audioStates} />
-            ) : activeTab === 'words' ? (
-              <TodayWordsView
-                groups={todayWords}
-                expressionsLoading={wordsLoading.expressions}
-                newsLoading={wordsLoading.news}
-              />
-            ) : loading ? (
-              <LoadingContainer>
-                <div>
-                  <Spinner />
-                  <LoadingText>
-                    <h3>
-                      {activeTab === 'expressions'
-                        ? `${(levelDescriptions as Record<string, string>)[level]} 레벨 표현을 만들고 있어요...`
-                        : `${(levelDescriptions as Record<string, string>)[level]} 레벨 뉴스를 만들고 있어요...`
-                      }
-                    </h3>
-                    <p>AI가 최적화된 학습 콘텐츠를 생성하고 있습니다</p>
-                  </LoadingText>
-                </div>
-              </LoadingContainer>
-            ) : error ? (
-              <ErrorContainer>
-                <h3>데이터를 불러오는 데 실패했습니다.</h3>
-                <p>잠시 후 다시 시도해주세요. 문제가 지속되면 관리자에게 문의하세요.</p>
-              </ErrorContainer>
-            ) : (
-              <ContentList>
-                {activeTab === 'expressions' && (
-                  expressions.map((expression, index) => (
-                    <ExpressionCard
-                      key={index}
-                      expression={expression}
-                      index={index}
-                      isActive={activeCardIndex === index}
-                      onToggle={(index: number) => {
-                        const isOpening = activeCardIndex !== index;
-
-                        if (isOpening) {
-                          const expression = expressions[index];
-                          const dateKey = toLocalDateKey();
-                          const key = `${dateKey}:${expression?.phrasal_verb || index}`;
-
-                          if (!viewedTodayRef.current.has(key)) {
-                            viewedTodayRef.current.add(key);
-                            record('viewed');
-                          }
+            <Suspense fallback={<LoadingContainer><Spinner /></LoadingContainer>}>
+              {activeTab === 'review' ? (
+                <ReviewView onPlayAudio={playAudio} audioStates={audioStates} />
+              ) : activeTab === 'wordbook' ? (
+                <WordbookView onPlayAudio={playAudio} audioStates={audioStates} />
+              ) : activeTab === 'words' ? (
+                <TodayWordsView
+                  groups={todayWords}
+                  expressionsLoading={wordsLoading.expressions}
+                  newsLoading={wordsLoading.news}
+                />
+              ) : activeTabLoading ? (
+                <LoadingContainer>
+                  <div>
+                    <Spinner />
+                    <LoadingText>
+                      <h3>
+                        {activeTab === 'expressions'
+                          ? `${(levelDescriptions as Record<string, string>)[level]} 레벨 표현을 만들고 있어요...`
+                          : `${(levelDescriptions as Record<string, string>)[level]} 레벨 뉴스를 만들고 있어요...`
                         }
-
-                        setActiveCardIndex(isOpening ? index : null);
-                      }}
-                      audioStates={audioStates}
-                      onPlayAudio={playAudio}
-                      onWordClick={openWordModal}
-                      onTranslate={translateText}
-                      level={level}
-                      translations={translations}
-                      handleTranslationClick={translateText}
-                    />
-                  ))
-                )}
-                {activeTab === 'news' && (
-                  news.length > 0 ? news.map((newsItem, index) => (
-                    <NewsCard
-                      key={index}
-                      newsItem={newsItem}
-                      index={index}
-                      isActive={activeNewsIndex === index}
-                      onToggle={(index: number) => {
-                        setActiveNewsIndex(activeNewsIndex === index ? null : index);
-                      }}
-                      audioStates={audioStates}
-                      onPlayAudio={playAudio}
-                      onWordClick={openWordModal}
-                      onTranslate={translateText}
-                      onSummarize={summarizeText}
-                      onGenerateExamples={generateExamples}
-                      onExplain={explainArticle}
-                      translations={translations}
-                      handleTranslationClick={translateText}
-                    />
-                  )) : (
-                    <LoadingContainer>
-                      <div>
-                        <Spinner />
-                        <LoadingText>
-                          <h3>뉴스를 불러오는 중...</h3>
-                          <p>AI가 최신 뉴스를 분석하고 있습니다</p>
-                        </LoadingText>
-                      </div>
-                    </LoadingContainer>
-                  )
-                )}
-              </ContentList>
-            )}
+                      </h3>
+                      <p>AI가 최적화된 학습 콘텐츠를 생성하고 있습니다</p>
+                    </LoadingText>
+                  </div>
+                </LoadingContainer>
+              ) : activeTabError ? (
+                <ErrorContainer>
+                  <h3>데이터를 불러오는 데 실패했습니다.</h3>
+                  <p>잠시 후 다시 시도해주세요. 문제가 지속되면 관리자에게 문의하세요.</p>
+                </ErrorContainer>
+              ) : (
+                <ContentList>
+                  {activeTab === 'expressions' && (
+                    expressions.map((expression, index) => (
+                      <ExpressionCard
+                        key={`${level}:${expression.phrasal_verb}:${index}`}
+                        expression={expression}
+                        index={index}
+                        isActive={activeCardIndex === index}
+                        onToggle={handleExpressionToggle}
+                        audioStates={audioStates}
+                        onPlayAudio={playAudio}
+                        onWordClick={openWordModal}
+                        onTranslate={translateText}
+                        level={level}
+                      />
+                    ))
+                  )}
+                  {activeTab === 'news' && (
+                    news.length > 0 ? news.map((newsItem, index) => (
+                      <NewsCard
+                        key={`${level}:${newsItem.category || index}:${newsItem.title}`}
+                        newsItem={newsItem}
+                        index={index}
+                        isActive={activeNewsIndex === index}
+                        onToggle={handleNewsToggle}
+                        audioStates={audioStates}
+                        onPlayAudio={playAudio}
+                        onWordClick={openWordModal}
+                        onTranslate={translateText}
+                        onExplain={explainArticle}
+                        level={level}
+                      />
+                    )) : (
+                      <LoadingContainer>
+                        <div>
+                          <Spinner />
+                          <LoadingText>
+                            <h3>뉴스를 불러오는 중...</h3>
+                            <p>AI가 최신 뉴스를 분석하고 있습니다</p>
+                          </LoadingText>
+                        </div>
+                      </LoadingContainer>
+                    )
+                  )}
+                </ContentList>
+              )}
+            </Suspense>
           </MainContent>
 
           <Footer>
             <p>Powered by Gemini AI</p>
-            <p>Seoul · 2026</p>
+            <p>Seoul · {currentDate.getFullYear()}</p>
           </Footer>
         </MainContainer>
         <AudioNotice notice={audioNotice} onDismiss={dismissAudioNotice} />

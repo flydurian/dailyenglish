@@ -87,6 +87,7 @@ export const describeAudioError = (error: { code?: string; retryAfterSec?: numbe
 };
 
 const NOTICE_MS = 4500;
+const MAX_AUDIO_CACHE_ITEMS = 12;
 
 interface AudioNotice {
   id: number;
@@ -101,12 +102,22 @@ export interface UseAudioResult {
   dismissAudioNotice: () => void;
 }
 
+const isNotAllowedError = (error: unknown): boolean =>
+  Boolean(error && typeof error === 'object' && (error as { name?: string }).name === 'NotAllowedError');
+
 export const useAudio = (): UseAudioResult => {
     const [audioStates, setAudioStates] = useState<AudioStates>({});
     const [audioNotice, setAudioNotice] = useState<AudioNotice | null>(null);
     const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const audioElements = useRef(new Map<string, HTMLAudioElement>());
     const objectUrls = useRef(new Map<string, string>());
+    const loadingKeysRef = useRef(new Set<string>());
+    const playbackGenRef = useRef(0);
+    const activePlaybackRef = useRef<{
+        audio: HTMLAudioElement | null;
+        stateKey: string | null;
+        cacheKey: string | null;
+    }>({ audio: null, stateKey: null, cacheKey: null });
 
     const updateState = useCallback((text: string, state: AudioState) => {
         setAudioStates((prev) => (prev[text] === state ? prev : { ...prev, [text]: state }));
@@ -123,46 +134,114 @@ export const useAudio = (): UseAudioResult => {
         noticeTimer.current = setTimeout(() => setAudioNotice(null), NOTICE_MS);
     }, []);
 
-    const playBlob = useCallback(async (stateKey: string, cacheKey: string, blob: Blob) => {
+    const stopCurrentPlayback = useCallback(() => {
+        const active = activePlaybackRef.current;
+        if (active.audio) {
+            try {
+                active.audio.pause();
+                active.audio.currentTime = 0;
+            } catch { /* ignore */ }
+        }
+        if (active.stateKey) {
+            updateState(active.stateKey, 'idle');
+        }
+        activePlaybackRef.current = { audio: null, stateKey: null, cacheKey: null };
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+            try { window.speechSynthesis.cancel(); } catch { /* ignore */ }
+        }
+    }, [updateState]);
+
+    const evictOldAudioElements = useCallback((protectedKey: string) => {
+        const elements = audioElements.current;
+        const urls = objectUrls.current;
+        while (elements.size > MAX_AUDIO_CACHE_ITEMS) {
+            const oldestKey = elements.keys().next().value as string | undefined;
+            if (!oldestKey || oldestKey === protectedKey || oldestKey === activePlaybackRef.current.cacheKey) {
+                break;
+            }
+            const oldAudio = elements.get(oldestKey);
+            if (oldAudio) {
+                try { oldAudio.pause(); } catch { /* ignore */ }
+            }
+            elements.delete(oldestKey);
+            const oldUrl = urls.get(oldestKey);
+            if (oldUrl) {
+                URL.revokeObjectURL(oldUrl);
+                urls.delete(oldestKey);
+            }
+        }
+    }, []);
+
+    const playBlob = useCallback(async (stateKey: string, cacheKey: string, blob: Blob, gen: number) => {
         const previousUrl = objectUrls.current.get(cacheKey);
         if (previousUrl) URL.revokeObjectURL(previousUrl);
 
         const url = URL.createObjectURL(blob);
+        objectUrls.current.delete(cacheKey);
         objectUrls.current.set(cacheKey, url);
 
         const audio = new Audio(url);
         audio.preload = 'auto';
+        audioElements.current.delete(cacheKey);
         audioElements.current.set(cacheKey, audio);
+        evictOldAudioElements(cacheKey);
 
-        audio.onplay = () => updateState(stateKey, 'playing');
-        audio.onended = () => updateState(stateKey, 'idle');
+        audio.onplay = () => {
+            if (playbackGenRef.current === gen) {
+                updateState(stateKey, 'playing');
+            }
+        };
+        audio.onended = () => {
+            if (activePlaybackRef.current.audio === audio) {
+                activePlaybackRef.current = { audio: null, stateKey: null, cacheKey: null };
+            }
+            updateState(stateKey, 'idle');
+        };
         audio.onerror = () => {
+            if (activePlaybackRef.current.audio === audio) {
+                activePlaybackRef.current = { audio: null, stateKey: null, cacheKey: null };
+            }
             updateState(stateKey, 'idle');
             audioElements.current.delete(cacheKey);
         };
 
+        activePlaybackRef.current = { audio, stateKey, cacheKey };
         await audio.play();
-    }, [updateState]);
+    }, [evictOldAudioElements, updateState]);
 
     // accent('us' | 'gb')가 오면 그 억양으로 생성하고 캐시 키에도 포함해 서로 섞이지 않게 합니다.
     const playAudio = useCallback(async (sentence: string, accent?: Accent): Promise<boolean> => {
         if (!sentence) return false;
-        if (audioStates[sentence] === 'loading') return false;
 
         const cacheKey = `${CACHE_VERSION}:${accent ?? 'default'}:${sentence}`;
+        if (loadingKeysRef.current.has(cacheKey)) return false;
+
+        stopCurrentPlayback();
+        const gen = ++playbackGenRef.current;
+
         const existing = audioElements.current.get(cacheKey);
         if (existing) {
             try {
+                // 최근 사용 항목으로 갱신
+                audioElements.current.delete(cacheKey);
+                audioElements.current.set(cacheKey, existing);
                 existing.currentTime = 0;
+                activePlaybackRef.current = { audio: existing, stateKey: sentence, cacheKey };
                 updateState(sentence, 'playing');
                 await existing.play();
                 return true;
-            } catch {
-                audioElements.current.delete(cacheKey);
+            } catch (playError) {
+                activePlaybackRef.current = { audio: null, stateKey: null, cacheKey: null };
                 updateState(sentence, 'idle');
+                if (isNotAllowedError(playError)) {
+                    showAudioNotice(describeAudioError(playError as { name?: string }));
+                    return false;
+                }
+                audioElements.current.delete(cacheKey);
             }
         }
 
+        loadingKeysRef.current.add(cacheKey);
         updateState(sentence, 'loading');
 
         try {
@@ -199,28 +278,55 @@ export const useAudio = (): UseAudioResult => {
                 await setCachedAudio(cacheKey, blob);
             }
 
-            await playBlob(sentence, cacheKey, blob);
+            // 대기하는 동안 다른 음성이 요청됐다면 캐시 저장만 끝내고 재생은 건너뜁니다.
+            if (playbackGenRef.current !== gen) {
+                updateState(sentence, 'idle');
+                return false;
+            }
+
+            await playBlob(sentence, cacheKey, blob, gen);
             return true;
         } catch (error) {
             console.error('음성을 재생하는 데 실패했습니다:', error);
+
+            // iOS Safari 자동재생 제한(NotAllowedError): 이미 고품질 오디오가 캐시돼 있으므로
+            // 브라우저 로봇 음성으로 덮어쓰지 않고 한 번 더 탭하도록 안내합니다.
+            if (isNotAllowedError(error)) {
+                updateState(sentence, 'idle');
+                showAudioNotice(describeAudioError(error as { name?: string }));
+                return false;
+            }
+
+            if (playbackGenRef.current !== gen) {
+                updateState(sentence, 'idle');
+                return false;
+            }
+
             // 서버 TTS 후보가 모두 막히면 브라우저 음성(en-GB / en-US)으로 대신 읽습니다.
+            activePlaybackRef.current = { audio: null, stateKey: sentence, cacheKey };
             updateState(sentence, 'playing');
             const playedLocally = await playWithBrowserTts(trimForTts(sentence), accent);
-            updateState(sentence, 'idle');
+            if (playbackGenRef.current === gen) {
+                activePlaybackRef.current = { audio: null, stateKey: null, cacheKey: null };
+                updateState(sentence, 'idle');
+            }
             if (playedLocally) return true;
 
             showAudioNotice(describeAudioError(error as { name?: string }));
             return false;
+        } finally {
+            loadingKeysRef.current.delete(cacheKey);
         }
-    }, [audioStates, playBlob, updateState, showAudioNotice]);
+    }, [playBlob, showAudioNotice, stopCurrentPlayback, updateState]);
 
     const clearAllAudioCache = useCallback(async () => {
+        stopCurrentPlayback();
         objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
         objectUrls.current.clear();
         audioElements.current.clear();
         setAudioStates({});
         await clearAudioCache();
-    }, []);
+    }, [stopCurrentPlayback]);
 
     useEffect(() => {
         // 이전 버전의 localStorage 오디오 캐시와 구 모델 IndexedDB 캐시를 정리합니다.
@@ -232,8 +338,13 @@ export const useAudio = (): UseAudioResult => {
         }
 
         const urls = objectUrls.current;
+        const elements = audioElements.current;
         const timer = noticeTimer;
         return () => {
+            elements.forEach((audio) => {
+                try { audio.pause(); } catch { /* ignore */ }
+            });
+            elements.clear();
             urls.forEach((url) => URL.revokeObjectURL(url));
             urls.clear();
             if (timer.current) clearTimeout(timer.current);

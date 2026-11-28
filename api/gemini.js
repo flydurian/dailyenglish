@@ -23,6 +23,7 @@ import {
 } from '../lib/modelChains.js';
 import { fetchGeminiStream } from '../lib/geminiStream.js';
 import { tryGoogleTts } from '../lib/googleTts.js';
+import { getSharedTextCache, setSharedTextCache } from '../lib/sharedCache.js';
 // API 키는 서버 환경변수(GEMINI_API_KEY)에만 존재하며 클라이언트로 전달되지 않습니다.
 
 // 클라이언트는 모델 대신 용도(tier:generate | tier:fast | tier:tts)를 보내고, 실제 모델은
@@ -185,6 +186,9 @@ const readTextCache = (key) => {
         textResponseCache.delete(key);
         return null;
     }
+    // 진정한 LRU: 조회된 키를 최신 위치로 이동
+    textResponseCache.delete(key);
+    textResponseCache.set(key, entry);
     return entry.data;
 };
 
@@ -233,7 +237,7 @@ const requestGemini = async (targetModel, targetPayload, apiKey, timeoutMs) => {
 
 // 텍스트는 스트리밍으로 받아 "첫 조각까지"와 "끝까지"를 따로 기다립니다 (lib/geminiStream.js).
 // 매달린 모델은 firstChunkMs 만에 포기하고, 느리지만 응답 중인 모델은 끝까지 기다립니다.
-const requestGeminiText = async (entry, targetPayload, apiKey, timeoutMs) => {
+const requestGeminiText = async (entry, targetPayload, apiKey, timeoutMs, onTextDelta) => {
     const result = await fetchGeminiStream({
         url: `https://generativelanguage.googleapis.com/v1beta/models/${entry.model}:streamGenerateContent?alt=sse`,
         init: {
@@ -244,6 +248,7 @@ const requestGeminiText = async (entry, targetPayload, apiKey, timeoutMs) => {
         firstChunkMs: Math.min(entry.firstChunkMs ?? timeoutMs, timeoutMs),
         idleMs: STREAM_IDLE_MS,
         totalMs: timeoutMs,
+        onTextDelta,
     });
 
     if (result.ok) {
@@ -288,13 +293,19 @@ export default async function handler(req, res) {
         return res.status(413).json({ error: 'Payload too large' });
     }
 
-    const { payload, model: requestedModel, format: requestedTtsFormat, accent: requestedAccent } = req.body || {};
+    const {
+        payload,
+        model: requestedModel,
+        format: requestedTtsFormat,
+        accent: requestedAccent,
+        stream: requestedStream,
+    } = req.body || {};
 
     if (!payload || typeof payload !== 'object' || !requestedModel) {
         return res.status(400).json({ error: 'Missing payload or model' });
     }
 
-    if (JSON.stringify(req.body).length > MAX_REQUEST_BYTES) {
+    if (Buffer.byteLength(JSON.stringify(req.body), 'utf8') > MAX_REQUEST_BYTES) {
         return res.status(413).json({ error: 'Payload too large' });
     }
 
@@ -303,6 +314,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Unsupported model' });
     }
     const isTts = tier === 'tts';
+    const wantsStream = !isTts && requestedStream === true && typeof res.write === 'function';
     if (isTts && requestedAccent !== undefined && !Object.hasOwn(TTS_ACCENT_VOICES, requestedAccent)) {
         return res.status(400).json({ error: 'Invalid accent' });
     }
@@ -354,13 +366,24 @@ export default async function handler(req, res) {
     const cacheKey = isTts ? null : getRequestCacheKey(tier, sanitizedPayload);
 
     if (cacheKey) {
-        const cached = readTextCache(cacheKey);
-        if (cached) {
+        const memCached = readTextCache(cacheKey);
+        if (memCached) {
             res.setHeader('Cache-Control', 'no-store');
             res.setHeader('X-Gemini-Cache', 'HIT');
-            return res.status(200).json(cached);
+            return res.status(200).json(memCached);
+        }
+
+        // 서버리스 콜드 스타트·다른 인스턴스 간 공유 캐시(Upstash Redis) 조회
+        const sharedCached = await getSharedTextCache(cacheKey);
+        if (sharedCached) {
+            writeTextCache(cacheKey, sharedCached);
+            res.setHeader('Cache-Control', 'no-store');
+            res.setHeader('X-Gemini-Cache', 'HIT-SHARED');
+            return res.status(200).json(sharedCached);
         }
     }
+
+    let streamCommitted = false;
 
     try {
         // 체인 순서대로 시도: 성공하면 바로 반환, 한도 초과·과부하·지연·빈 응답이면 다음 모델.
@@ -377,21 +400,45 @@ export default async function handler(req, res) {
                     ? (entry.voice || accentVoice)
                     : undefined;
                 const modelPayload = buildModelPayload(entry, sanitizedPayload, tier, voice);
+                const onTextDelta = wantsStream
+                    ? (delta) => {
+                        if (!streamCommitted) {
+                            streamCommitted = true;
+                            res.status(200);
+                            res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+                            res.setHeader('Cache-Control', 'no-cache, no-transform');
+                            res.setHeader('Connection', 'keep-alive');
+                            res.setHeader('X-Accel-Buffering', 'no');
+                            res.setHeader('X-Gemini-Cache', cacheKey ? 'MISS' : 'BYPASS');
+                            res.setHeader('X-Gemini-Model', entry.model);
+                            if (typeof res.flushHeaders === 'function') res.flushHeaders();
+                        }
+                        res.write(`data: ${JSON.stringify({ text: delta })}\n\n`);
+                    }
+                    : undefined;
+
                 const result = isTts
                     ? await requestGemini(entry.model, modelPayload, apiKey, timeoutMs)
-                    : await requestGeminiText(entry, modelPayload, apiKey, timeoutMs);
-                if (!result.ok) return result;
+                    : await requestGeminiText(entry, modelPayload, apiKey, timeoutMs, onTextDelta);
+                if (!result.ok) {
+                    return streamCommitted ? { ...result, abortChain: true } : result;
+                }
 
                 const value = isTts ? extractAudio(result.data) : normalizeTextResponse(result.data);
                 if (!value) {
                     console.warn(`Gemini empty ${isTts ? 'audio' : 'text'} response [${entry.model}]`);
-                    return { ok: false, empty: true };
+                    return streamCommitted ? { ok: false, empty: true, abortChain: true } : { ok: false, empty: true };
                 }
                 return { ok: true, value };
             },
         });
 
         if (!outcome.ok) {
+            if (streamCommitted) {
+                res.write(`data: ${JSON.stringify({ error: 'Stream interrupted' })}\n\n`);
+                return res.end();
+            }
+
             console.error(`Gemini ${tier} chain failed (${outcome.status}); tried: ${outcome.tried.join(', ') || 'none (all cooling down)'}`);
 
             // TTS 후보가 모두 막혔을 때(한도·과부하) 구글 클라우드 TTS를 서브로 씁니다.
@@ -421,6 +468,16 @@ export default async function handler(req, res) {
             console.warn(`Gemini ${tier} fell back to ${outcome.model} after: ${outcome.tried.slice(0, -1).join(', ')}`);
         }
 
+        if (cacheKey) {
+            writeTextCache(cacheKey, outcome.value);
+            void setSharedTextCache(cacheKey, outcome.value);
+        }
+
+        if (streamCommitted) {
+            res.write('data: [DONE]\n\n');
+            return res.end();
+        }
+
         res.setHeader('Cache-Control', 'no-store');
         res.setHeader('X-Gemini-Cache', cacheKey ? 'MISS' : 'BYPASS');
         res.setHeader('X-Gemini-Model', outcome.model);
@@ -429,7 +486,7 @@ export default async function handler(req, res) {
 
         // TTS는 후보 JSON 대신 오디오를 바이너리로 내려줍니다. WAV(24kHz s16 mono)를
         // 그대로 내려주면 84초 기준 4.0MB라 서버리스 응답 한도(4.5MB)에 근접하므로,
-        // 기본값은 서버에서 Opus/WebM으로 트랜스코딩해 약 700KB(약 5.7배 작게)로 내립니다.
+        // 기본값은 서버에서 Opus/WebM으로 트랜스코딩해 약 400KB 내외로 내립니다.
         // raw PCM을 내는 예비 TTS 모델도 extractAudio가 WAV로 감싸 같은 경로를 탑니다.
         // 트랜스코딩 실패 시 WAV를 그대로 내려 폴백합니다.
         if (isTts) {
@@ -445,10 +502,16 @@ export default async function handler(req, res) {
             return res.status(200).end(Buffer.from(audio.bytes));
         }
 
-        if (cacheKey) writeTextCache(cacheKey, outcome.value);
         res.status(200).json(outcome.value);
     } catch (error) {
         console.error('Gemini API Server Error:', error);
+        if (streamCommitted) {
+            try {
+                res.write(`data: ${JSON.stringify({ error: 'Internal server error' })}\n\n`);
+                res.end();
+            } catch { /* ignore */ }
+            return;
+        }
         res.status(500).json({ error: 'Internal server error' });
     }
 }

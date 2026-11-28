@@ -5,15 +5,6 @@ export const isDirectPlayableAudio = (mimeType: string): boolean => (
   /audio\/(wav|wave|x-wav|webm|mpeg|mp3)/i.test(mimeType || '')
 );
 
-export const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
-    const binaryString = window.atob(base64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i += 1) {
-        bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes.buffer;
-};
-
 // raw PCM(L16) 데이터에 WAV 헤더를 붙여 재생 가능한 Blob을 만듭니다.
 export const pcmToWav = (pcmData: Int16Array, sampleRate: number): Blob => {
     const numChannels = 1;

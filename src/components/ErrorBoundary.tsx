@@ -36,7 +36,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
         <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', background: 'var(--paper)', color: 'var(--ink)' }}>
           <div style={{ background: 'var(--card-paper)', border: '1px solid var(--line)', borderRadius: '20px', boxShadow: '0 16px 30px rgba(63, 46, 22, 0.07)', padding: '24px', maxWidth: '420px', width: '100%', textAlign: 'center' }}>
             <div style={{ color: 'var(--coral)', marginBottom: '16px' }}>
-              <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg style={{ width: '64px', height: '64px', margin: '0 auto', display: 'block' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
             </div>
@@ -47,7 +47,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
               애플리케이션에서 예상치 못한 오류가 발생했습니다.
               페이지를 새로고침하거나 잠시 후 다시 시도해 주세요.
             </p>
-            <div className="space-y-2">
+            <div>
               <button
                 onClick={() => window.location.reload()}
                 style={{ width: '100%', padding: '12px 16px', border: 0, borderRadius: '999px', background: 'var(--ink)', color: 'var(--paper)', fontSize: '13px', fontWeight: 650, cursor: 'pointer' }}
@@ -62,17 +62,17 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
               </button>
             </div>
             {import.meta.env.DEV && this.state.error && (
-              <details className="mt-4 text-left">
-                <summary className="cursor-pointer text-sm text-gray-500 hover:text-gray-700">
+              <details style={{ marginTop: '16px', textAlign: 'left' }}>
+                <summary style={{ cursor: 'pointer', fontSize: '13px', color: 'var(--muted)' }}>
                   개발자 정보 (클릭하여 확장)
                 </summary>
-                <div className="mt-2 p-3 bg-gray-100 rounded text-xs font-mono overflow-auto">
-                  <div className="mb-2">
+                <div style={{ marginTop: '8px', padding: '12px', background: 'var(--paper-deep)', borderRadius: '8px', fontSize: '12px', fontFamily: 'var(--font-mono)', overflow: 'auto' }}>
+                  <div style={{ marginBottom: '8px' }}>
                     <strong>Error:</strong> {this.state.error.toString()}
                   </div>
                   <div>
                     <strong>Stack:</strong>
-                    <pre className="whitespace-pre-wrap">
+                    <pre style={{ whiteSpace: 'pre-wrap', margin: '4px 0 0' }}>
                       {this.state.errorInfo?.componentStack}
                     </pre>
                   </div>
